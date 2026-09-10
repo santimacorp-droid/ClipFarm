@@ -47,6 +47,7 @@ export interface ProcessAffiliateResult {
   ass_path: string
   language: string
   model_used?: string
+  transcript_provided?: boolean
   caption_style: string
   cta_platform: string
   cta_handle: string
@@ -72,6 +73,8 @@ export const affiliateApi = {
   processByPath: async (payload: {
     video_path: string
     output_dir?: string
+    transcript_path?: string
+    transcript_text?: string
     fb_handle?: string
     caption_style?: string
     cta_style?: string

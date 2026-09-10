@@ -11,6 +11,7 @@ Lightweight, focused video processing pipeline that:
 """
 
 import os
+import re
 import json
 import time
 import logging
@@ -19,7 +20,7 @@ import subprocess
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Union
 
-from backend.utils.caption_styles import ViralCaptionGenerator, CAPTION_STYLES
+from backend.utils.caption_styles import ViralCaptionGenerator, CAPTION_STYLES, _parse_time_to_seconds
 from backend.utils.cta_overlay import apply_cta_overlay
 
 logger = logging.getLogger(__name__)
@@ -330,6 +331,296 @@ Return strictly a JSON array of objects without markdown formatting:
             "engine": "whisper"
         }
 
+    @staticmethod
+    def parse_transcript_content(content: str) -> Optional[List[Dict[str, Any]]]:
+        """
+        Parse user-provided transcript content into structured subtitle segments.
+        Supports:
+        - SRT format (subtitles with HH:MM:SS,mmm --> HH:MM:SS,mmm)
+        - WebVTT format (WEBVTT with HH:MM:SS.mmm --> HH:MM:SS.mmm)
+        - JSON array of segment dicts (or dict with 'segments')
+        If timestamps are present, interpolates word-level timestamps so word-by-word active
+        highlight styling operates smoothly.
+        Returns None if content is plain untimed text.
+        """
+        if not content or not content.strip():
+            return None
+
+        clean_content = content.strip()
+
+        # 1. Try JSON parsing
+        if clean_content.startswith(("[", "{")):
+            try:
+                data = json.loads(clean_content)
+                if isinstance(data, dict) and "segments" in data:
+                    data = data["segments"]
+                if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
+                    if "start" in data[0] and "text" in data[0]:
+                        structured = []
+                        for item in data:
+                            st = float(item.get("start", 0.0))
+                            en = float(item.get("end", st + 2.0))
+                            txt = str(item.get("text", "")).strip()
+                            words = item.get("words", [])
+                            if not words and txt:
+                                w_tokens = txt.split()
+                                if w_tokens:
+                                    dur = max(0.1, en - st)
+                                    step = dur / len(w_tokens)
+                                    words = [
+                                        {"word": w, "start": round(st + i * step, 3), "end": round(st + (i + 1) * step, 3)}
+                                        for i, w in enumerate(w_tokens)
+                                    ]
+                            structured.append({
+                                "start": st,
+                                "end": en,
+                                "text": txt,
+                                "words": words
+                            })
+                        return structured
+            except Exception:
+                pass
+
+        # 2. Try SRT / WebVTT parsing
+        if "-->" in clean_content:
+            raw_blocks = re.split(r'\n\s*\n', clean_content)
+            segments = []
+            for block in raw_blocks:
+                lines = [l.strip() for l in block.splitlines() if l.strip()]
+                if not lines:
+                    continue
+                time_line_idx = -1
+                for idx, line in enumerate(lines[:3]):
+                    if "-->" in line:
+                        time_line_idx = idx
+                        break
+                if time_line_idx == -1:
+                    continue
+
+                time_line = lines[time_line_idx]
+                time_match = re.search(r'((?:\d+:)?\d+:\d+[.,]\d+)\s*-->\s*((?:\d+:)?\d+:\d+[.,]\d+)', time_line)
+                if not time_match:
+                    continue
+
+                start_sec = _parse_time_to_seconds(time_match.group(1))
+                end_sec = _parse_time_to_seconds(time_match.group(2))
+                text_lines = lines[time_line_idx + 1:]
+                clean_text = ' '.join(text_lines)
+                clean_text = re.sub(r'<[^>]+>', '', clean_text).strip()
+
+                if clean_text and end_sec > start_sec:
+                    # Interpolate word timings for highlighting
+                    w_tokens = clean_text.split()
+                    dur = max(0.1, end_sec - start_sec)
+                    step = dur / max(1, len(w_tokens))
+                    words = [
+                        {"word": w, "start": round(start_sec + i * step, 3), "end": round(start_sec + (i + 1) * step, 3)}
+                        for i, w in enumerate(w_tokens)
+                    ]
+                    segments.append({
+                        "start": start_sec,
+                        "end": end_sec,
+                        "text": clean_text,
+                        "words": words
+                    })
+
+            if segments:
+                return segments
+
+        # If neither JSON nor timestamped subtitle pattern was found, it's untimed text
+        return None
+
+    def align_transcript_with_audio(
+        self,
+        reference_text: str,
+        video_path: Path,
+        language: str = "tl"
+    ) -> List[Dict[str, Any]]:
+        """
+        Align an untimed user transcript script to the actual audio in the video.
+        Uses Gemini 2.5 Flash to accurately synchronize the user's exact words with speech timestamps.
+        """
+        video_path = Path(video_path)
+        if not video_path.exists():
+            raise FileNotFoundError(f"Video not found for alignment: {video_path}")
+
+        api_key = self._get_gemini_api_key()
+        if not api_key:
+            logger.warning("GEMINI_API_KEY not found for transcript audio alignment; using duration-proportional pacing fallback.")
+            return self._fallback_script_pacing(reference_text, video_path)
+
+        # Extract 16kHz mono audio
+        tmp_audio = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+        tmp_audio_path = tmp_audio.name
+        tmp_audio.close()
+
+        try:
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", str(video_path),
+                "-vn",
+                "-ac", "1",
+                "-ar", "16000",
+                "-b:a", "64k",
+                tmp_audio_path
+            ]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            if res.returncode != 0 or not os.path.exists(tmp_audio_path) or os.path.getsize(tmp_audio_path) < 500:
+                raise RuntimeError("Failed to extract audio for transcript alignment.")
+
+            with open(tmp_audio_path, "rb") as f:
+                audio_bytes = f.read()
+
+            client = genai.Client(api_key=api_key)
+            prompt = (
+                f"You are a professional audio alignment and subtitle synchronization system.\n"
+                f"We have an audio track of a video, and the EXACT reference transcript provided by the creator.\n"
+                f"Language: {language} (Filipino / Tagalog).\n\n"
+                f"YOUR TASK: Align the user's reference transcript to the audio timestamps.\n"
+                f"RULES:\n"
+                f"1. Use the EXACT text provided by the user. Do NOT omit, rephrase, or rewrite their words.\n"
+                f"2. Break the transcript into natural, short subtitle chunks (2 to 6 words each) suitable for vertical mobile video captions.\n"
+                f"3. For each chunk, provide exact start and end timestamps in seconds (float).\n"
+                f"4. For each word in the chunk, provide word-level start and end timestamps.\n"
+                f"5. Return ONLY a valid JSON array of chunk objects.\n\n"
+                f"User's Reference Transcript:\n"
+                f'\"\"\"{reference_text.strip()}\"\"\"\n\n'
+                f"Output format:\n"
+                f"[\n"
+                f'  {{"start": 0.0, "end": 2.1, "text": "...", "words": [{{"word": "...", "start": 0.0, "end": 0.5}}]}}\n'
+                f"]"
+            )
+
+            logger.info(f"Aligning user transcript ({len(reference_text)} chars) with audio using Gemini 2.5 Flash...")
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[
+                    types.Part.from_bytes(data=audio_bytes, mime_type="audio/mp3"),
+                    prompt
+                ]
+            )
+
+            raw_text = response.text or ""
+            raw_text = re.sub(r"^```json\s*", "", raw_text.strip())
+            raw_text = re.sub(r"^```\s*", "", raw_text)
+            raw_text = re.sub(r"\s*```$", "", raw_text.strip())
+
+            segments_data = json.loads(raw_text)
+            if not isinstance(segments_data, list) or not segments_data:
+                raise ValueError("Gemini returned invalid segment list structure.")
+
+            structured: List[Dict[str, Any]] = []
+            for seg in segments_data:
+                st = float(seg.get("start", 0.0))
+                en = float(seg.get("end", st + 1.0))
+                txt = str(seg.get("text", "")).strip()
+                words = seg.get("words", [])
+                if not words and txt:
+                    w_tokens = txt.split()
+                    step = (en - st) / max(1, len(w_tokens))
+                    words = [
+                        {"word": w, "start": round(st + i * step, 3), "end": round(st + (i + 1) * step, 3)}
+                        for i, w in enumerate(w_tokens)
+                    ]
+                structured.append({
+                    "start": st,
+                    "end": en,
+                    "text": txt,
+                    "words": words
+                })
+            logger.info(f"Transcript aligned successfully: {len(structured)} chunks created.")
+            return structured
+
+        except Exception as e:
+            logger.warning(f"Gemini transcript alignment failed ({e}); falling back to proportional script pacing.")
+            return self._fallback_script_pacing(reference_text, video_path)
+        finally:
+            if os.path.exists(tmp_audio_path):
+                try:
+                    os.remove(tmp_audio_path)
+                except Exception:
+                    pass
+
+    def _fallback_script_pacing(self, text: str, video_path: Path) -> List[Dict[str, Any]]:
+        """Fallback when audio alignment cannot be run: evenly pace script sentences across video duration."""
+        vinfo = self.get_video_info(video_path)
+        duration = vinfo.get("duration", 30.0)
+        lines = [l.strip() for l in re.split(r'[\n.!?]+', text) if l.strip()]
+        if not lines:
+            lines = [text.strip()]
+        seg_dur = duration / max(1, len(lines))
+        segments = []
+        for i, line in enumerate(lines):
+            st = i * seg_dur
+            en = min(duration, (i + 1) * seg_dur)
+            w_tokens = line.split()
+            step = (en - st) / max(1, len(w_tokens))
+            words = [
+                {"word": w, "start": round(st + j * step, 3), "end": round(st + (j + 1) * step, 3)}
+                for j, w in enumerate(w_tokens)
+            ]
+            segments.append({
+                "start": round(st, 3),
+                "end": round(en, 3),
+                "text": line,
+                "words": words
+            })
+        return segments
+
+    def load_or_align_transcript(
+        self,
+        transcript_source: Union[str, Path],
+        video_path: Path,
+        language: str = "tl"
+    ) -> Dict[str, Any]:
+        """
+        Load an existing transcription or align an untimed transcript with the video.
+        Accepts:
+        - A Path or path string to an .srt, .vtt, .txt, or .json file
+        - A raw string containing SRT subtitles or plain text script
+        Returns:
+            Dict containing:
+                "segments": List[Dict[str, Any]],
+                "model": str,
+                "engine": str
+        """
+        content = ""
+        source_is_file = False
+        source_str = str(transcript_source).strip()
+
+        try:
+            possible_path = Path(source_str)
+            if possible_path.exists() and possible_path.is_file():
+                content = possible_path.read_text(encoding="utf-8", errors="ignore")
+                source_is_file = True
+        except Exception:
+            pass
+
+        if not content:
+            content = source_str
+
+        if not content.strip():
+            raise ValueError("Provided transcript content is empty.")
+
+        # 1. Attempt to parse as timed subtitle (SRT / VTT / JSON with timestamps)
+        timed_segments = self.parse_transcript_content(content)
+        if timed_segments:
+            logger.info(f"Loaded {len(timed_segments)} timed subtitle segments from transcript source.")
+            return {
+                "segments": timed_segments,
+                "model": "user-transcript-file" if source_is_file else "user-transcript-text",
+                "engine": "custom_file"
+            }
+
+        # 2. Untimed script: align against video audio
+        logger.info("Transcript contains no timestamps. Aligning transcript text with video audio...")
+        aligned_segments = self.align_transcript_with_audio(content, video_path=video_path, language=language)
+        return {
+            "segments": aligned_segments,
+            "model": "user-script-aligned",
+            "engine": "gemini_aligned"
+        }
+
     def export_srt(self, segments: List[Dict[str, Any]], output_srt_path: Path) -> Path:
         """Write standard SRT subtitle file."""
         output_srt_path = Path(output_srt_path)
@@ -465,6 +756,7 @@ Return strictly a JSON array of objects without markdown formatting:
         self,
         input_video_path: Union[str, Path],
         output_video_path: Optional[Union[str, Path]] = None,
+        transcript_source: Optional[Union[str, Path]] = None,
         fb_handle: str = "",
         caption_style: Optional[str] = None,
         cta_style: str = "pill",
@@ -476,7 +768,8 @@ Return strictly a JSON array of objects without markdown formatting:
         """
         Complete end-to-end affiliate video creation pipeline:
         1. Probe video dimensions and duration.
-        2. Transcribe audio using Gemini 2.5 Flash (or Whisper) in Filipino ('tl').
+        2. Obtain subtitle segments: from provided user transcript slot (SRT/VTT/aligned script)
+           or automatically transcribed via Gemini 2.5 Flash / Whisper in Filipino ('tl').
         3. Generate stylish ASS captions (e.g. Hormozi Yellow).
         4. Burn captions into video.
         5. Overlay Facebook Follow CTA.
@@ -506,8 +799,13 @@ Return strictly a JSON array of objects without markdown formatting:
             ass_path = temp_dir / f"{input_path.stem}.ass"
             captioned_video = temp_dir / f"{input_path.stem}_captioned.mp4"
 
-            # 1. Transcribe Filipino speech with selected engine
-            trans_result = self.transcribe_filipino(input_path, language=language, engine=engine)
+            # 1. Obtain subtitle segments (from user transcript slot or automatic speech transcription)
+            if transcript_source:
+                logger.info("Using provided user transcript slot for video captions...")
+                trans_result = self.load_or_align_transcript(transcript_source, input_path, language=language)
+            else:
+                trans_result = self.transcribe_filipino(input_path, language=language, engine=engine)
+
             segments = trans_result["segments"]
             model_used = trans_result["model"]
 
@@ -559,6 +857,7 @@ Return strictly a JSON array of objects without markdown formatting:
                 "ass_path": str(final_ass),
                 "language": language,
                 "model_used": model_used,
+                "transcript_provided": bool(transcript_source),
                 "caption_style": chosen_style,
                 "cta_platform": "facebook",
                 "cta_handle": fb_handle,

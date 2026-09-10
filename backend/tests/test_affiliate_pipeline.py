@@ -174,3 +174,69 @@ def test_process_affiliate_video_end_to_end(tmp_path, sample_video, monkeypatch)
     assert result["word_count"] == 4
     assert result["cta_platform"] == "facebook"
     assert result["cta_handle"] == "MyAffiliatePage"
+
+
+def test_parse_transcript_content_srt():
+    srt_content = """1
+00:00:00,000 --> 00:00:01,500
+Ito ang pinakamagandang portable gas stove!
+
+2
+00:00:01,600 --> 00:00:03,200
+Subukan na natin agad.
+"""
+    segments = AffiliateVideoProcessor.parse_transcript_content(srt_content)
+    assert segments is not None
+    assert len(segments) == 2
+    assert segments[0]["start"] == 0.0
+    assert segments[0]["end"] == 1.5
+    assert segments[0]["text"] == "Ito ang pinakamagandang portable gas stove!"
+    assert len(segments[0]["words"]) == 6
+    assert segments[0]["words"][0]["word"] == "Ito"
+    assert segments[1]["start"] == 1.6
+    assert segments[1]["end"] == 3.2
+
+
+def test_parse_transcript_content_vtt():
+    vtt_content = """WEBVTT
+
+00:00:00.500 --> 00:00:02.000
+Sobrang comfy nitong sneakers na 'to!
+"""
+    segments = AffiliateVideoProcessor.parse_transcript_content(vtt_content)
+    assert segments is not None
+    assert len(segments) == 1
+    assert segments[0]["start"] == 0.5
+    assert segments[0]["end"] == 2.0
+    assert len(segments[0]["words"]) == 6
+
+
+def test_process_affiliate_video_with_custom_transcript_file(tmp_path, sample_video):
+    proc = AffiliateVideoProcessor()
+    
+    # Create custom user SRT file
+    custom_srt = tmp_path / "custom_input.srt"
+    custom_srt.write_text("""1
+00:00:00,000 --> 00:00:01,200
+Custom Affiliate Review
+
+2
+00:00:01,300 --> 00:00:02,000
+Solid and Sulit!
+""", encoding="utf-8")
+
+    out_video = tmp_path / "custom_affiliate_output.mp4"
+    result = proc.process_affiliate_video(
+        input_video_path=sample_video,
+        output_video_path=out_video,
+        transcript_source=custom_srt,
+        fb_handle="ShopPH",
+        caption_style="hormozi_yellow"
+    )
+
+    assert result["success"] is True
+    assert result["transcript_provided"] is True
+    assert result["segment_count"] == 2
+    assert result["model_used"] == "user-transcript-file"
+    assert Path(result["output_video"]).exists()
+    assert Path(result["output_video"]).stat().st_size > 1024

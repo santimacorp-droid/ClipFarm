@@ -65,6 +65,12 @@ def main():
         help="CTA position on screen (default: lower_center)."
     )
     parser.add_argument(
+        "--transcript", "--srt",
+        dest="transcript",
+        default=None,
+        help="Path to existing transcription file (.srt, .vtt, .txt, .json) or transcript text to align and burn."
+    )
+    parser.add_argument(
         "--engine",
         default="gemini",
         choices=["gemini", "whisper", "auto"],
@@ -124,6 +130,7 @@ def main():
             res = processor.process_affiliate_video(
                 input_video_path=vid,
                 output_video_path=out_vid,
+                transcript_source=args.transcript,
                 fb_handle=args.fb_handle,
                 caption_style=args.caption_style,
                 cta_style=args.cta_style,

@@ -15,7 +15,8 @@ import {
   message,
   Spin,
   Alert,
-  Tabs
+  Tabs,
+  Segmented
 } from 'antd'
 import {
   VideoCameraOutlined,
@@ -24,7 +25,10 @@ import {
   DownloadOutlined,
   CheckCircleOutlined,
   FacebookOutlined,
-  ThunderboltOutlined
+  ThunderboltOutlined,
+  FileTextOutlined,
+  DeleteOutlined,
+  CloudUploadOutlined
 } from '@ant-design/icons'
 import {
   affiliateApi,
@@ -52,6 +56,13 @@ export const AffiliatePage: React.FC = () => {
   const [fbHandle, setFbHandle] = useState<string>('@AffiliatePH')
   const [ctaStyle, setCtaStyle] = useState<string>('pill')
   const [ctaPosition, setCtaPosition] = useState<string>('lower_center')
+
+  // Transcription Slot state
+  const [transcriptMode, setTranscriptMode] = useState<'slot' | 'ai'>('slot')
+  const [transcriptInputType, setTranscriptInputType] = useState<'upload' | 'path' | 'text'>('upload')
+  const [uploadedTranscriptFile, setUploadedTranscriptFile] = useState<File | null>(null)
+  const [manualTranscriptPath, setManualTranscriptPath] = useState<string>('')
+  const [transcriptText, setTranscriptText] = useState<string>('')
 
   // Processing state
   const [processing, setProcessing] = useState(false)
@@ -116,9 +127,16 @@ export const AffiliatePage: React.FC = () => {
         formData.append('cta_position', ctaPosition)
         formData.append('language', language)
         formData.append('engine', engine)
+        if (transcriptMode === 'slot') {
+          if (transcriptInputType === 'upload' && uploadedTranscriptFile) {
+            formData.append('transcript_file', uploadedTranscriptFile)
+          } else if (transcriptInputType === 'text' && transcriptText.trim()) {
+            formData.append('transcript_text', transcriptText.trim())
+          }
+        }
         res = await affiliateApi.processByUpload(formData)
       } else {
-        res = await affiliateApi.processByPath({
+        const payload: any = {
           video_path: videoPathToProcess,
           fb_handle: fbHandle,
           caption_style: captionStyle,
@@ -126,7 +144,17 @@ export const AffiliatePage: React.FC = () => {
           cta_position: ctaPosition,
           language: language,
           engine: engine
-        })
+        }
+        if (transcriptMode === 'slot') {
+          if (transcriptInputType === 'upload' && uploadedTranscriptFile) {
+            payload.transcript_text = await uploadedTranscriptFile.text()
+          } else if (transcriptInputType === 'path' && manualTranscriptPath.trim()) {
+            payload.transcript_path = manualTranscriptPath.trim()
+          } else if (transcriptInputType === 'text' && transcriptText.trim()) {
+            payload.transcript_text = transcriptText.trim()
+          }
+        }
+        res = await affiliateApi.processByPath(payload)
       }
 
       setResult(res)
@@ -259,66 +287,187 @@ export const AffiliatePage: React.FC = () => {
 
             <Divider style={{ borderColor: 'var(--ac-line-2)' }} />
 
-            {/* Step 2: Language, Model & Caption Style */}
+            {/* Step 2: Transcription Slot & Audio Alignment */}
             <div style={{ marginBottom: '24px' }}>
-              <Text strong style={{ display: 'block', marginBottom: '10px' }}>
-                2. Caption Language, Model & Visual Style
-              </Text>
-              
-              <Row gutter={16} style={{ marginBottom: '12px' }}>
-                <Col span={12}>
-                  <Text style={{ fontSize: '12px', color: 'var(--ac-sub)', display: 'block', marginBottom: '4px' }}>
-                    Spoken Language
-                  </Text>
-                  <Select
-                    style={{ width: '100%' }}
-                    value={language}
-                    onChange={(v) => setLanguage(v)}
-                  >
-                    <Option value="tl">🇵🇭 Tagalog / Filipino</Option>
-                    <Option value="en">🇺🇸 English</Option>
-                  </Select>
-                </Col>
-
-                <Col span={12}>
-                  <Text style={{ fontSize: '12px', color: 'var(--ac-sub)', display: 'block', marginBottom: '4px' }}>
-                    Transcription AI Model
-                  </Text>
-                  <Select
-                    style={{ width: '100%' }}
-                    value={engine}
-                    onChange={(v) => setEngine(v)}
-                  >
-                    <Option value="gemini">🌟 Gemini 2.5 Flash (Ultra Accurate Filipino)</Option>
-                    <Option value="whisper">⚡ Local Whisper (CTranslate2)</Option>
-                  </Select>
-                </Col>
-              </Row>
-
-              <div>
-                <Text style={{ fontSize: '12px', color: 'var(--ac-sub)', display: 'block', marginBottom: '4px' }}>
-                  Caption Preset Style
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <Text strong style={{ margin: 0 }}>
+                  2. Transcription Slot & Alignment
                 </Text>
-                <Select
-                  style={{ width: '100%' }}
-                  value={captionStyle}
-                  onChange={(v) => setCaptionStyle(v)}
-                >
-                  <Option value="hormozi_yellow">⚡ Hormozi Yellow (Electric Yellow Highlight)</Option>
-                  <Option value="neon_green">🟢 Neon Green (High Contrast)</Option>
-                  <Option value="neon_cyan">🔵 Neon Cyan (Modern Social)</Option>
-                  <Option value="minimal_box">⬛ Minimalist Box (Translucent Dark)</Option>
-                  <Option value="none">Clean Subtitles (No Highlight)</Option>
-                </Select>
+                <Segmented
+                  size="small"
+                  value={transcriptMode}
+                  onChange={(v) => setTranscriptMode(v as 'slot' | 'ai')}
+                  options={[
+                    { label: '📄 Provide Transcript File', value: 'slot' },
+                    { label: '🤖 Auto-Transcribe with AI', value: 'ai' }
+                  ]}
+                />
               </div>
+
+              {transcriptMode === 'slot' ? (
+                <div style={{
+                  background: 'var(--ac-card-sub, rgba(255,255,255,0.03))',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--ac-line)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <Text style={{ fontSize: '12px', color: 'var(--ac-sub)' }}>
+                      Select input method for your transcription:
+                    </Text>
+                    <Radio.Group
+                      size="small"
+                      value={transcriptInputType}
+                      onChange={(e) => setTranscriptInputType(e.target.value)}
+                    >
+                      <Radio.Button value="upload">Upload File</Radio.Button>
+                      <Radio.Button value="path">File Path</Radio.Button>
+                      <Radio.Button value="text">Paste Script / SRT</Radio.Button>
+                    </Radio.Group>
+                  </div>
+
+                  {transcriptInputType === 'upload' && (
+                    <div>
+                      {uploadedTranscriptFile ? (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '12px 16px',
+                          background: 'rgba(24, 119, 242, 0.08)',
+                          borderRadius: '8px',
+                          border: '1px solid #1877F2'
+                        }}>
+                          <Space>
+                            <FileTextOutlined style={{ color: '#1877F2', fontSize: '20px' }} />
+                            <div>
+                              <Text strong style={{ display: 'block', fontSize: '13px' }}>{uploadedTranscriptFile.name}</Text>
+                              <Text style={{ fontSize: '11px', color: 'var(--ac-sub)' }}>
+                                {(uploadedTranscriptFile.size / 1024).toFixed(1)} KB • Ready to align & burn
+                              </Text>
+                            </div>
+                          </Space>
+                          <Button
+                            type="text"
+                            danger
+                            size="small"
+                            icon={<DeleteOutlined />}
+                            onClick={() => setUploadedTranscriptFile(null)}
+                          />
+                        </div>
+                      ) : (
+                        <Upload.Dragger
+                          accept=".srt,.vtt,.txt,.json"
+                          maxCount={1}
+                          beforeUpload={(file) => {
+                            setUploadedTranscriptFile(file)
+                            return false
+                          }}
+                          showUploadList={false}
+                          style={{ padding: '16px 0', background: 'transparent' }}
+                        >
+                          <p className="ant-upload-drag-icon" style={{ marginBottom: '8px' }}>
+                            <CloudUploadOutlined style={{ fontSize: '28px', color: '#1877F2' }} />
+                          </p>
+                          <p style={{ margin: 0, fontSize: '13px', fontWeight: 500 }}>
+                            Click or drag transcribed file here (.srt, .vtt, .txt, .json)
+                          </p>
+                          <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--ac-sub)' }}>
+                            Timed subtitles (.srt, .vtt) are formatted directly; plain text scripts (.txt) are automatically aligned to audio.
+                          </p>
+                        </Upload.Dragger>
+                      )}
+                    </div>
+                  )}
+
+                  {transcriptInputType === 'path' && (
+                    <div>
+                      <Input
+                        placeholder="/path/to/transcript.srt or script.txt"
+                        value={manualTranscriptPath}
+                        onChange={(e) => setManualTranscriptPath(e.target.value)}
+                        prefix={<FileTextOutlined style={{ color: 'var(--ac-sub)' }} />}
+                      />
+                      <Text style={{ fontSize: '11px', color: 'var(--ac-sub)', display: 'block', marginTop: '6px' }}>
+                        Enter the absolute or relative path to your local .srt, .vtt, or text file.
+                      </Text>
+                    </div>
+                  )}
+
+                  {transcriptInputType === 'text' && (
+                    <div>
+                      <Input.TextArea
+                        rows={4}
+                        placeholder="Paste your SRT cues or Filipino transcript text here..."
+                        value={transcriptText}
+                        onChange={(e) => setTranscriptText(e.target.value)}
+                        style={{ fontSize: '12px' }}
+                      />
+                      <Text style={{ fontSize: '11px', color: 'var(--ac-sub)', display: 'block', marginTop: '6px' }}>
+                        If raw text without timestamps is pasted, audio alignment will synchronize each phrase to the spoken video.
+                      </Text>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Text style={{ fontSize: '12px', color: 'var(--ac-sub)', display: 'block', marginBottom: '4px' }}>
+                      Spoken Language
+                    </Text>
+                    <Select
+                      style={{ width: '100%' }}
+                      value={language}
+                      onChange={(v) => setLanguage(v)}
+                    >
+                      <Option value="tl">🇵🇭 Tagalog / Filipino</Option>
+                      <Option value="en">🇺🇸 English</Option>
+                    </Select>
+                  </Col>
+
+                  <Col span={12}>
+                    <Text style={{ fontSize: '12px', color: 'var(--ac-sub)', display: 'block', marginBottom: '4px' }}>
+                      Transcription AI Model
+                    </Text>
+                    <Select
+                      style={{ width: '100%' }}
+                      value={engine}
+                      onChange={(v) => setEngine(v)}
+                    >
+                      <Option value="gemini">🌟 Gemini 2.5 Flash (Ultra Accurate Filipino)</Option>
+                      <Option value="whisper">⚡ Local Whisper (CTranslate2)</Option>
+                    </Select>
+                  </Col>
+                </Row>
+              )}
             </div>
 
             <Divider style={{ borderColor: 'var(--ac-line-2)' }} />
 
-            {/* Step 3: Facebook Follow CTA */}
+            {/* Step 3: Caption Visual Style */}
+            <div style={{ marginBottom: '24px' }}>
+              <Text strong style={{ display: 'block', marginBottom: '10px' }}>
+                3. Caption Visual Style
+              </Text>
+              <Select
+                style={{ width: '100%' }}
+                value={captionStyle}
+                onChange={(v) => setCaptionStyle(v)}
+              >
+                <Option value="hormozi_yellow">⚡ Hormozi Yellow (Electric Yellow Highlight)</Option>
+                <Option value="neon_green">🟢 Neon Green (High Contrast)</Option>
+                <Option value="neon_cyan">🔵 Neon Cyan (Modern Social)</Option>
+                <Option value="minimal_box">⬛ Minimalist Box (Translucent Dark)</Option>
+                <Option value="none">Clean Subtitles (No Highlight)</Option>
+              </Select>
+            </div>
+
+            <Divider style={{ borderColor: 'var(--ac-line-2)' }} />
+
+            {/* Step 4: Facebook Follow CTA */}
             <div style={{ marginBottom: '28px' }}>
               <Text strong style={{ display: 'block', marginBottom: '10px' }}>
-                3. Facebook Follow CTA Configuration
+                4. Facebook Follow CTA Configuration
               </Text>
 
               <Row gutter={16} style={{ marginBottom: '12px' }}>
@@ -451,8 +600,8 @@ export const AffiliatePage: React.FC = () => {
                     message="Video Ready for Posting!"
                     description={
                       <div style={{ fontSize: '13px', marginTop: '4px' }}>
-                        <div>AI Engine: <b>{result.model_used || 'Gemini 2.5 Flash'}</b></div>
-                        <div>Transcribed: <b>{result.word_count} words</b> across {result.segment_count} segments</div>
+                        <div>Source / Engine: <b>{result.transcript_provided ? 'Custom Transcribed File' : (result.model_used || 'Gemini 2.5 Flash')}</b></div>
+                        <div>Subtitle Cues: <b>{result.segment_count} segments</b> ({result.word_count} words)</div>
                         <div>Duration: <b>{result.video_duration.toFixed(1)}s</b> ({result.video_width}x{result.video_height})</div>
                         <div>Render Time: <b>{result.processing_time_sec}s</b></div>
                       </div>

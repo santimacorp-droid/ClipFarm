@@ -22,6 +22,8 @@ router = APIRouter(prefix="/affiliate", tags=["affiliate"])
 class ProcessVideoRequest(BaseModel):
     video_path: str
     output_dir: Optional[str] = None
+    transcript_path: Optional[str] = None
+    transcript_text: Optional[str] = None
     fb_handle: Optional[str] = ""
     caption_style: Optional[str] = "hormozi_yellow"
     cta_style: Optional[str] = "pill"
@@ -139,9 +141,11 @@ async def process_video_by_path(req: ProcessVideoRequest) -> Dict[str, Any]:
             default_caption_style=req.caption_style or "hormozi_yellow",
             default_engine=req.engine or "auto"
         )
+        transcript_src = req.transcript_path or req.transcript_text or None
         result = processor.process_affiliate_video(
             input_video_path=p,
             output_video_path=out_video,
+            transcript_source=transcript_src,
             fb_handle=req.fb_handle or "",
             caption_style=req.caption_style or "hormozi_yellow",
             cta_style=req.cta_style or "pill",
@@ -159,6 +163,8 @@ async def process_video_by_path(req: ProcessVideoRequest) -> Dict[str, Any]:
 @router.post("/process-upload")
 async def process_video_upload(
     video_file: UploadFile = File(...),
+    transcript_file: Optional[UploadFile] = File(None),
+    transcript_text: Optional[str] = Form(None),
     fb_handle: str = Form(""),
     caption_style: str = Form("hormozi_yellow"),
     cta_style: str = Form("pill"),
@@ -166,7 +172,7 @@ async def process_video_upload(
     language: str = Form("tl"),
     engine: str = Form("gemini")
 ) -> Dict[str, Any]:
-    """Upload and process a video file directly."""
+    """Upload and process a video file directly with optional custom transcript."""
     uploads_dir = Path("data/uploads/affiliate").resolve()
     uploads_dir.mkdir(parents=True, exist_ok=True)
     
@@ -176,6 +182,15 @@ async def process_video_upload(
     try:
         with open(temp_input_path, "wb") as buffer:
             shutil.copyfileobj(video_file.file, buffer)
+
+        transcript_src = None
+        if transcript_file and transcript_file.filename:
+            transcript_path = uploads_dir / f"transcript_{transcript_file.filename}"
+            with open(transcript_path, "wb") as buffer:
+                shutil.copyfileobj(transcript_file.file, buffer)
+            transcript_src = transcript_path
+        elif transcript_text and transcript_text.strip():
+            transcript_src = transcript_text.strip()
             
         output_dir = Path("data/output/affiliate").resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -189,6 +204,7 @@ async def process_video_upload(
         result = processor.process_affiliate_video(
             input_video_path=temp_input_path,
             output_video_path=out_video,
+            transcript_source=transcript_src,
             fb_handle=fb_handle,
             caption_style=caption_style,
             cta_style=cta_style,
