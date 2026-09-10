@@ -27,6 +27,7 @@ class ProcessVideoRequest(BaseModel):
     cta_style: Optional[str] = "pill"
     cta_position: Optional[str] = "lower_center"
     language: Optional[str] = "tl"
+    engine: Optional[str] = "gemini"
 
 
 @router.get("/styles")
@@ -134,8 +135,9 @@ async def process_video_by_path(req: ProcessVideoRequest) -> Dict[str, Any]:
 
     try:
         processor = AffiliateVideoProcessor(
-            whisper_model="base",
-            default_caption_style=req.caption_style or "hormozi_yellow"
+            whisper_model="small",
+            default_caption_style=req.caption_style or "hormozi_yellow",
+            default_engine=req.engine or "auto"
         )
         result = processor.process_affiliate_video(
             input_video_path=p,
@@ -144,7 +146,8 @@ async def process_video_by_path(req: ProcessVideoRequest) -> Dict[str, Any]:
             caption_style=req.caption_style or "hormozi_yellow",
             cta_style=req.cta_style or "pill",
             cta_position=req.cta_position or "lower_center",
-            language=req.language or "tl"
+            language=req.language or "tl",
+            engine=req.engine or "auto"
         )
         result["video_url"] = f"/api/v1/affiliate/video?filename={out_video.name}"
         return result
@@ -160,7 +163,8 @@ async def process_video_upload(
     caption_style: str = Form("hormozi_yellow"),
     cta_style: str = Form("pill"),
     cta_position: str = Form("lower_center"),
-    language: str = Form("tl")
+    language: str = Form("tl"),
+    engine: str = Form("gemini")
 ) -> Dict[str, Any]:
     """Upload and process a video file directly."""
     uploads_dir = Path("data/uploads/affiliate").resolve()
@@ -178,8 +182,9 @@ async def process_video_upload(
         out_video = output_dir / f"{temp_input_path.stem}_filipino_fb.mp4"
 
         processor = AffiliateVideoProcessor(
-            whisper_model="base",
-            default_caption_style=caption_style
+            whisper_model="small",
+            default_caption_style=caption_style,
+            default_engine=engine
         )
         result = processor.process_affiliate_video(
             input_video_path=temp_input_path,
@@ -188,7 +193,8 @@ async def process_video_upload(
             caption_style=caption_style,
             cta_style=cta_style,
             cta_position=cta_position,
-            language=language
+            language=language,
+            engine=engine
         )
         result["video_url"] = f"/api/v1/affiliate/video?filename={out_video.name}"
         return result

@@ -137,20 +137,24 @@ def test_process_affiliate_video_end_to_end(tmp_path, sample_video, monkeypatch)
     proc = AffiliateVideoProcessor()
 
     # Mock transcribe_filipino to avoid downloading heavy whisper models during unit test
-    def mock_transcribe(video_path, language="tl", vad_filter=True):
-        return [
-            {
-                "start": 0.0,
-                "end": 1.5,
-                "text": "Subukan ang bagong produkto!",
-                "words": [
-                    {"word": "Subukan", "start": 0.0, "end": 0.5},
-                    {"word": "ang", "start": 0.5, "end": 0.7},
-                    {"word": "bagong", "start": 0.7, "end": 1.1},
-                    {"word": "produkto!", "start": 1.1, "end": 1.5}
-                ]
-            }
-        ]
+    def mock_transcribe(video_path, language="tl", engine="auto", **kwargs):
+        return {
+            "segments": [
+                {
+                    "start": 0.0,
+                    "end": 1.5,
+                    "text": "Subukan ang bagong produkto!",
+                    "words": [
+                        {"word": "Subukan", "start": 0.0, "end": 0.5},
+                        {"word": "ang", "start": 0.5, "end": 0.7},
+                        {"word": "bagong", "start": 0.7, "end": 1.1},
+                        {"word": "produkto!", "start": 1.1, "end": 1.5}
+                    ]
+                }
+            ],
+            "model": "gemini-2.5-flash",
+            "engine": "gemini"
+        }
 
     monkeypatch.setattr(proc, "transcribe_filipino", mock_transcribe)
 

@@ -46,6 +46,7 @@ export interface ProcessAffiliateResult {
   srt_path: string
   ass_path: string
   language: string
+  model_used?: string
   caption_style: string
   cta_platform: string
   cta_handle: string
@@ -76,6 +77,7 @@ export const affiliateApi = {
     cta_style?: string
     cta_position?: string
     language?: string
+    engine?: string
   }): Promise<ProcessAffiliateResult> => {
     return unwrap(await api.post('/affiliate/process-path', payload))
   },

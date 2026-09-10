@@ -1,7 +1,9 @@
 """
 Affiliate Marketing Video Processor
 Lightweight, focused video processing pipeline that:
-1. Transcribes audio in Filipino / Tagalog ('tl') with word-level timestamps using faster-whisper.
+1. Transcribes audio in Filipino / Tagalog ('tl') with word-level timestamps using:
+   - Primary/High-Accuracy: Google Gemini 2.5 Flash AI (native conversational Filipino & slang)
+   - Fallback/Offline: faster-whisper (CTranslate2)
 2. Generates styled viral ASS captions (active-word highlights, 9:16 safe-zone margins).
 3. Burns styled captions into the video via FFmpeg libass.
 4. Overlays an authentic animated Facebook Follow CTA ('Follow' pill / card with checkmark animation).
@@ -31,10 +33,11 @@ class AffiliateVideoProcessor:
 
     def __init__(
         self,
-        whisper_model: str = "base",
+        whisper_model: str = "small",
         device: str = "auto",
         compute_type: str = "int8",
         default_caption_style: str = "hormozi_yellow",
+        default_engine: str = "auto",
     ):
         """
         Initialize the affiliate video processor.
@@ -44,12 +47,32 @@ class AffiliateVideoProcessor:
             device: 'auto', 'cpu', or 'cuda'
             compute_type: 'int8', 'float16', 'float32'
             default_caption_style: Style preset from CAPTION_STYLES ('hormozi_yellow', 'neon_green', 'neon_cyan', etc.)
+            default_engine: 'auto' (prefers Gemini for high accuracy), 'gemini', or 'whisper'
         """
         self.whisper_model_name = whisper_model
         self.device = device
         self.compute_type = compute_type
         self.default_caption_style = default_caption_style
+        self.default_engine = default_engine
         self._whisper_model = None
+
+    def _get_gemini_api_key(self) -> Optional[str]:
+        """Fetch Gemini API key from environment variables or .env file."""
+        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("API_GEMINI_API_KEY")
+        if not api_key:
+            env_file = Path(__file__).resolve().parent.parent.parent / ".env"
+            if env_file.exists():
+                try:
+                    with open(env_file, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if line.startswith("GEMINI_API_KEY="):
+                                api_key = line.split("=", 1)[1].strip()
+                                break
+                            elif line.startswith("API_GEMINI_API_KEY=") and not api_key:
+                                api_key = line.split("=", 1)[1].strip()
+                except Exception:
+                    pass
+        return api_key
 
     def _get_whisper_model(self):
         """Lazy load faster-whisper model to optimize startup time and memory."""
@@ -99,43 +122,153 @@ class AffiliateVideoProcessor:
             logger.warning(f"Failed to probe video {video_path}: {e}")
         return info
 
-    def transcribe_filipino(
+    def transcribe_with_gemini(
+        self,
+        video_path: Path,
+        language: str = "tl"
+    ) -> List[Dict[str, Any]]:
+        """
+        Transcribe audio using Google Gemini 2.5 Flash for native, high-accuracy Filipino/Taglish.
+        Produces short, punchy subtitle chunks with word-level interpolated timestamps.
+        """
+        api_key = self._get_gemini_api_key()
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY not found in environment or .env")
+
+        from google import genai
+        from google.genai import types
+
+        video_path = Path(video_path)
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp_audio:
+            tmp_audio_path = tmp_audio.name
+
+        try:
+            # Extract 16kHz mono audio for optimal speech recognition
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", str(video_path),
+                "-vn",
+                "-ar", "16000",
+                "-ac", "1",
+                "-b:a", "64k",
+                tmp_audio_path
+            ]
+            subprocess.run(cmd, capture_output=True, check=True)
+
+            with open(tmp_audio_path, "rb") as f:
+                audio_bytes = f.read()
+
+            client = genai.Client(api_key=api_key)
+            prompt = """
+You are an expert transcriber for Philippine social media, TikTok, and Facebook affiliate marketing videos.
+Transcribe this entire audio in native conversational Filipino (Tagalog / Taglish) with 100% accuracy.
+Ensure correct Filipino spelling, slang, and brand terms (e.g. portable gas stove, solid, sulit, brownout, Shopee, etc.).
+Break speech into punchy, short subtitle chunks (2 to 5 words per chunk, 1 to 2.5 seconds each) designed for TikTok / Reels / Shorts captions.
+Return strictly a JSON array of objects without markdown formatting:
+[
+  {"start": 0.0, "end": 2.1, "text": "Grabe, ito na 'yung binili ko"},
+  {"start": 2.1, "end": 4.6, "text": "na portable gas stove!"}
+]
+"""
+            logger.info(f"Transcribing {video_path.name} with Gemini 2.5 Flash (Filipino AI)...")
+            res = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[
+                    types.Part.from_bytes(data=audio_bytes, mime_type="audio/mp3"),
+                    prompt
+                ]
+            )
+
+            raw = res.text.strip()
+            if raw.startswith("```json"):
+                raw = raw[7:]
+            if raw.startswith("```"):
+                raw = raw[3:]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+
+            chunks = json.loads(raw.strip())
+            structured_segments: List[Dict[str, Any]] = []
+
+            for chunk in chunks:
+                start_t = float(chunk["start"])
+                end_t = float(chunk["end"])
+                chunk_text = str(chunk["text"]).strip()
+                if not chunk_text:
+                    continue
+
+                # Tokenize words and interpolate word timings
+                words = chunk_text.split()
+                w_count = len(words)
+                total_duration = max(0.2, end_t - start_t)
+                word_dur = total_duration / max(1, w_count)
+
+                words_list = []
+                for i, w in enumerate(words):
+                    w_s = round(start_t + i * word_dur, 2)
+                    w_e = round(min(end_t, w_s + word_dur), 2)
+                    words_list.append({
+                        "word": w,
+                        "start": w_s,
+                        "end": w_e
+                    })
+
+                structured_segments.append({
+                    "start": start_t,
+                    "end": end_t,
+                    "text": chunk_text,
+                    "words": words_list
+                })
+
+            logger.info(f"Gemini transcription complete: {len(structured_segments)} accurate Filipino chunks.")
+            return structured_segments
+
+        finally:
+            if os.path.exists(tmp_audio_path):
+                try:
+                    os.remove(tmp_audio_path)
+                except Exception:
+                    pass
+
+    def transcribe_with_whisper(
         self,
         video_path: Path,
         language: str = "tl",
         vad_filter: bool = True
     ) -> List[Dict[str, Any]]:
         """
-        Transcribe speech from video in Filipino/Tagalog ('tl') with word-level timestamps.
-        
-        Returns:
-            List of segment dictionaries with 'start', 'end', 'text', and 'words'.
+        Transcribe speech from video using local faster-whisper.
         """
         video_path = Path(video_path)
         if not video_path.exists():
             raise FileNotFoundError(f"Input video not found: {video_path}")
 
         model = self._get_whisper_model()
-        logger.info(f"Transcribing {video_path.name} in Filipino (language='{language}')...")
+        logger.info(f"Transcribing {video_path.name} with faster-whisper (model='{self.whisper_model_name}', language='{language}')...")
 
-        # First attempt with vad_filter
-        seg_iter, transcription_info = model.transcribe(
+        # Initial prompt with authentic Filipino affiliate vocabulary
+        filipino_prompt = (
+            "Grabe, sobrang ganda, sulit, i-try natin kung gaano kabilis, portable gas stove, sapatos, tela, "
+            "quality, malakas ang apoy, i-on natin, safe dalhin sa bag, checkout, comment section, link, follow."
+        )
+
+        seg_iter, _ = model.transcribe(
             str(video_path),
             language=language,
             vad_filter=vad_filter,
             word_timestamps=True,
-            initial_prompt="Magandang araw! Ito ay isang affiliate marketing product review sa Tagalog o Filipino."
+            initial_prompt=filipino_prompt
         )
         raw_segments = list(seg_iter)
 
-        # If vad_filter filtered everything out, retry without vad_filter
         if not raw_segments and vad_filter:
             logger.info("VAD filter yielded no speech segments, retrying without VAD filter...")
             seg_iter, _ = model.transcribe(
                 str(video_path),
                 language=language,
                 vad_filter=False,
-                word_timestamps=True
+                word_timestamps=True,
+                initial_prompt=filipino_prompt
             )
             raw_segments = list(seg_iter)
 
@@ -161,8 +294,41 @@ class AffiliateVideoProcessor:
                     "words": words_list
                 })
 
-        logger.info(f"Transcription complete: {len(structured_segments)} segments extracted.")
+        logger.info(f"Whisper transcription complete: {len(structured_segments)} segments extracted.")
         return structured_segments
+
+    def transcribe_filipino(
+        self,
+        video_path: Path,
+        language: str = "tl",
+        engine: str = "auto",
+        vad_filter: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Transcribe video audio with automatic model routing:
+        1. If engine == 'gemini' or ('auto' and GEMINI_API_KEY available): use Gemini 2.5 Flash for native Filipino accuracy.
+        2. Fall back to faster-whisper on any error or if engine == 'whisper'.
+        """
+        chosen_engine = engine or self.default_engine
+        use_gemini = (chosen_engine == "gemini") or (chosen_engine == "auto" and bool(self._get_gemini_api_key()))
+
+        if use_gemini:
+            try:
+                segments = self.transcribe_with_gemini(video_path, language=language)
+                return {
+                    "segments": segments,
+                    "model": "gemini-2.5-flash",
+                    "engine": "gemini"
+                }
+            except Exception as e:
+                logger.warning(f"Gemini transcription failed ({e}), falling back to local faster-whisper...")
+
+        segments = self.transcribe_with_whisper(video_path, language=language, vad_filter=vad_filter)
+        return {
+            "segments": segments,
+            "model": f"whisper-{self.whisper_model_name}",
+            "engine": "whisper"
+        }
 
     def export_srt(self, segments: List[Dict[str, Any]], output_srt_path: Path) -> Path:
         """Write standard SRT subtitle file."""
@@ -304,12 +470,13 @@ class AffiliateVideoProcessor:
         cta_style: str = "pill",
         cta_position: str = "lower_center",
         language: str = "tl",
+        engine: str = "auto",
         keep_intermediate: bool = False,
     ) -> Dict[str, Any]:
         """
         Complete end-to-end affiliate video creation pipeline:
         1. Probe video dimensions and duration.
-        2. Transcribe audio in Filipino ('tl') with word timestamps.
+        2. Transcribe audio using Gemini 2.5 Flash (or Whisper) in Filipino ('tl').
         3. Generate stylish ASS captions (e.g. Hormozi Yellow).
         4. Burn captions into video.
         5. Overlay Facebook Follow CTA.
@@ -324,7 +491,7 @@ class AffiliateVideoProcessor:
         if output_video_path:
             final_output = Path(output_video_path).resolve()
         else:
-            final_output = input_path.parent / f"{input_path.stem}_filipino_fb_cta.mp4"
+            final_output = input_path.parent / f"{input_path.stem}_filipino_fb.mp4"
         final_output.parent.mkdir(parents=True, exist_ok=True)
 
         # Video metadata
@@ -339,8 +506,11 @@ class AffiliateVideoProcessor:
             ass_path = temp_dir / f"{input_path.stem}.ass"
             captioned_video = temp_dir / f"{input_path.stem}_captioned.mp4"
 
-            # 1. Transcribe Filipino speech
-            segments = self.transcribe_filipino(input_path, language=language)
+            # 1. Transcribe Filipino speech with selected engine
+            trans_result = self.transcribe_filipino(input_path, language=language, engine=engine)
+            segments = trans_result["segments"]
+            model_used = trans_result["model"]
+
             self.export_srt(segments, srt_path)
 
             # 2. Generate styled ASS captions
@@ -375,7 +545,7 @@ class AffiliateVideoProcessor:
             elapsed = round(time.time() - t0, 2)
             word_count = sum(len(s.get("words", [])) for s in segments)
 
-            # If user wants to keep SRT/ASS companion files next to final output
+            # Write SRT/ASS companion files next to final output
             final_srt = final_output.parent / f"{final_output.stem}.srt"
             final_ass = final_output.parent / f"{final_output.stem}.ass"
             final_srt.write_text(srt_path.read_text(encoding="utf-8"), encoding="utf-8")
@@ -388,6 +558,7 @@ class AffiliateVideoProcessor:
                 "srt_path": str(final_srt),
                 "ass_path": str(final_ass),
                 "language": language,
+                "model_used": model_used,
                 "caption_style": chosen_style,
                 "cta_platform": "facebook",
                 "cta_handle": fb_handle,
@@ -399,7 +570,7 @@ class AffiliateVideoProcessor:
                 "word_count": word_count,
                 "processing_time_sec": elapsed,
             }
-            logger.info(f"Affiliate video processing completed in {elapsed}s -> {final_output}")
+            logger.info(f"Affiliate video processing completed in {elapsed}s (Model: {model_used}) -> {final_output}")
             return result
 
         finally:

@@ -65,10 +65,16 @@ def main():
         help="CTA position on screen (default: lower_center)."
     )
     parser.add_argument(
+        "--engine",
+        default="gemini",
+        choices=["gemini", "whisper", "auto"],
+        help="Transcription model: 'gemini' (Gemini 2.5 Flash Native Filipino AI - Recommended), 'whisper' (local faster-whisper), or 'auto'."
+    )
+    parser.add_argument(
         "--model",
-        default="base",
+        default="small",
         choices=["tiny", "base", "small", "medium"],
-        help="faster-whisper model size (default: base)."
+        help="faster-whisper model size if whisper engine is used (default: small)."
     )
     parser.add_argument(
         "--language",
@@ -106,13 +112,14 @@ def main():
     processor = AffiliateVideoProcessor(
         whisper_model=args.model,
         device=args.device,
-        default_caption_style=args.caption_style
+        default_caption_style=args.caption_style,
+        default_engine=args.engine
     )
 
     results = []
     for vid in video_files:
         out_vid = output_dir / f"{vid.stem}_filipino_fb.mp4"
-        logger.info(f"Processing: {vid.name} -> {out_vid.name}")
+        logger.info(f"Processing: {vid.name} -> {out_vid.name} (Engine: {args.engine})")
         try:
             res = processor.process_affiliate_video(
                 input_video_path=vid,
@@ -121,7 +128,8 @@ def main():
                 caption_style=args.caption_style,
                 cta_style=args.cta_style,
                 cta_position=args.cta_position,
-                language=args.language
+                language=args.language,
+                engine=args.engine
             )
             results.append(res)
             logger.info(f"✓ Completed {vid.name}: {res['segment_count']} segments, {res['processing_time_sec']}s")

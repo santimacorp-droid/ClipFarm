@@ -47,6 +47,7 @@ export const AffiliatePage: React.FC = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
 
   const [language, setLanguage] = useState<string>('tl')
+  const [engine, setEngine] = useState<string>('gemini')
   const [captionStyle, setCaptionStyle] = useState<string>('hormozi_yellow')
   const [fbHandle, setFbHandle] = useState<string>('@AffiliatePH')
   const [ctaStyle, setCtaStyle] = useState<string>('pill')
@@ -114,6 +115,7 @@ export const AffiliatePage: React.FC = () => {
         formData.append('cta_style', ctaStyle)
         formData.append('cta_position', ctaPosition)
         formData.append('language', language)
+        formData.append('engine', engine)
         res = await affiliateApi.processByUpload(formData)
       } else {
         res = await affiliateApi.processByPath({
@@ -122,7 +124,8 @@ export const AffiliatePage: React.FC = () => {
           caption_style: captionStyle,
           cta_style: ctaStyle,
           cta_position: ctaPosition,
-          language: language
+          language: language,
+          engine: engine
         })
       }
 
@@ -256,13 +259,13 @@ export const AffiliatePage: React.FC = () => {
 
             <Divider style={{ borderColor: 'var(--ac-line-2)' }} />
 
-            {/* Step 2: Language & Caption Style */}
+            {/* Step 2: Language, Model & Caption Style */}
             <div style={{ marginBottom: '24px' }}>
               <Text strong style={{ display: 'block', marginBottom: '10px' }}>
-                2. Caption Language & Visual Style
+                2. Caption Language, Model & Visual Style
               </Text>
               
-              <Row gutter={16}>
+              <Row gutter={16} style={{ marginBottom: '12px' }}>
                 <Col span={12}>
                   <Text style={{ fontSize: '12px', color: 'var(--ac-sub)', display: 'block', marginBottom: '4px' }}>
                     Spoken Language
@@ -279,21 +282,35 @@ export const AffiliatePage: React.FC = () => {
 
                 <Col span={12}>
                   <Text style={{ fontSize: '12px', color: 'var(--ac-sub)', display: 'block', marginBottom: '4px' }}>
-                    Caption Preset Style
+                    Transcription AI Model
                   </Text>
                   <Select
                     style={{ width: '100%' }}
-                    value={captionStyle}
-                    onChange={(v) => setCaptionStyle(v)}
+                    value={engine}
+                    onChange={(v) => setEngine(v)}
                   >
-                    <Option value="hormozi_yellow">⚡ Hormozi Yellow (Electric Yellow Highlight)</Option>
-                    <Option value="neon_green">🟢 Neon Green (High Contrast)</Option>
-                    <Option value="neon_cyan">🔵 Neon Cyan (Modern Social)</Option>
-                    <Option value="minimal_box">⬛ Minimalist Box (Translucent Dark)</Option>
-                    <Option value="none">Clean Subtitles (No Highlight)</Option>
+                    <Option value="gemini">🌟 Gemini 2.5 Flash (Ultra Accurate Filipino)</Option>
+                    <Option value="whisper">⚡ Local Whisper (CTranslate2)</Option>
                   </Select>
                 </Col>
               </Row>
+
+              <div>
+                <Text style={{ fontSize: '12px', color: 'var(--ac-sub)', display: 'block', marginBottom: '4px' }}>
+                  Caption Preset Style
+                </Text>
+                <Select
+                  style={{ width: '100%' }}
+                  value={captionStyle}
+                  onChange={(v) => setCaptionStyle(v)}
+                >
+                  <Option value="hormozi_yellow">⚡ Hormozi Yellow (Electric Yellow Highlight)</Option>
+                  <Option value="neon_green">🟢 Neon Green (High Contrast)</Option>
+                  <Option value="neon_cyan">🔵 Neon Cyan (Modern Social)</Option>
+                  <Option value="minimal_box">⬛ Minimalist Box (Translucent Dark)</Option>
+                  <Option value="none">Clean Subtitles (No Highlight)</Option>
+                </Select>
+              </div>
             </div>
 
             <Divider style={{ borderColor: 'var(--ac-line-2)' }} />
@@ -434,6 +451,7 @@ export const AffiliatePage: React.FC = () => {
                     message="Video Ready for Posting!"
                     description={
                       <div style={{ fontSize: '13px', marginTop: '4px' }}>
+                        <div>AI Engine: <b>{result.model_used || 'Gemini 2.5 Flash'}</b></div>
                         <div>Transcribed: <b>{result.word_count} words</b> across {result.segment_count} segments</div>
                         <div>Duration: <b>{result.video_duration.toFixed(1)}s</b> ({result.video_width}x{result.video_height})</div>
                         <div>Render Time: <b>{result.processing_time_sec}s</b></div>
