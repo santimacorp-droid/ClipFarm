@@ -720,14 +720,17 @@ Return strictly a JSON array of objects without markdown formatting:
         output_video_path: Path,
         fb_handle: str = "",
         cta_style: str = "pill",
-        cta_position: str = "lower_center",
+        cta_position: str = "lower_middle",
         start_time: Optional[float] = None,
         video_width: Optional[int] = None,
         video_height: Optional[int] = None,
-        video_duration: Optional[float] = None
+        video_duration: Optional[float] = None,
+        watermark: bool = True
     ) -> Path:
         """
         Overlay the Facebook Follow CTA animation onto the video.
+        Acts as persistent anti-theft watermark throughout the clip, and animates
+        the interactive Follow action at the end.
         """
         input_video_path = Path(input_video_path)
         output_video_path = Path(output_video_path)
@@ -743,7 +746,8 @@ Return strictly a JSON array of objects without markdown formatting:
             start_time=start_time,
             video_width=video_width,
             video_height=video_height,
-            video_duration=video_duration
+            video_duration=video_duration,
+            watermark=watermark
         )
 
         if not success or not output_video_path.exists() or output_video_path.stat().st_size <= 1024:
@@ -760,9 +764,10 @@ Return strictly a JSON array of objects without markdown formatting:
         fb_handle: str = "",
         caption_style: Optional[str] = None,
         cta_style: str = "pill",
-        cta_position: str = "lower_center",
+        cta_position: str = "lower_middle",
         language: str = "tl",
         engine: str = "auto",
+        watermark: bool = True,
         keep_intermediate: bool = False,
     ) -> Dict[str, Any]:
         """
@@ -837,7 +842,8 @@ Return strictly a JSON array of objects without markdown formatting:
                 cta_position=cta_position,
                 video_width=w,
                 video_height=h,
-                video_duration=duration
+                video_duration=duration,
+                watermark=watermark
             )
 
             elapsed = round(time.time() - t0, 2)
@@ -862,6 +868,8 @@ Return strictly a JSON array of objects without markdown formatting:
                 "cta_platform": "facebook",
                 "cta_handle": fb_handle,
                 "cta_style": cta_style,
+                "cta_position": cta_position,
+                "cta_watermark": watermark,
                 "video_width": w,
                 "video_height": h,
                 "video_duration": duration,

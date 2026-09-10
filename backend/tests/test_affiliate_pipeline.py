@@ -240,3 +240,22 @@ Solid and Sulit!
     assert result["model_used"] == "user-transcript-file"
     assert Path(result["output_video"]).exists()
     assert Path(result["output_video"]).stat().st_size > 1024
+
+
+def test_facebook_cta_watermark_lower_middle(tmp_path, sample_video):
+    """Verify Facebook CTA generates lower-middle watermark badge and handles correctly."""
+    out_video = tmp_path / "watermark_cta.mp4"
+    res = AffiliateVideoProcessor.apply_facebook_cta(
+        input_video_path=sample_video,
+        output_video_path=out_video,
+        fb_handle="@AffiliatePH",
+        cta_style="card",
+        cta_position="lower_middle",
+        watermark=True,
+        video_width=1080,
+        video_height=1920,
+        video_duration=2.0
+    )
+    assert res.exists()
+    assert res.stat().st_size > 1024
+

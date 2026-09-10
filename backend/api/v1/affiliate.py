@@ -27,7 +27,8 @@ class ProcessVideoRequest(BaseModel):
     fb_handle: Optional[str] = ""
     caption_style: Optional[str] = "hormozi_yellow"
     cta_style: Optional[str] = "pill"
-    cta_position: Optional[str] = "lower_center"
+    cta_position: Optional[str] = "lower_middle"
+    watermark: Optional[bool] = True
     language: Optional[str] = "tl"
     engine: Optional[str] = "gemini"
 
@@ -55,7 +56,7 @@ async def get_caption_styles() -> Dict[str, Any]:
             "platform": "facebook",
             "action": "Follow",
             "supported_styles": ["pill", "card"],
-            "supported_positions": ["lower_center", "lower_third", "bottom_center"]
+            "supported_positions": ["lower_middle", "lower_center", "lower_third", "bottom_center"]
         }
     }
 
@@ -149,9 +150,10 @@ async def process_video_by_path(req: ProcessVideoRequest) -> Dict[str, Any]:
             fb_handle=req.fb_handle or "",
             caption_style=req.caption_style or "hormozi_yellow",
             cta_style=req.cta_style or "pill",
-            cta_position=req.cta_position or "lower_center",
+            cta_position=req.cta_position or "lower_middle",
             language=req.language or "tl",
-            engine=req.engine or "auto"
+            engine=req.engine or "auto",
+            watermark=req.watermark if req.watermark is not None else True
         )
         result["video_url"] = f"/api/v1/affiliate/video?filename={out_video.name}"
         return result
@@ -168,7 +170,8 @@ async def process_video_upload(
     fb_handle: str = Form(""),
     caption_style: str = Form("hormozi_yellow"),
     cta_style: str = Form("pill"),
-    cta_position: str = Form("lower_center"),
+    cta_position: str = Form("lower_middle"),
+    watermark: bool = Form(True),
     language: str = Form("tl"),
     engine: str = Form("gemini")
 ) -> Dict[str, Any]:
@@ -209,6 +212,7 @@ async def process_video_upload(
             caption_style=caption_style,
             cta_style=cta_style,
             cta_position=cta_position,
+            watermark=watermark,
             language=language,
             engine=engine
         )

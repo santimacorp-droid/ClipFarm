@@ -79,6 +79,7 @@ export const affiliateApi = {
     caption_style?: string
     cta_style?: string
     cta_position?: string
+    watermark?: boolean
     language?: string
     engine?: string
   }): Promise<ProcessAffiliateResult> => {

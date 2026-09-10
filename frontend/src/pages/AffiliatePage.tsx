@@ -16,7 +16,8 @@ import {
   Spin,
   Alert,
   Tabs,
-  Segmented
+  Segmented,
+  Switch
 } from 'antd'
 import {
   VideoCameraOutlined,
@@ -54,8 +55,9 @@ export const AffiliatePage: React.FC = () => {
   const [engine, setEngine] = useState<string>('gemini')
   const [captionStyle, setCaptionStyle] = useState<string>('hormozi_yellow')
   const [fbHandle, setFbHandle] = useState<string>('@AffiliatePH')
-  const [ctaStyle, setCtaStyle] = useState<string>('pill')
-  const [ctaPosition, setCtaPosition] = useState<string>('lower_center')
+  const [ctaStyle, setCtaStyle] = useState<string>('card')
+  const [ctaPosition, setCtaPosition] = useState<string>('lower_middle')
+  const [watermark, setWatermark] = useState<boolean>(true)
 
   // Transcription Slot state
   const [transcriptMode, setTranscriptMode] = useState<'slot' | 'ai'>('slot')
@@ -125,6 +127,7 @@ export const AffiliatePage: React.FC = () => {
         formData.append('caption_style', captionStyle)
         formData.append('cta_style', ctaStyle)
         formData.append('cta_position', ctaPosition)
+        formData.append('watermark', String(watermark))
         formData.append('language', language)
         formData.append('engine', engine)
         if (transcriptMode === 'slot') {
@@ -142,6 +145,7 @@ export const AffiliatePage: React.FC = () => {
           caption_style: captionStyle,
           cta_style: ctaStyle,
           cta_position: ctaPosition,
+          watermark: watermark,
           language: language,
           engine: engine
         }
@@ -497,7 +501,7 @@ export const AffiliatePage: React.FC = () => {
                 </Col>
               </Row>
 
-              <div>
+              <div style={{ marginBottom: '14px' }}>
                 <Text style={{ fontSize: '12px', color: 'var(--ac-sub)', display: 'block', marginBottom: '4px' }}>
                   Overlay Position
                 </Text>
@@ -506,10 +510,35 @@ export const AffiliatePage: React.FC = () => {
                   onChange={(e) => setCtaPosition(e.target.value)}
                   size="small"
                 >
-                  <Radio.Button value="lower_center">Lower Center (Recommended)</Radio.Button>
+                  <Radio.Button value="lower_middle">Lower Middle (Recommended)</Radio.Button>
+                  <Radio.Button value="lower_center">Lower Center</Radio.Button>
                   <Radio.Button value="lower_third">Lower Third</Radio.Button>
                   <Radio.Button value="bottom_center">Bottom Center</Radio.Button>
                 </Radio.Group>
+              </div>
+
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 14px',
+                background: 'rgba(24, 119, 242, 0.06)',
+                borderRadius: '8px',
+                border: '1px solid rgba(24, 119, 242, 0.2)'
+              }}>
+                <div>
+                  <Text strong style={{ fontSize: '13px', display: 'block' }}>
+                    🛡️ Persistent Anti-Theft Watermark
+                  </Text>
+                  <Text style={{ fontSize: '11px', color: 'var(--ac-sub)' }}>
+                    Stamps your Facebook handle throughout the clip in lower middle so no one can steal or reupload your video, with animated Follow CTA at the end.
+                  </Text>
+                </div>
+                <Switch
+                  checked={watermark}
+                  onChange={(checked) => setWatermark(checked)}
+                  style={{ background: watermark ? '#1877F2' : undefined }}
+                />
               </div>
             </div>
 
