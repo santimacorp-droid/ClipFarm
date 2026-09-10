@@ -4,12 +4,15 @@ import { Layout } from 'antd'
 import HomePage from './pages/HomePage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
 import SettingsPage from './pages/SettingsPage'
+import CampaignsPage from './pages/CampaignsPage'
+import CampaignDetailPage from './pages/CampaignDetailPage'
+import AffiliatePage from './pages/AffiliatePage'
 import Header from './components/Header'
-import { trackPageview } from './analytics/posthog'
+import { trackPageview } from './appEvents/client'
 
 const { Content } = Layout
 
-// HashRouter 下手动上报 pageview（init 时已关闭自动 pageview）
+// HashRouter Please upload manually now pageview(init Auto-upload has already been disabled pageview)
 function usePageviewTracking() {
   const location = useLocation()
   useEffect(() => {
@@ -18,7 +21,9 @@ function usePageviewTracking() {
 }
 
 function App() {
-  console.log('🎬 App组件已加载');
+  useEffect(() => {
+    console.log('🎬 App initialized')
+  }, [])
   usePageviewTracking()
 
   return (
@@ -28,7 +33,11 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/project/:id" element={<ProjectDetailPage />} />
+          <Route path="/projects/:id" element={<ProjectDetailPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/campaigns" element={<CampaignsPage />} />
+          <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
+          <Route path="/affiliate" element={<AffiliatePage />} />
         </Routes>
       </Content>
     </Layout>

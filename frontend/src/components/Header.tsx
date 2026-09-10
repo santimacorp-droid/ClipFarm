@@ -1,6 +1,6 @@
 import React from 'react'
 import { Layout, Button } from 'antd'
-import { SettingOutlined, ArrowLeftOutlined, BulbOutlined, MoonOutlined } from '@ant-design/icons'
+import { SettingOutlined, ArrowLeftOutlined, BulbOutlined, MoonOutlined, ThunderboltOutlined, FireOutlined, ShopOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTheme } from '../context/ThemeContext'
 
@@ -29,21 +29,33 @@ const Header: React.FC = () => {
         borderBottom: '1px solid var(--ac-line-2)',
       }}
     >
-      {/* Wordmark — serif, italic "Clip" */}
+      {/* Wordmark — The Loudest Minute */}
       <div
-        style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+        style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
         onClick={() => navigate('/')}
       >
-        <span
-          style={{
-            fontFamily: 'var(--ac-font-serif)',
-            fontSize: '26px',
-            color: 'var(--ac-ink)',
-            letterSpacing: '0.3px',
-          }}
-        >
-          Auto<em style={{ fontStyle: 'italic' }}>Clip</em>
-        </span>
+        <img
+          src="/the_loudest_minute.png"
+          alt="The Loudest Minute"
+          style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }}
+        />
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span
+            style={{
+              fontFamily: 'var(--ac-font-serif)',
+              fontSize: '20px',
+              fontWeight: 700,
+              color: 'var(--ac-ink)',
+              letterSpacing: '0.5px',
+              lineHeight: 1.2
+            }}
+          >
+            The Loudest Minute
+          </span>
+          <span style={{ fontSize: '11px', color: 'var(--ac-sub)', letterSpacing: '0.2px' }}>
+            Sharpest 60s Moments
+          </span>
+        </div>
       </div>
 
       {/* Right side */}
@@ -55,15 +67,48 @@ const Header: React.FC = () => {
             onClick={() => navigate('/')}
             style={{ color: 'var(--ac-sub)', height: '36px', borderRadius: '999px' }}
           >
-            返回
+            Back
           </Button>
         )}
         <Button
           type="text"
+          icon={<ShopOutlined style={{ color: '#1877F2' }} />}
+          onClick={() => navigate('/affiliate')}
+          style={{
+            color: location.pathname.startsWith('/affiliate') ? '#1877F2' : 'var(--ac-sub)',
+            border: '1px solid var(--ac-line)',
+            borderRadius: '999px',
+            height: '36px',
+            padding: '0 14px',
+            background: 'var(--ac-card)',
+            fontSize: '13px',
+            fontWeight: location.pathname.startsWith('/affiliate') ? 600 : 400
+          }}
+        >
+          Affiliate
+        </Button>
+        <Button
+          type="text"
+          icon={<FireOutlined style={{ color: '#ff4d4f' }} />}
+          onClick={() => navigate('/campaigns')}
+          style={{
+            color: location.pathname.startsWith('/campaigns') ? '#1890ff' : 'var(--ac-sub)',
+            border: '1px solid var(--ac-line)',
+            borderRadius: '999px',
+            height: '36px',
+            padding: '0 14px',
+            background: 'var(--ac-card)',
+            fontSize: '13px'
+          }}
+        >
+          Campaigns
+        </Button>
+        <Button
+          type="text"
           icon={theme === 'dark' ? <BulbOutlined /> : <MoonOutlined />}
           onClick={toggleTheme}
-          aria-label={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
-          title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           style={{
             color: 'var(--ac-sub)',
             border: '1px solid var(--ac-line)',
@@ -74,6 +119,22 @@ const Header: React.FC = () => {
             background: 'var(--ac-card)',
           }}
         />
+        <Button
+          type="text"
+          icon={<ThunderboltOutlined style={{ color: '#faad14' }} />}
+          onClick={() => navigate('/settings')}
+          style={{
+            color: 'var(--ac-sub)',
+            border: '1px solid var(--ac-line)',
+            borderRadius: '999px',
+            height: '36px',
+            padding: '0 14px',
+            background: 'var(--ac-card)',
+            fontSize: '13px'
+          }}
+        >
+          Tokens & Rates
+        </Button>
         <Button
           type="text"
           icon={<SettingOutlined />}
@@ -87,7 +148,7 @@ const Header: React.FC = () => {
             background: 'var(--ac-card)',
           }}
         >
-          设置
+          Settings
         </Button>
       </div>
     </AntHeader>

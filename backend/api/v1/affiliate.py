@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from backend.affiliate.affiliate_processor import AffiliateVideoProcessor
@@ -56,6 +57,70 @@ async def get_caption_styles() -> Dict[str, Any]:
     }
 
 
+@router.get("/video")
+async def get_affiliate_video(filename: str):
+    """Serve processed video file for playback and download."""
+    p = Path("data/output/affiliate").resolve() / filename
+    if not p.exists() or not p.is_file():
+        p = Path(filename).resolve()
+        if not p.exists() or not p.is_file():
+            raise HTTPException(status_code=404, detail="Video file not found")
+    return FileResponse(path=str(p), media_type="video/mp4", filename=p.name)
+
+
+@router.get("/recent")
+async def list_recent_affiliate_videos() -> List[Dict[str, Any]]:
+    """List already processed affiliate videos in data/output/affiliate."""
+    out_dir = Path("data/output/affiliate").resolve()
+    if not out_dir.exists():
+        return []
+    videos = []
+    for f in sorted(out_dir.glob("*_filipino_fb.mp4"), key=os.path.getmtime, reverse=True):
+        srt_file = f.parent / f"{f.stem}.srt"
+        stat = f.stat()
+        videos.append({
+            "filename": f.name,
+            "path": str(f),
+            "size_mb": round(stat.st_size / (1024 * 1024), 2),
+            "modified": stat.st_mtime,
+            "has_srt": srt_file.exists(),
+            "video_url": f"/api/v1/affiliate/video?filename={f.name}"
+        })
+    return videos
+
+
+@router.get("/candidates")
+async def list_candidate_videos() -> List[Dict[str, Any]]:
+    """Find available affiliate candidate videos from Downloads and data folders."""
+    candidates = []
+    search_dirs = [
+        Path.home() / "Downloads",
+        Path("data").resolve(),
+    ]
+    seen_paths = set()
+    for sdir in search_dirs:
+        if not sdir.exists():
+            continue
+        for ext in ["*.mp4", "*.mov"]:
+            for f in sdir.glob(ext):
+                if f.name.endswith("_filipino_fb.mp4"):
+                    continue
+                if str(f) in seen_paths:
+                    continue
+                seen_paths.add(str(f))
+                try:
+                    candidates.append({
+                        "filename": f.name,
+                        "path": str(f),
+                        "size_mb": round(f.stat().st_size / (1024 * 1024), 2),
+                        "mtime": f.stat().st_mtime
+                    })
+                except Exception:
+                    pass
+    candidates.sort(key=lambda x: x["mtime"], reverse=True)
+    return candidates[:20]
+
+
 @router.post("/process-path")
 async def process_video_by_path(req: ProcessVideoRequest) -> Dict[str, Any]:
     """Process an existing local video path."""
@@ -81,6 +146,7 @@ async def process_video_by_path(req: ProcessVideoRequest) -> Dict[str, Any]:
             cta_position=req.cta_position or "lower_center",
             language=req.language or "tl"
         )
+        result["video_url"] = f"/api/v1/affiliate/video?filename={out_video.name}"
         return result
     except Exception as e:
         logger.error(f"Failed to process affiliate video: {e}", exc_info=True)
@@ -124,6 +190,7 @@ async def process_video_upload(
             cta_position=cta_position,
             language=language
         )
+        result["video_url"] = f"/api/v1/affiliate/video?filename={out_video.name}"
         return result
     except Exception as e:
         logger.error(f"Failed to process uploaded affiliate video: {e}", exc_info=True)
