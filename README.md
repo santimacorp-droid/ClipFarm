@@ -83,8 +83,8 @@ ClipFarm works with virtually every modern LLM inference engine. Configure your 
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/clipfarm/clipfarm.git
-cd clipfarm
+git clone https://github.com/santimacorp-droid/ClipFarm.git
+cd ClipFarm
 ```
 
 ### 2. Configure Environment
@@ -95,12 +95,12 @@ cp .env.example .env
 
 ### 3. Quick Launch (Automated Script)
 ```bash
-chmod +x start_autoclip.sh stop_autoclip.sh
-./start_autoclip.sh
+chmod +x start_clipfarm.sh stop_clipfarm.sh run_all.sh
+./start_clipfarm.sh
 ```
 This script initializes the Python virtual environment, installs requirements, sets up the frontend, and launches:
-- **Backend API**: `http://localhost:8000`
-- **Frontend Studio UI**: `http://localhost:3000`
+- **Backend API**: `http://localhost:8001`
+- **Frontend Studio UI**: `http://localhost:3001`
 
 ### 4. Running with Docker
 ```bash
@@ -134,8 +134,8 @@ ClipFarm/
 
 ## 📞 Community & Contributing
 
-- **Issues**: Found a bug or need an improvement? Open an issue in [GitHub Issues](https://github.com/clipfarm/clipfarm/issues).
-- **Discussions**: Have an idea or want to share workflows? Join [GitHub Discussions](https://github.com/clipfarm/clipfarm/discussions).
+- **Issues**: Found a bug or need an improvement? Open an issue in [GitHub Issues](https://github.com/santimacorp-droid/ClipFarm/issues).
+- **Discussions**: Have an idea or want to share workflows? Join [GitHub Discussions](https://github.com/santimacorp-droid/ClipFarm/discussions).
 - **Contributing**: Contributions are welcome! Check out [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 
 ---
