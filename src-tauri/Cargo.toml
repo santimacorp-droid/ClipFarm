@@ -4,7 +4,7 @@ version = "1.1.0"
 description = "ClipFarm Desktop Application"
 authors = ["ClipFarm Team"]
 license = "MIT"
-repository = "https://github.com/clipfarm/clipfarm"
+repository = "https://github.com/santimacorp-droid/ClipFarm"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
