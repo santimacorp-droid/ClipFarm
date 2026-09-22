@@ -1,31 +1,31 @@
 /**
- * API工具函数
- * 统一处理API URL和请求
+ * APIutility function
+ * unified handlingAPI URLand request
  */
 
 import { apiConfigManager, getApiBaseUrl, buildApiUrl } from './apiConfig'
 
-// 动态获取API基础URL
+// dynamic fetchAPIbaseURL
 export const getApiBaseUrlAsync = async () => {
-  // 等待 API 配置就绪
+  // wait API configuration ready
   await apiConfigManager.waitForReady(5000);
   return getApiBaseUrl();
 }
 
-// 构建完整的API URL
+// build completeAPI URL
 export const buildApiUrlAsync = async (path: string) => {
-  // 等待 API 配置就绪
+  // wait API configuration ready
   await apiConfigManager.waitForReady(5000);
   return buildApiUrl(path);
 }
 
-// 统一的fetch函数
+// uniformfetchfunction
 export const apiFetch = async (path: string, options?: RequestInit) => {
   const url = await buildApiUrlAsync(path);
   return fetch(url, options);
 }
 
-// 统一的GET请求
+// uniformGETrequest
 export const apiGet = async (path: string) => {
   return apiFetch(path, {
     method: 'GET',
@@ -35,7 +35,7 @@ export const apiGet = async (path: string) => {
   })
 }
 
-// 统一的POST请求
+// uniformPOSTrequest
 export const apiPost = async (path: string, data?: any) => {
   return apiFetch(path, {
     method: 'POST',
@@ -46,7 +46,7 @@ export const apiPost = async (path: string, data?: any) => {
   })
 }
 
-// 统一的PUT请求
+// uniformPUTrequest
 export const apiPut = async (path: string, data?: any) => {
   return apiFetch(path, {
     method: 'PUT',
@@ -57,7 +57,7 @@ export const apiPut = async (path: string, data?: any) => {
   })
 }
 
-// 统一的DELETE请求
+// uniformDELETErequest
 export const apiDelete = async (path: string) => {
   return apiFetch(path, {
     method: 'DELETE',

@@ -1,6 +1,6 @@
 """
-任务提交工具
-独立的工具函数，避免循环导入问题
+Task submission tool
+A separate utility function, avoiding circular import issues
 """
 
 import logging
@@ -16,12 +16,12 @@ def _is_desktop_mode() -> bool:
 
 
 def _run_pipeline_locally(project_id: str, input_video_path: str, input_srt_path: str) -> Dict[str, Any]:
-    """桌面模式：不经过 Redis/Celery broker，直接在后台线程内同步执行流水线任务。
+    """Desktop mode: Not through Redis/Celery broker, Runs the pipeline task synchronously in the background thread. 
 
-    桌面安装包里没有 Redis，而生产用的 core.celery_app 走 redis://localhost。
-    Celery 任务 process_video_pipeline 本身是「在任务内同步跑完整条流水线」
-    （asyncio.run(pipeline_adapter...)），不会再派发子任务，所以可以用 .apply()
-    在本地线程里直接跑，进度照常写进数据库的 Task 记录供前端轮询。
+    The desktop installer does not include Redis; the production uses core.celery_app redis://localhost. 
+    Celery The task process_video_pipeline itself is「Reruns the entire pipeline synchronously within the task」
+    (asyncio.run(pipeline_adapter...)), No longer dispatches sub-tasks, so can use .apply()
+    Running directly in the local thread, progress is written to the Task record in the database for front-end polling. 
     """
     import uuid
     import threading
@@ -30,49 +30,49 @@ def _run_pipeline_locally(project_id: str, input_video_path: str, input_srt_path
 
     def run():
         try:
-            # 延迟导入，避免循环依赖
+            # Deferred import to avoid circular dependency
             from ..tasks.processing import process_video_pipeline
             process_video_pipeline.apply(
                 args=[project_id, input_video_path, input_srt_path],
                 task_id=task_id,
             )
-            logger.info(f"桌面模式本地流水线执行结束: {project_id}, task_id={task_id}")
+            logger.info(f"Local pipeline execution in desktop mode complete: {project_id}, task_id={task_id}")
         except Exception as e:  # noqa: BLE001
-            logger.error(f"桌面模式本地流水线执行失败: {project_id}, 错误: {e}", exc_info=True)
+            logger.error(f"Local pipeline execution in desktop mode failed: {project_id}, Error: {e}", exc_info=True)
 
     threading.Thread(target=run, name=f"pipeline-{project_id[:8]}", daemon=True).start()
-    logger.info(f"桌面模式：已在本地后台线程启动视频流水线 {project_id}, task_id={task_id}")
+    logger.info(f"Desktop mode: Video pipeline is started in the local background thread {project_id}, task_id={task_id}")
     return {
         'success': True,
         'task_id': task_id,
         'status': 'PENDING',
-        'message': '视频流水线任务已在本地启动',
+        'message': 'Video pipeline task started locally',
     }
 
 
 def submit_video_pipeline_task(project_id: str, input_video_path: str, input_srt_path: str) -> Dict[str, Any]:
     """
-    提交视频流水线任务
+    Submit video pipeline task
 
     Args:
-        project_id: 项目ID
-        input_video_path: 输入视频路径
-        input_srt_path: 输入SRT路径
+        project_id: ProjectID
+        input_video_path: Input video path
+        input_srt_path: Enter SRT path
 
     Returns:
-        任务提交结果
+        Task submission result
     """
-    # 桌面模式没有 Redis，走本地线程执行
+    # Desktop mode without Redis uses local thread execution
     if _is_desktop_mode():
         return _run_pipeline_locally(project_id, input_video_path, input_srt_path)
 
     try:
-        logger.info(f"提交视频流水线任务: {project_id}")
+        logger.info(f"Submit video pipeline task: {project_id}")
         
-        # 直接使用celery_app提交任务
-        logger.info(f"准备提交任务到队列...")
-        logger.info(f"任务名称: backend.tasks.processing.process_video_pipeline")
-        logger.info(f"任务参数: {[project_id, input_video_path, input_srt_path]}")
+        # Directly use celery_app to submit tasks
+        logger.info(f"Prepare to submit task to queue...")
+        logger.info(f"Task name: backend.tasks.processing.process_video_pipeline")
+        logger.info(f"Task parameters: {[project_id, input_video_path, input_srt_path]}")
         
         try:
             celery_task = celery_app.send_task(
@@ -80,69 +80,69 @@ def submit_video_pipeline_task(project_id: str, input_video_path: str, input_srt
                 args=[project_id, input_video_path, input_srt_path]
             )
             
-            logger.info(f"视频流水线任务已提交: {celery_task.id}")
-            logger.info(f"任务状态: {celery_task.state}")
+            logger.info(f"Video pipeline task submitted: {celery_task.id}")
+            logger.info(f"Task status: {celery_task.state}")
             
-            # 检查任务是否真的提交到队列
+            # Check if the task was really submitted to the queue
             import redis
             r = redis.Redis(host='localhost', port=6379, db=0)
             queue_length = r.llen('processing')
-            logger.info(f"Redis队列长度: {queue_length}")
+            logger.info(f"RedisQueue length: {queue_length}")
             
         except Exception as e:
-            logger.error(f"任务提交过程中出现异常: {e}")
+            logger.error(f"Exception occurred during task submission: {e}")
             raise
         
         return {
             'success': True,
             'task_id': celery_task.id,
             'status': 'PENDING',
-            'message': '视频流水线任务已提交'
+            'message': 'Video pipeline task submitted'
         }
         
     except Exception as e:
-        logger.error(f"提交视频流水线任务失败: {project_id}, 错误: {e}")
+        logger.error(f"Failed to submit video pipeline task: {project_id}, Error: {e}")
         return {
             'success': False,
             'error': str(e),
-            'message': '任务提交失败'
+            'message': 'Task submission failed'
         }
 
 def submit_single_step_task(project_id: str, step: str, config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    提交单个步骤任务
+    Submit single-step task
     
     Args:
-        project_id: 项目ID
-        step: 步骤名称
-        config: 处理配置
+        project_id: ProjectID
+        step: Step name
+        config: Processing configuration
         
     Returns:
-        任务提交结果
+        Task submission result
     """
     try:
-        logger.info(f"提交单个步骤任务: {project_id}, {step}")
+        logger.info(f"Submit single-step task: {project_id}, {step}")
         
-        # 直接使用celery_app提交任务
+        # Directly use celery_app to submit tasks
         celery_task = celery_app.send_task(
             'tasks.processing.process_single_step',
             args=[project_id, step, config]
         )
         
-        logger.info(f"单个步骤任务已提交: {celery_task.id}")
+        logger.info(f"Single-step task submitted: {celery_task.id}")
         
         return {
             'success': True,
             'task_id': celery_task.id,
             'step': step,
             'status': 'PENDING',
-            'message': f'步骤 {step} 任务已提交'
+            'message': f'Step {step} Task submitted'
         }
         
     except Exception as e:
-        logger.error(f"提交单个步骤任务失败: {project_id}, {step}, 错误: {e}")
+        logger.error(f"Failed to submit a single-step task: {project_id}, {step}, Error: {e}")
         return {
             'success': False,
             'error': str(e),
-            'message': '任务提交失败'
+            'message': 'Task submission failed'
         }

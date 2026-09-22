@@ -1,6 +1,6 @@
 """
-统一的进度发布服务
-提供标准化的进度事件发布接口
+Unified progress publishing service
+Provide a standardized progress event publishing interface
 """
 
 import json
@@ -15,14 +15,14 @@ from ..core.config import get_redis_url
 logger = logging.getLogger(__name__)
 
 class ProgressPublisher:
-    """统一的进度发布器"""
+    """Unified progress publisher"""
     
     def __init__(self):
         self.redis_url = get_redis_url()
         self.redis_client: Optional[redis.Redis] = None
     
     async def _get_redis_client(self) -> redis.Redis:
-        """获取Redis客户端"""
+        """Get Redis client"""
         if self.redis_client is None:
             self.redis_client = redis.from_url(self.redis_url, decode_responses=True)
         return self.redis_client
@@ -38,19 +38,19 @@ class ProgressPublisher:
         task_id: Optional[str] = None
     ) -> bool:
         """
-        发布项目进度事件
+        Publish project progress events
         
         Args:
-            project_id: 项目ID
-            step: 当前步骤
-            total_steps: 总步骤数
-            percent: 进度百分比 (0-100)
-            message: 进度消息
-            status: 状态 (running/succeeded/failed)
-            task_id: 任务ID（可选）
+            project_id: ProjectID
+            step: Current step
+            total_steps: Total steps
+            percent: Progress percentage (0-100)
+            message: Progress message
+            status: Status (running/succeeded/failed)
+            task_id: Task ID (optional))
             
         Returns:
-            是否发布成功
+            Whether publish succeeded
         """
         try:
             channel = project_progress_channel(project_id)
@@ -71,22 +71,22 @@ class ProgressPublisher:
             redis_client = await self._get_redis_client()
             await redis_client.publish(channel, json.dumps(payload, ensure_ascii=False))
             
-            logger.info(f"进度事件已发布: {project_id} - {percent}% - {message}")
+            logger.info(f"Progress event published successfully: {project_id} - {percent}% - {message}")
             return True
             
         except Exception as e:
-            logger.error(f"发布进度事件失败: {e}")
+            logger.error(f"Failed to publish progress event: {e}")
             return False
     
     async def close(self):
-        """关闭Redis连接"""
+        """Close Redis connection"""
         if self.redis_client:
             await self.redis_client.close()
 
-# 全局实例
+# Global instance
 progress_publisher = ProgressPublisher()
 
-# 便捷函数
+# Convenience function
 async def publish_project_progress(
     project_id: str, 
     step: int, 
@@ -96,7 +96,7 @@ async def publish_project_progress(
     status: str = "running",
     task_id: Optional[str] = None
 ) -> bool:
-    """发布项目进度的便捷函数"""
+    """Publish project progress with a convenient function"""
     return await progress_publisher.publish_project_progress(
         project_id, step, total_steps, percent, message, status, task_id
     )

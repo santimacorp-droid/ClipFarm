@@ -1,198 +1,155 @@
-# B站登录替代方案指南
+# BAlternative login solutions guide
 
-## 问题背景
+## Problem backgroundBSite's risk control mechanisms can cause login failures or account restrictions. To solve this problem, we provide multiple alternative login options. 
 
-扫码登录方式容易触发B站的风控机制，导致登录失败或账号被限制。为了解决这个问题，我们提供了多种替代的登录方式。
+## Supported login methods
 
-## 支持的登录方式
+### 1. CookieImport login ⭐⭐⭐⭐⭐ (Recommend)
 
-### 1. Cookie导入登录 ⭐⭐⭐⭐⭐ (推荐)
+**Advantages: **
+- Will not triggerBSite's risk control)
 
-**优点：**
-- 不会触发B站风控
-- 登录成功率高
-- 操作简单
-- 安全性好（本地加密存储）
+**Disadvantages: **
+- Need to obtain manuallyCookie
+- CookieHas time limits, requires regular updates
 
-**缺点：**
-- 需要手动获取Cookie
-- Cookie有时效性，需要定期更新
+**Use cases: **
+- For everyday use
 
-**适用场景：**
-- 日常使用
-- 批量账号管理
-- 避免风控需求
+**Usage method: **
+1. Log in in browserBSite
+2. ByF12Open developer tools
+3. Switch toNetworkTab page
+4. Refresh page, find any request
+5. Copy in request headersCookieField values
+6. Paste intoAutoClipOf/theCookieIn the input field
 
-**使用方法：**
-1. 在浏览器中登录B站
-2. 按F12打开开发者工具
-3. 切换到Network标签页
-4. 刷新页面，找到任意请求
-5. 在请求头中复制Cookie字段的值
-6. 粘贴到AutoClip的Cookie输入框中
+### 2. Account password login ⭐⭐⭐
 
-### 2. 账号密码登录 ⭐⭐⭐
+**Advantages: **
+- Intuitive operation
 
-**优点：**
-- 操作直观
-- 不需要额外工具
+**Disadvantages: **
+- May need to handle verification codes
 
-**缺点：**
-- 可能需要处理验证码
-- 有触发风控的风险
-- 需要输入敏感信息
+**Use cases: **
+- New users' first loginCookieIn this case
 
-**适用场景：**
-- 新用户首次登录
-- 无法获取Cookie的情况
+**Usage method: **
+1. InputBSite username/Phone number
+2. Enter password
+3. Set nickname
+4. Click login
 
-**使用方法：**
-1. 输入B站用户名/手机号
-2. 输入密码
-3. 设置昵称
-4. 点击登录
+### 3. Scan QR code for login ⭐⭐
 
-### 3. 扫码登录 ⭐⭐
+**Advantages: **
+- Simple operation
 
-**优点：**
-- 操作简单
-- 不需要输入密码
+**Disadvantages: **
+- Easy to triggerBSite's risk controlBSiteAPP
 
-**缺点：**
-- 容易触发B站风控
-- 成功率较低
-- 需要手机B站APP
+**Use cases: **
+- For temporary testing
 
-**适用场景：**
-- 临时测试
-- 其他方式都不可用的情况
+**Usage method: **
+1. Click "Start scanning QR code to log in""
+2. UseBSiteAPPScan QR code
+3. AtAPPConfirm login
 
-**使用方法：**
-1. 点击"开始扫码登录"
-2. 使用B站APP扫描二维码
-3. 在APP中确认登录
+### 4. Third-party login ⭐⭐
 
-### 4. 第三方登录 ⭐⭐
+**Advantages: **
+- No needBSite account passwords
 
-**优点：**
-- 不需要B站账号密码
-- 相对安全
+**Disadvantages: **
+- Third-party account required
 
-**缺点：**
-- 需要第三方账号
-- 流程复杂
-- 支持有限
+**Use cases: **
+- Has WeChat/QQAccount user(s)BAccount password information
 
-**适用场景：**
-- 有微信/QQ账号的用户
-- 不想使用B站账号密码的情况
+## Recommended usage strategy
 
-## 推荐使用策略
+### Recommended for daily use
+1. **Primary: CookieImport**
+   - The most stable and reliable optionCookie
 
-### 日常使用推荐
-1. **首选：Cookie导入**
-   - 最稳定可靠的方式
-   - 不会触发风控
-   - 建议定期更新Cookie
+2. **Alternative option: standard username/password login**
+   - WhenCookieWhen invalid, use
 
-2. **备选：账号密码登录**
-   - 当Cookie失效时使用
-   - 注意验证码处理
+### Batch account managementCookieImport methodCookieUpdate mechanism
 
-### 批量账号管理
-- 统一使用Cookie导入方式
-- 建立Cookie更新机制
-- 定期检查账号状态
+### New user guidance
+1. Provide detailedCookieGet tutorial
+2. Create visual operational guidelines
+3. One-click copy support
 
-### 新用户引导
-1. 提供详细的Cookie获取教程
-2. 制作可视化操作指南
-3. 提供一键复制功能
+## Security considerations
 
-## 安全注意事项
+### CookieSecurity
+- CookieContains login credentials. Please keep them safe.Cookie
+- Clear after use is completed
 
-### Cookie安全
-- Cookie包含登录凭证，请妥善保管
-- 不要分享给他人
-- 定期更换Cookie
-- 使用完毕后及时清除
+### Account security
 
-### 账号安全
-- 不要在公共设备上登录
-- 定期检查账号状态
-- 发现异常及时处理
+## Technical implementation
 
-## 技术实现
-
-### 后端API
+### BackendAPI
 ```python
-# Cookie验证
+# CookieVerify
 async def validate_bilibili_cookies(cookies: dict) -> dict:
-    """验证B站Cookie有效性"""
-    # 使用Cookie访问用户信息API
-    # 返回验证结果和用户信息
+    """VerifyBSiteCookieValidity"""
+    # UseCookieAccess user informationAPI
+    # Return verification result and user information
 
-# 账号密码登录
+# Account password login
 async def bilibili_password_login(username: str, password: str) -> dict:
-    """B站账号密码登录"""
-    # 处理验证码和登录流程
-    # 返回登录结果
+    """BAccount password login"""
+    # Handle captcha and login flow
+    # Return login result
 ```
 
-### 前端组件
+### Frontend component
 ```typescript
-// 多种登录方式支持
+// Multiple login method support
 const loginMethods = [
-  { id: 'cookie', name: 'Cookie导入', recommended: true },
-  { id: 'password', name: '账号密码', recommended: true },
-  { id: 'qr', name: '扫码登录', recommended: false },
-  { id: 'wechat', name: '微信登录', recommended: false },
-  { id: 'qq', name: 'QQ登录', recommended: false }
+  { id: 'cookie', name: 'CookieImport', recommended: true },
+  { id: 'password', name: 'Username/password', recommended: true },
+  { id: 'qr', name: 'Scan QR code for login', recommended: false },
+  { id: 'wechat', name: 'WeChat login', recommended: false },
+  { id: 'qq', name: 'QQLogin', recommended: false }
 ]
 ```
 
-## 故障排除
+## Troubleshooting
 
-### 常见问题
+### Frequently asked questions
 
-1. **Cookie无效**
-   - 检查Cookie是否过期
-   - 确认Cookie格式正确
-   - 重新获取Cookie
+1. **CookieInvalid**
+   - CheckCookieExpiration statusCookieCorrect formatCookie
 
-2. **账号密码登录失败**
-   - 检查用户名密码是否正确
-   - 确认是否需要验证码
-   - 尝试使用Cookie导入
+2. **Account password login failed**
+   - Check if username and password are correctCookieImport
 
-3. **扫码登录超时**
-   - 检查网络连接
-   - 确认B站APP版本
-   - 尝试其他登录方式
+3. **Scan login timeout**
+   - Check network connectionBSiteAPPVersion
 
-### 调试方法
-1. 查看浏览器控制台错误信息
-2. 检查网络请求状态
-3. 查看后端日志
-4. 使用开发者工具分析
+### Debugging methods
+1. View browser console error messages
+2. Check network request status codes
+3. View backend logs
+4. Use developer tools to analyze
 
-## 更新日志
+## Release notes
 
 ### v1.0.0
-- 添加Cookie导入登录
-- 添加账号密码登录
-- 优化扫码登录流程
-- 添加登录方式选择界面
+- AddCookieImport login
 
-### 后续计划
-- 添加Cookie自动更新功能
-- 支持更多第三方登录
-- 优化用户体验
-- 增强安全性
+### Future plansCookieAuto-update function
 
-## 相关文档
+## Related documentation
 
-- [Cookie获取详细教程](./COOKIE_GETTING_GUIDE.md)
-- [B站API接口文档](./BILIBILI_API_DOCS.md)
-- [安全最佳实践](./SECURITY_BEST_PRACTICES.md)
+- [CookieGet detailed tutorial](./COOKIE_GETTING_GUIDE.md)
+- [BSiteAPIAPI documentation](./BILIBILI_API_DOCS.md)
+- [Security best practices](./SECURITY_BEST_PRACTICES.md)
 

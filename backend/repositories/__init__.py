@@ -1,6 +1,6 @@
 """
-数据访问层包
-实现Repository模式，提供统一的数据访问接口
+Data Access Layer package
+Implement the Repository pattern, providing a unified data access interface
 """
 from .base import BaseRepository
 

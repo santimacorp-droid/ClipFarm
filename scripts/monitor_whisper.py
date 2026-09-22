@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Whisper进程监控工具
-用于检测和防止重复的Whisper进程
+WhisperProcess monitor toolWhisperProcess
 """
 
 import psutil
@@ -13,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def find_whisper_processes():
-    """查找所有正在运行的Whisper进程"""
+    """Looking up all running instancesWhisperProcess"""
     whisper_processes = []
     
     for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'cpu_percent', 'memory_info']):
@@ -33,20 +32,20 @@ def find_whisper_processes():
     return whisper_processes
 
 def check_duplicate_whisper_processes():
-    """检查是否有重复的Whisper进程处理同一个文件"""
+    """Checking for existing duplicatesWhisperProcesses handling the same file"""
     whisper_processes = find_whisper_processes()
     
     if not whisper_processes:
-        logger.info("没有发现Whisper进程")
+        logger.info("Not foundWhisperProcess")
         return True
     
-    logger.info(f"发现 {len(whisper_processes)} 个Whisper进程:")
+    logger.info(f"Found {len(whisper_processes)} CountWhisperProcess:")
     
-    # 按视频文件分组
+    # Grouping by video file
     video_files = {}
     for proc in whisper_processes:
         cmdline = proc['cmdline']
-        # 提取视频文件路径
+        # Extracting video file paths
         parts = cmdline.split()
         video_file = None
         for i, part in enumerate(parts):
@@ -59,29 +58,29 @@ def check_duplicate_whisper_processes():
                 video_files[video_file] = []
             video_files[video_file].append(proc)
     
-    # 检查重复处理
+    # Checking duplicate processing
     duplicates_found = False
     for video_file, processes in video_files.items():
         if len(processes) > 1:
-            logger.warning(f"发现重复处理文件 {video_file}:")
+            logger.warning(f"Found duplicate file processing {video_file}:")
             duplicates_found = True
             for proc in processes:
-                logger.warning(f"  PID {proc['pid']}: CPU {proc['cpu_percent']:.1f}%, 内存 {proc['memory_mb']:.1f}MB")
+                logger.warning(f"  PID {proc['pid']}: CPU {proc['cpu_percent']:.1f}%, Memory {proc['memory_mb']:.1f}MB")
     
     if not duplicates_found:
-        logger.info("没有发现重复处理的Whisper进程")
+        logger.info("No duplicate processing foundWhisperProcess")
     
     return not duplicates_found
 
 def kill_duplicate_whisper_processes():
-    """终止重复的Whisper进程"""
+    """Terminated duplicatesWhisperProcess"""
     whisper_processes = find_whisper_processes()
     
     if not whisper_processes:
-        logger.info("没有Whisper进程需要终止")
+        logger.info("NoWhisperProcess needs to be terminated")
         return
     
-    # 按视频文件分组
+    # Grouping by video file
     video_files = {}
     for proc in whisper_processes:
         cmdline = proc['cmdline']
@@ -97,39 +96,39 @@ def kill_duplicate_whisper_processes():
                 video_files[video_file] = []
             video_files[video_file].append(proc)
     
-    # 保留CPU使用率最高的进程，终止其他的
+    # KeepCPUFor detecting and preventing duplicates
     for video_file, processes in video_files.items():
         if len(processes) > 1:
-            logger.info(f"处理重复进程 - 文件: {video_file}")
+            logger.info(f"Handling duplicate processes - by file: {video_file}")
             
-            # 按CPU使用率排序，保留最高的
+            # ByCPUBy usage rank, keeping the top ones
             processes.sort(key=lambda x: x['cpu_percent'], reverse=True)
             keep_process = processes[0]
             
-            logger.info(f"保留进程 PID {keep_process['pid']} (CPU: {keep_process['cpu_percent']:.1f}%)")
+            logger.info(f"Keep process PID {keep_process['pid']} (CPU: {keep_process['cpu_percent']:.1f}%)")
             
-            # 终止其他进程
+            # Terminating other processes
             for proc in processes[1:]:
                 try:
-                    logger.info(f"终止重复进程 PID {proc['pid']}")
+                    logger.info(f"Terminating duplicate processes PID {proc['pid']}")
                     psutil.Process(proc['pid']).terminate()
                 except psutil.NoSuchProcess:
-                    logger.info(f"进程 PID {proc['pid']} 已经不存在")
+                    logger.info(f"Process PID {proc['pid']} Already does not exist")
                 except psutil.AccessDenied:
-                    logger.error(f"无法终止进程 PID {proc['pid']} (权限不足)")
+                    logger.error(f"Unable to terminate process PID {proc['pid']} (Insufficient permissions)")
 
 def main():
-    """主函数"""
+    """Main function"""
     if len(sys.argv) > 1 and sys.argv[1] == '--kill-duplicates':
-        logger.info("检查并终止重复的Whisper进程...")
+        logger.info("Checking and terminating duplicatesWhisperProcess...")
         kill_duplicate_whisper_processes()
     else:
-        logger.info("检查Whisper进程状态...")
+        logger.info("CheckWhisperProcess state...")
         if check_duplicate_whisper_processes():
-            logger.info("✅ 系统状态正常")
+            logger.info("✅ System state is healthy")
             sys.exit(0)
         else:
-            logger.warning("⚠️ 发现重复的Whisper进程")
+            logger.warning("⚠️ Duplicate foundWhisperProcess")
             sys.exit(1)
 
 if __name__ == '__main__':

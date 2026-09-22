@@ -679,15 +679,59 @@ Return strictly a JSON array of objects without markdown formatting:
     def burn_captions(
         input_video_path: Path,
         ass_path: Path,
-        output_video_path: Path
+        output_video_path: Path,
+        watermark_path: Optional[Path] = None,
+        watermark_position: str = "bottom_right",
+        watermark_scale: float = 15.0,
+        watermark_opacity: float = 0.85,
+        watermark_margin: int = 24
     ) -> Path:
-        """Burn ASS subtitles into video using FFmpeg libass."""
+        """Burn ASS subtitles and optional brand logo watermark into video using FFmpeg."""
         input_video_path = Path(input_video_path)
         ass_path = Path(ass_path)
         output_video_path = Path(output_video_path)
         output_video_path.parent.mkdir(parents=True, exist_ok=True)
 
-        ass_filter_path = str(ass_path.resolve()).replace("\\", "/").replace(":", r"\:")
+        ass_filter_path = str(ass_path.resolve()).replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
+        has_wm = watermark_path is not None and Path(watermark_path).exists()
+
+        if has_wm:
+            try:
+                from backend.utils.watermark_processor import get_watermark_overlay_expr
+                scale_ratio = max(0.05, min(0.50, float(watermark_scale) / 100.0))
+                op_val = max(0.05, min(1.0, float(watermark_opacity)))
+                overlay_expr = get_watermark_overlay_expr(watermark_position, watermark_margin)
+
+                filter_graph = (
+                    f"[1:v]format=rgba,colorchannelmixer=aa={op_val}[wm_alpha];"
+                    f"[wm_alpha][0:v]scale2ref=w=main_w*{scale_ratio}:h=ow/mdar[wm_scaled][base_v];"
+                    f"[base_v][wm_scaled]overlay={overlay_expr}[v_wm];"
+                    f"[v_wm]ass='{ass_filter_path}'[outv]"
+                )
+
+                cmd = [
+                    "ffmpeg", "-y",
+                    "-i", str(input_video_path),
+                    "-i", str(watermark_path),
+                    "-filter_complex", filter_graph,
+                    "-map", "[outv]",
+                    "-map", "0:a?",
+                    "-c:v", "libx264",
+                    "-preset", "fast",
+                    "-crf", "20",
+                    "-pix_fmt", "yuv420p",
+                    "-movflags", "+faststart",
+                    "-c:a", "copy",
+                    str(output_video_path)
+                ]
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                if res.returncode == 0 and output_video_path.exists() and output_video_path.stat().st_size > 1024:
+                    logger.info(f"Burned subtitles and brand watermark ({watermark_position}): {output_video_path}")
+                    return output_video_path
+                else:
+                    logger.warning(f"Combined watermark+caption burn failed: {res.stderr[-300:] if res.stderr else ''}, falling back to caption-only")
+            except Exception as e:
+                logger.warning(f"Error during combined watermark+caption burn: {e}")
 
         for filter_name in ["ass", "subtitles"]:
             cmd = [
@@ -768,6 +812,7 @@ Return strictly a JSON array of objects without markdown formatting:
         language: str = "tl",
         engine: str = "auto",
         watermark: bool = True,
+        watermark_preset_id: Optional[str] = "none",
         keep_intermediate: bool = False,
     ) -> Dict[str, Any]:
         """
@@ -776,8 +821,8 @@ Return strictly a JSON array of objects without markdown formatting:
         2. Obtain subtitle segments: from provided user transcript slot (SRT/VTT/aligned script)
            or automatically transcribed via Gemini 2.5 Flash / Whisper in Filipino ('tl').
         3. Generate stylish ASS captions (e.g. Hormozi Yellow).
-        4. Burn captions into video.
-        5. Overlay Facebook Follow CTA.
+        4. Burn captions and optional brand watermark into video.
+        5. Overlay Facebook Follow CTA (persistent anti-theft watermark + animated follow action).
         6. Return complete metadata and output path.
         """
         t0 = time.time()
@@ -826,11 +871,38 @@ Return strictly a JSON array of objects without markdown formatting:
                 style=chosen_style
             )
 
-            # 3. Burn captions into video
+            # Resolve brand watermark preset if specified
+            brand_logo_path = None
+            wm_position = "bottom_right"
+            wm_scale = 15.0
+            wm_opacity = 0.85
+            wm_margin = 24
+            if watermark_preset_id and watermark_preset_id != "none":
+                try:
+                    from backend.services.watermark_service import watermark_service
+                    wm_preset = watermark_service.get_preset(watermark_preset_id)
+                    if wm_preset and wm_preset.get("logo_filename"):
+                        logo_file = watermark_service.get_logo_path(wm_preset["logo_filename"])
+                        if logo_file and logo_file.exists():
+                            brand_logo_path = logo_file
+                            wm_position = wm_preset.get("position", "bottom_right")
+                            wm_scale = float(wm_preset.get("scale_percent", 15.0))
+                            wm_opacity = float(wm_preset.get("opacity", 0.85))
+                            wm_margin = int(wm_preset.get("margin", 24))
+                            logger.info(f"Resolved brand watermark preset '{watermark_preset_id}' -> {brand_logo_path.name}")
+                except Exception as wm_err:
+                    logger.warning(f"Failed to resolve watermark preset '{watermark_preset_id}': {wm_err}")
+
+            # 3. Burn captions and optional brand watermark into video
             self.burn_captions(
                 input_video_path=input_path,
                 ass_path=ass_path,
-                output_video_path=captioned_video
+                output_video_path=captioned_video,
+                watermark_path=brand_logo_path,
+                watermark_position=wm_position,
+                watermark_scale=wm_scale,
+                watermark_opacity=wm_opacity,
+                watermark_margin=wm_margin
             )
 
             # 4. Overlay Facebook Follow CTA
@@ -870,6 +942,8 @@ Return strictly a JSON array of objects without markdown formatting:
                 "cta_style": cta_style,
                 "cta_position": cta_position,
                 "cta_watermark": watermark,
+                "watermark_preset_id": watermark_preset_id or "none",
+                "brand_watermark_applied": bool(brand_logo_path),
                 "video_width": w,
                 "video_height": h,
                 "video_duration": duration,

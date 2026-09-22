@@ -1,125 +1,103 @@
-# B站管理功能使用指南
+# BSite management function guide
 
-## 📋 功能概述
+## 📋 Function overviewBThe account management feature is designed for beginners, offering the simplest and most intuitive account and posting experience. 
 
-新的B站管理功能专为小白用户设计，提供最简单、最直观的账号管理和投稿体验。
+## 🎯 Core functionality
 
-## 🎯 核心功能
+### 1. Account management
+- **add account**: SupportCookieImport method, secure and reliable
+- **Multi-account support**: Can add multipleBSite account
+- **account status**: Real-time display of account health status
+- **Quick delete**: One-click delete unnecessary accounts
 
-### 1. 账号管理
-- **添加账号**: 支持Cookie导入方式，安全可靠
-- **多账号支持**: 可以添加多个B站账号
-- **账号状态**: 实时显示账号健康状态
-- **快速删除**: 一键删除不需要的账号
+### 2. submit contribution
+- **segmented submission**: Post directly from slice details page
+- **Batch upload**: Support uploading multiple slices simultaneously
+- **Account selection**: Flexible choice of posting account
+- **Section settings**: SupportBAll sections of site
 
-### 2. 投稿上传
-- **切片投稿**: 在切片详情页直接投稿
-- **批量投稿**: 支持同时上传多个切片
-- **账号选择**: 灵活选择投稿账号
-- **分区设置**: 支持B站所有分区
+## 🚀 usage flow
 
-## 🚀 使用流程
+### Step one: addBSite account
 
-### 第一步：添加B站账号
+1. **Enter settings page**
+   - Click the left navigation bar's "Settings""B"Labels" tab for site account management
 
-1. **进入设置页面**
-   - 点击左侧导航栏的"设置"
-   - 选择"B站账号管理"标签页
+2. **add account**
+   - Click "Manage"BAccount button
 
-2. **添加账号**
-   - 点击"管理B站账号"按钮
-   - 选择"账号管理"标签页
-   - 点击"添加账号"按钮
+3. **RetrieveCookie**
+   - OpenBSite and loginF12Open developer toolsNetworkTabRequest HeadersFound inCookieField — copyCookieof values (not including"Cookie: "Prefix)
 
-3. **获取Cookie**
-   - 打开B站网站并登录
-   - 按F12打开开发者工具
-   - 点击Network标签页
-   - 刷新页面
-   - 找到任意请求，点击查看
-   - 在Request Headers中找到Cookie字段
-   - 复制Cookie的值（不包含"Cookie: "前缀）
+4. **import accounts**
+   - Input account nickname (for identification)CookieContent"
 
-4. **导入账号**
-   - 输入账号昵称（用于识别）
-   - 粘贴Cookie内容
-   - 点击"添加账号"
+### Step two: post slice
 
-### 第二步：投稿切片
+1. **select segments**
+   - Enter project details page
 
-1. **选择切片**
-   - 进入项目详情页
-   - 找到要投稿的切片
-   - 点击切片卡片上的"投稿"按钮
+2. **Configure posting information**
+   - Select to useBAccount)
 
-2. **配置投稿信息**
-   - 选择要使用的B站账号
-   - 选择视频分区
-   - 输入视频标题
-   - 添加描述和标签（可选）
+3. **Start posting**
+   - Click the "Start Posting" button
 
-3. **开始投稿**
-   - 点击"开始投稿"按钮
-   - 系统会在后台处理投稿
-   - 投稿完成后会显示成功提示
+## 💡 usage tips
 
-## 💡 使用技巧
+### Cookieget tips
+- **Recommended browser**: Chrome, Edge, Firefox
+- **Get location**: Developer tools → Network → Any request → Request Headers
+- **Format requirements**: CompleteCookieString, separated by semicolons
+- **Validity period**: CookieUsually has7-30Day validity, re-obtain after expiration
 
-### Cookie获取技巧
-- **推荐浏览器**: Chrome、Edge、Firefox
-- **获取位置**: 开发者工具 → Network → 任意请求 → Request Headers
-- **格式要求**: 完整的Cookie字符串，用分号分隔
-- **有效期**: Cookie通常有7-30天有效期，过期后需要重新获取
+### Account management tips
+- **nickname set**: Use meaningful nicknames, such as "main account," "backup account""
+- **Regular check**: It is recommended to regularly check account status and update expired accounts in a timely mannerCookie
+- **Multi-account strategy**: You can set up accounts for different purposes, such as "test account," "official account""
 
-### 账号管理技巧
-- **昵称设置**: 使用有意义的昵称，如"主账号"、"备用账号"
-- **定期检查**: 建议定期检查账号状态，及时更新过期Cookie
-- **多账号策略**: 可以设置不同用途的账号，如"测试账号"、"正式账号"
+### Posting optimization tips
+- **title optimization**: Use engaging titles, avoiding excessively long ones
+- **Select section**: Choose suitable categories to improve recommendation results
+- **Tag settings**: Add relevant tags to increase visibility
+- **Batch upload**: For multiple related slices, you can post in bulk
 
-### 投稿优化技巧
-- **标题优化**: 使用吸引人的标题，避免过长
-- **分区选择**: 选择合适的分区，提高推荐效果
-- **标签设置**: 添加相关标签，增加曝光度
-- **批量投稿**: 对于多个相关切片，可以批量投稿
+## ⚠️ Important notes
 
-## ⚠️ 注意事项
+### security alert
+- **CookieSecure**: CookieContains login information, please keep it safe
+- **Account security**: Do not log in on public devices
+- **periodic updates**: Recommend regular updatesCookie, Avoid expiration
 
-### 安全提醒
-- **Cookie安全**: Cookie包含登录信息，请妥善保管
-- **账号安全**: 不要在公共设备上登录
-- **定期更新**: 建议定期更新Cookie，避免过期
+### Usage limits
+- **Upload limit**: FollowBSite upload rules and limits
+- **Content standards**: Ensure content complies withBSite community guidelines
+- **rate limiting**: Avoid frequent posting to prevent triggering anti-risk measures
 
-### 使用限制
-- **上传限制**: 遵守B站上传规则和限制
-- **内容规范**: 确保内容符合B站社区规范
-- **频率控制**: 避免频繁投稿，防止触发风控
+### Troubleshooting
+- **CookieInvalid**: CheckCookieFormat and validity period
+- **Upload failed**: Check network connection and account status
+- **Section error**: Confirm sectionIDvalid?
 
-### 故障排除
-- **Cookie无效**: 检查Cookie格式和有效期
-- **上传失败**: 检查网络连接和账号状态
-- **分区错误**: 确认分区ID是否正确
+## 🔧 technical details
 
-## 🔧 技术说明
+### Supported login methods
+- **CookieImport** (Recommended): Most secure, will not trigger risk control
+- **Account password login**: Traditional method, may have CAPTCHA
+- **scan-to-login**: NeedBSiteAPP, May trigger risk control
 
-### 支持的登录方式
-- **Cookie导入** (推荐): 最安全，不会触发风控
-- **账号密码登录**: 传统方式，可能有验证码
-- **扫码登录**: 需要B站APP，可能触发风控
+### Upload mechanism
+- **DirectAPICall**: UseBSite officialAPI, Stable and reliable
+- **segmented upload**: Support large file slicing upload
+- **retry mechanism**: Automatic retry of failed uploads
+- **Progress tracking**: Show upload progress in real time
 
-### 上传机制
-- **直接API调用**: 使用B站官方API，稳定可靠
-- **分片上传**: 支持大文件分片上传
-- **重试机制**: 自动重试失败的上传
-- **进度跟踪**: 实时显示上传进度
-
-## 📞 技术支持
-
-如果遇到问题，可以：
-1. 查看系统日志获取详细错误信息
-2. 检查网络连接和账号状态
-3. 重新获取Cookie并更新账号
-4. 联系技术支持获取帮助
+## 📞 Technical support: 
+1. Check system logs for detailed error information
+2. Check network connection and account status
+3. refresh againCookieAnd update account
+4. Contact technical support for assistance
 
 ---
 
-*最后更新: 2024年12月*
+*Last updated: 2024Year12Month*

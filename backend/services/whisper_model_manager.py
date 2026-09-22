@@ -1,9 +1,9 @@
 """
-Whisper 模型管理服务（mlx-whisper）
+Whisper Model Management Service (mlx-whisper)
 
-负责 mlx-community Whisper 模型的下载、状态检查、删除。模型从 HuggingFace 拉取，
-统一缓存到 `<data_dir>/whisper-models`（由 whisper_runtime 设置 HF_HOME）。
-依赖（huggingface_hub）来自运行时安装目录，所有相关 import 都延迟到函数内。
+Responsible for downloading, status checking, and deletion of the mlx-community Whisper model. Downloads models from HuggingFace, 
+Unified cache directory `<data_dir>/whisper-models` (configured via whisper_runtime HF_HOME). 
+Dependencies (huggingface_hub) come from the runtime installation directory; all related imports are delayed until within functions. 
 """
 import logging
 import threading
@@ -18,10 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class ModelStatus(str, Enum):
-    AVAILABLE = "available"      # 运行时就绪、可下载
-    DOWNLOADING = "downloading"  # 下载中
-    DOWNLOADED = "downloaded"    # 已下载
-    ERROR = "error"              # 错误（通常是运行时未安装）
+    AVAILABLE = "available"      # Runtime ready, downloadable
+    DOWNLOADING = "downloading"  # Downloading
+    DOWNLOADED = "downloaded"    # Downloaded
+    ERROR = "error"              # Error (typically runtime not installed)
     NOT_FOUND = "not_found"
 
 
@@ -40,32 +40,32 @@ class ModelInfo:
     error_message: Optional[str] = None
 
 
-# 模型名 -> HuggingFace 仓库 + 展示信息（faster-whisper / CTranslate2 模型）
+# Model name -> HuggingFace repository + display information (faster-whisper / CTranslate2 model)
 _MODELS = {
     "tiny": {
         "repo_id": "Systran/faster-whisper-tiny",
         "size": "~75 MB", "size_bytes": 75 * 1024 * 1024,
-        "description": "最快，准确度较低，适合快速预览", "accuracy": "较低", "speed": "最快",
+        "description": "Fastest, lower accuracy, ideal for quick previews",
     },
     "base": {
         "repo_id": "Systran/faster-whisper-base",
         "size": "~145 MB", "size_bytes": 145 * 1024 * 1024,
-        "description": "平衡之选，推荐日常使用", "accuracy": "中等", "speed": "快",
+        "description": "Balanced choice, recommended for everyday use",
     },
     "small": {
         "repo_id": "Systran/faster-whisper-small",
         "size": "~488 MB", "size_bytes": 488 * 1024 * 1024,
-        "description": "较好准确度，适合重要内容", "accuracy": "较好", "speed": "中等",
+        "description": "Better accuracy, suitable for important content",
     },
     "medium": {
         "repo_id": "Systran/faster-whisper-medium",
         "size": "~1.5 GB", "size_bytes": 1500 * 1024 * 1024,
-        "description": "高准确度，适合专业用途", "accuracy": "高", "speed": "较慢",
+        "description": "High accuracy, suitable for professional use",
     },
     "large-v3": {
         "repo_id": "Systran/faster-whisper-large-v3",
         "size": "~3 GB", "size_bytes": 3000 * 1024 * 1024,
-        "description": "最高准确度", "accuracy": "最高", "speed": "最慢",
+        "description": "Highest accuracy", "accuracy": "Highest", "speed": "Slowest",
     },
 }
 
@@ -82,10 +82,10 @@ class WhisperModelManager:
         self._download_state: Dict[str, Dict] = {}
         self._lock = threading.Lock()
 
-    # ---- 路径 / 状态 ----
+    # ---- Path / Status ----
     def _model_cache_dir(self, model_name: str) -> Path:
         repo = self.model_configs[model_name]["repo_id"]
-        # HF 缓存目录命名：models--<org>--<name>
+        # HF cache directory naming: models--<org>--<name>
         return whisper_runtime.get_models_dir() / "hub" / ("models--" + repo.replace("/", "--"))
 
     def _is_downloaded(self, model_name: str) -> bool:
@@ -103,7 +103,7 @@ class WhisperModelManager:
         if self._is_downloaded(model_name):
             return ModelStatus.DOWNLOADED
         if not whisper_runtime.is_installed():
-            return ModelStatus.ERROR  # 运行时没装，模型也用不了
+            return ModelStatus.ERROR  # Runtime not installed, model unavailable
         return ModelStatus.AVAILABLE
 
     def _info(self, model_name: str) -> ModelInfo:
@@ -129,12 +129,12 @@ class WhisperModelManager:
             return None
         return self._info(model_name)
 
-    # ---- 下载（后台线程，非阻塞）----
+    # ---- Download (background thread, non-blocking) ----
     async def download_model(self, model_name: str) -> bool:
         if model_name not in self.model_configs:
-            raise ValueError(f"不支持的模型: {model_name}")
+            raise ValueError(f"Unsupported model: {model_name}")
         if not whisper_runtime.is_installed():
-            raise RuntimeError("请先安装 Whisper 运行时")
+            raise RuntimeError("Please install Whisper runtime first")
         if self._is_downloaded(model_name):
             return True
         with self._lock:
@@ -153,16 +153,16 @@ class WhisperModelManager:
         try:
             whisper_runtime.ensure_on_path()
             from huggingface_hub import snapshot_download
-            logger.info(f"开始下载 Whisper 模型 {model_name} ({repo_id})")
+            logger.info(f"Starting download of Whisper model {model_name} ({repo_id})")
             snapshot_download(
                 repo_id=repo_id,
                 cache_dir=str(whisper_runtime.get_models_dir() / "hub"),
             )
             with self._lock:
                 self._download_state[model_name] = {"status": "downloaded", "progress": 100, "error": None}
-            logger.info(f"Whisper 模型 {model_name} 下载完成")
+            logger.info(f"Whisper model {model_name} download completed")
         except Exception as e:  # noqa: BLE001
-            logger.error(f"下载 Whisper 模型 {model_name} 失败: {e}", exc_info=True)
+            logger.error(f"Downloading Whisper model {model_name} failed: {e}", exc_info=True)
             with self._lock:
                 self._download_state[model_name] = {"status": "error", "progress": 0, "error": str(e)}
 
@@ -174,7 +174,7 @@ class WhisperModelManager:
         return st.get("progress")
 
     def cancel_download(self, model_name: str) -> bool:
-        # snapshot_download 不易中断；这里只清状态，已下载分片保留可续传
+        # snapshot_download is difficult to interrupt; here we only clear state, keeping downloaded shards
         with self._lock:
             if model_name in self._download_state and self._download_state[model_name].get("status") == "downloading":
                 self._download_state[model_name] = {"status": "available", "progress": 0, "error": None}
@@ -191,10 +191,10 @@ class WhisperModelManager:
                 shutil.rmtree(d, ignore_errors=True)
             with self._lock:
                 self._download_state.pop(model_name, None)
-            logger.info(f"Whisper 模型 {model_name} 已删除")
+            logger.info(f"Whisper Model {model_name} Deleted")
             return True
         except Exception as e:  # noqa: BLE001
-            logger.error(f"删除 Whisper 模型 {model_name} 失败: {e}")
+            logger.error(f"Deleting Whisper model {model_name} failed: {e}")
             return False
 
 

@@ -1,100 +1,114 @@
 """
-Repository模式测试
-验证数据访问层的功能
+RepositoryPattern test
 """
 
 import sys, os
-# 添加项目根目录到sys.path，确保能找到backend包
+# Add project root directory tosys.path, Ensure can findbackendPackage
 current_file = os.path.abspath(__file__)
-backend_dir = os.path.dirname(os.path.dirname(current_file))  # backend目录
-project_root = os.path.dirname(backend_dir)  # autoclip根目录
+backend_dir = os.path.dirname(os.path.dirname(current_file))  # backendDirectory / Catalog
+project_root = os.path.dirname(backend_dir)  # autoclipRoot directory
 
-# 将项目根目录添加到sys.path，这样Python能找到backend包
+# Add project root directory tosys.path, Like thisPythonCan findbackendPackage
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import pytest
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import StaticPool
+from backend.models.base import Base
+import backend.core.database as db_module
+from backend.core.database import get_db
 from backend.repositories.factory import (
     get_project_repository,
     get_clip_repository,
     get_collection_repository,
     get_task_repository
 )
-from backend.core.database import get_db, init_database, reset_database
 from backend.models.project import ProjectStatus, ProjectType
 from backend.models.clip import ClipStatus
 from backend.models.collection import CollectionStatus
 from backend.models.task import TaskStatus, TaskType
 
+test_engine = create_engine(
+    "sqlite:///:memory:",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool
+)
+TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
 class TestRepositoryPattern:
-    """Repository模式测试类"""
+    """RepositoryPattern test class"""
     
     @pytest.fixture(autouse=True)
-    def setup_database(self):
-        """设置测试数据库"""
-        # 重置数据库，确保测试环境干净
-        reset_database()
-        # 初始化数据库
-        init_database()
+    def setup_database(self, monkeypatch):
+        """Set isolated in-memory test database so real database is never wiped"""
+        Base.metadata.create_all(bind=test_engine)
+        def _get_test_db():
+            session = TestSessionLocal()
+            try:
+                yield session
+            finally:
+                session.close()
+        monkeypatch.setattr(db_module, "get_db", _get_test_db)
+        monkeypatch.setattr(db_module, "SessionLocal", TestSessionLocal)
         yield
-        # 测试结束后清理数据库
-        reset_database()
+        Base.metadata.drop_all(bind=test_engine)
     
     def test_project_repository_crud(self):
-        """测试项目Repository的CRUD操作"""
+        """Test projectRepository's / of / forCRUDOperation"""
         db = next(get_db())
         project_repo = get_project_repository(db)
         
-        # 创建项目
+        # Create project
         project_data = {
-            "name": "测试项目",
-            "description": "这是一个测试项目",
+            "name": "Test project",
+            "description": "This is a test project",
             "project_type": ProjectType.KNOWLEDGE,
             "status": ProjectStatus.PENDING
         }
         
         project = project_repo.create(**project_data)
         assert project.id is not None
-        assert project.name == "测试项目"
+        assert project.name == "Test project"
         assert project.status == ProjectStatus.PENDING
         
-        # 查询项目
+        # Query project
         retrieved_project = project_repo.get_by_id(project.id)
         assert retrieved_project is not None
-        assert retrieved_project.name == "测试项目"
+        assert retrieved_project.name == "Test project"
         
-        # 更新项目
+        # Update project
         updated_project = project_repo.update(project.id, status=ProjectStatus.PROCESSING)
         assert updated_project.status == ProjectStatus.PROCESSING
         
-        # 删除项目
+        # Delete project
         success = project_repo.delete(project.id)
         assert success is True
         
-        # 验证删除
+        # Verify delete
         deleted_project = project_repo.get_by_id(project.id)
         assert deleted_project is None
     
     def test_clip_repository_operations(self):
-        """测试切片Repository的操作"""
+        """Test sliceRepositoryOf operation"""
         db = next(get_db())
         project_repo = get_project_repository(db)
         clip_repo = get_clip_repository(db)
         
-        # 创建项目
+        # Create project
         project = project_repo.create(
-            name="测试项目",
+            name="Test project",
             project_type=ProjectType.KNOWLEDGE,
             status=ProjectStatus.PENDING
         )
         
-        # 创建切片
+        # Create slice
         clip_data = {
             "project_id": project.id,
-            "title": "测试切片",
-            "description": "这是一个测试切片",
+            "title": "Test slice",
+            "description": "This is a test slice",
             "start_time": 0,
             "end_time": 60,
             "duration": 60,
@@ -104,42 +118,42 @@ class TestRepositoryPattern:
         
         clip = clip_repo.create(**clip_data)
         assert clip.project_id == project.id
-        assert clip.title == "测试切片"
+        assert clip.title == "Test slice"
         
-        # 测试按项目查询切片
+        # Test by project query slice
         project_clips = clip_repo.get_by_project(project.id)
         assert len(project_clips) == 1
         assert project_clips[0].id == clip.id
         
-        # 测试按状态查询切片
+        # Test by state query slice
         completed_clips = clip_repo.get_by_status(ClipStatus.COMPLETED)
         assert len(completed_clips) == 1
         assert completed_clips[0].id == clip.id
         
-        # 测试高分切片查询
+        # Test high-score slice query
         high_score_clips = clip_repo.get_high_score_clips(project.id, min_score=0.7)
         assert len(high_score_clips) == 1
         assert high_score_clips[0].id == clip.id
     
     def test_collection_repository_operations(self):
-        """测试合集Repository的操作"""
+        """Test suiteRepositoryOf operation"""
         db = next(get_db())
         project_repo = get_project_repository(db)
         collection_repo = get_collection_repository(db)
         
-        # 创建项目
+        # Create project
         project = project_repo.create(
-            name="测试项目",
+            name="Test project",
             project_type=ProjectType.KNOWLEDGE,
             status=ProjectStatus.PENDING
         )
         
-        # 创建合集
+        # Create set
         collection_data = {
             "project_id": project.id,
-            "name": "测试合集",
-            "description": "这是一个测试合集",
-            "theme": "测试主题",
+            "name": "Test suite",
+            "description": "This is a test set",
+            "theme": "Test topic",
             "clips_count": 5,
             "total_duration": 300,
             "status": CollectionStatus.COMPLETED
@@ -147,36 +161,36 @@ class TestRepositoryPattern:
         
         collection = collection_repo.create(**collection_data)
         assert collection.project_id == project.id
-        assert collection.name == "测试合集"
+        assert collection.name == "Test suite"
         
-        # 测试按项目查询合集
+        # Test by project query set
         project_collections = collection_repo.get_by_project(project.id)
         assert len(project_collections) == 1
         assert project_collections[0].id == collection.id
         
-        # 测试按主题查询合集
-        theme_collections = collection_repo.get_by_theme(project.id, "测试主题")
+        # Test by topic query set
+        theme_collections = collection_repo.get_by_theme(project.id, "Test topic")
         assert len(theme_collections) == 1
         assert theme_collections[0].id == collection.id
     
     def test_task_repository_operations(self):
-        """测试任务Repository的操作"""
+        """Test taskRepositoryOf operation"""
         db = next(get_db())
         project_repo = get_project_repository(db)
         task_repo = get_task_repository(db)
         
-        # 创建项目
+        # Create project
         project = project_repo.create(
-            name="测试项目",
+            name="Test project",
             project_type=ProjectType.KNOWLEDGE,
             status=ProjectStatus.PENDING
         )
         
-        # 创建任务
+        # Create task
         task_data = {
             "project_id": project.id,
-            "name": "测试任务",
-            "description": "这是一个测试任务",
+            "name": "Test task",
+            "description": "This is a test task",
             "task_type": TaskType.VIDEO_PROCESSING,
             "status": TaskStatus.PENDING,
             "priority": 1
@@ -184,44 +198,44 @@ class TestRepositoryPattern:
         
         task = task_repo.create(**task_data)
         assert task.project_id == project.id
-        assert task.name == "测试任务"
+        assert task.name == "Test task"
         assert task.status == TaskStatus.PENDING
         
-        # 测试任务状态更新
+        # Test task status update
         task_repo.update_task_status(task.id, TaskStatus.RUNNING)
         updated_task = task_repo.get_by_id(task.id)
         assert updated_task.status == TaskStatus.RUNNING
         
-        # 测试任务完成
+        # Test task complete
         task_repo.update_task_status(task.id, TaskStatus.COMPLETED)
         completed_task = task_repo.get_by_id(task.id)
         assert completed_task.status == TaskStatus.COMPLETED
         
-        # 测试按项目查询任务
+        # Test by project query task
         project_tasks = task_repo.get_by_project(project.id)
         assert len(project_tasks) == 1
         assert project_tasks[0].id == task.id
     
     def test_repository_statistics(self):
-        """测试Repository统计功能"""
+        """Test / Stress / TrialRepositoryStatistics function"""
         db = next(get_db())
         project_repo = get_project_repository(db)
         clip_repo = get_clip_repository(db)
         collection_repo = get_collection_repository(db)
         task_repo = get_task_repository(db)
         
-        # 创建项目
+        # Create project
         project = project_repo.create(
-            name="统计测试项目",
+            name="Test project statistics",
             project_type=ProjectType.KNOWLEDGE,
             status=ProjectStatus.COMPLETED
         )
         
-        # 创建多个切片
+        # Create multiple slices
         for i in range(5):
             clip_repo.create(
                 project_id=project.id,
-                title=f"切片{i+1}",
+                title=f"Slice{i+1}",
                 start_time=i*60,
                 end_time=(i+1)*60,
                 duration=60,
@@ -229,83 +243,83 @@ class TestRepositoryPattern:
                 status=ClipStatus.COMPLETED
             )
         
-        # 创建多个合集
+        # Create multiple sets
         for i in range(3):
             collection_repo.create(
                 project_id=project.id,
-                name=f"合集{i+1}",
-                theme=f"主题{i+1}",
+                name=f"Suite{i+1}",
+                theme=f"Theme / Subject{i+1}",
                 clips_count=2,
                 total_duration=120,
                 status=CollectionStatus.COMPLETED
             )
         
-        # 创建多个任务
+        # Create multiple tasks
         for i in range(6):
             task_repo.create(
                 project_id=project.id,
-                name=f"任务{i+1}",
+                name=f"Task{i+1}",
                             task_type=TaskType.VIDEO_PROCESSING,
             status=TaskStatus.COMPLETED if i < 5 else TaskStatus.FAILED
             )
         
-        # 测试项目统计
+        # Test project statistics
         project_stats = project_repo.get_project_statistics()
         assert project_stats["total"] >= 1
         assert project_stats["completed"] >= 1
         
-        # 测试切片统计
+        # Test slice statistics
         clip_stats = clip_repo.get_clips_statistics(project.id)
         assert clip_stats["total"] == 5
         assert clip_stats["completed"] == 5
         assert clip_stats["avg_score"] > 0.7
         
-        # 测试合集统计
+        # Test set statistics
         collection_stats = collection_repo.get_collections_statistics(project.id)
         assert collection_stats["total"] == 3
         assert collection_stats["completed"] == 3
         
-        # 测试任务统计
+        # Test task statistics
         task_stats = task_repo.get_tasks_statistics(project.id)
         assert task_stats["total"] == 6
         assert task_stats["completed"] == 5
         assert task_stats["failed"] == 1
     
     def test_repository_search(self):
-        """测试Repository搜索功能"""
+        """Test / Stress / TrialRepositorySearch function"""
         db = next(get_db())
         project_repo = get_project_repository(db)
         clip_repo = get_clip_repository(db)
         
-        # 创建项目
+        # Create project
         project = project_repo.create(
-            name="搜索测试项目",
-            description="这是一个用于搜索测试的项目",
+            name="Search test projects",
+            description="This is a project for searching tests",
             project_type=ProjectType.KNOWLEDGE,
             status=ProjectStatus.PENDING
         )
         
-        # 创建切片
+        # Create slice
         clip_repo.create(
             project_id=project.id,
-            title="包含关键词的切片",
-            description="这个切片包含重要的关键词",
+            title="Slice containing keyword",
+            description="This slice contains important keywords",
             start_time=0,
             end_time=60,
             duration=60,
             status=ClipStatus.COMPLETED
         )
         
-        # 测试项目搜索
-        search_results = project_repo.search_projects("搜索测试")
+        # Test project search
+        search_results = project_repo.search_projects("Search test")
         assert len(search_results) == 1
         assert search_results[0].id == project.id
         
-        # 测试切片搜索
-        clip_results = clip_repo.search_clips(project.id, "关键词")
+        # Test slice search
+        clip_results = clip_repo.search_clips(project.id, "keyword")
         assert len(clip_results) == 1
-        assert "关键词" in clip_results[0].title or "关键词" in clip_results[0].description
+        assert "keyword" in clip_results[0].title.lower() or "keyword" in clip_results[0].description.lower()
 
 if __name__ == "__main__":
-    # 运行测试
+    # Run test
     pytest.main([__file__, "-v"]) 

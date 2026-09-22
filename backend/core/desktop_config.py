@@ -129,9 +129,9 @@ class DesktopConfig:
             try:
                 directory.mkdir(parents=True, exist_ok=True)
             except Exception as exc:
-                errors.append(f"目录不可用: {directory} ({exc})")
+                errors.append(f"Directory unavailable: {directory} ({exc})")
         if not self.settings.api_dashscope_api_key:
-            warnings.append("未配置 DashScope API Key")
+            warnings.append("Not configured DashScope API Key")
         return {"valid": not errors, "errors": errors, "warnings": warnings}
 
     def dict(self):

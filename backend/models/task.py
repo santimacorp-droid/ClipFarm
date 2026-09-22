@@ -1,6 +1,6 @@
 """
-任务模型
-定义后台任务的基本信息和执行状态
+Task model
+Define background task basic information and execution status
 """
 
 import enum
@@ -9,116 +9,116 @@ from sqlalchemy.orm import relationship
 from .base import BaseModel, TimestampMixin
 
 class TaskStatus(str, enum.Enum):
-    """任务状态枚举"""
-    PENDING = "pending"           # 等待中
-    RUNNING = "running"           # 运行中
-    COMPLETED = "completed"       # 已完成
-    FAILED = "failed"            # 失败
-    CANCELLED = "cancelled"      # 已取消
+    """Task status enumeration"""
+    PENDING = "pending"           # Pending
+    RUNNING = "running"           # Running
+    COMPLETED = "completed"       # Finished
+    FAILED = "failed"            # Failed
+    CANCELLED = "cancelled"      # Cancelled
 
 class TaskType(str, enum.Enum):
-    """任务类型枚举"""
-    VIDEO_PROCESSING = "video_processing"    # 视频处理
-    CLIP_GENERATION = "clip_generation"      # 切片生成
-    COLLECTION_CREATION = "collection_creation"  # 合集创建
-    EXPORT = "export"                        # 导出
-    CLEANUP = "cleanup"                      # 清理
+    """Task type enumeration"""
+    VIDEO_PROCESSING = "video_processing"    # Video Processing
+    CLIP_GENERATION = "clip_generation"      # Slice Generation
+    COLLECTION_CREATION = "collection_creation"  # Collection Creation
+    EXPORT = "export"                        # Export
+    CLEANUP = "cleanup"                      # Cleanup
 
 class Task(BaseModel, TimestampMixin):
-    """任务模型"""
+    """Task model"""
     
     __tablename__ = "tasks"
     
-    # 基本信息
+    # Basic Information
     name = Column(
         String(255), 
         nullable=False, 
-        comment="任务名称"
+        comment="Task Name"
     )
     description = Column(
         Text, 
         nullable=True, 
-        comment="任务描述"
+        comment="Task description"
     )
     
-    # 状态信息
+    # Status Information
     status = Column(
         Enum(TaskStatus), 
         default=TaskStatus.PENDING,
         nullable=False,
-        comment="任务状态"
+        comment="Task Status"
     )
     task_type = Column(
         Enum(TaskType), 
         nullable=False,
-        comment="任务类型"
+        comment="Task type"
     )
     
-    # 进度信息
-    progress = Column(Float, default=0.0, comment="进度百分比")
+    # Progress information
+    progress = Column(Float, default=0.0, comment="Progress percentage")
     current_step = Column(
         String(100), 
         nullable=True, 
-        comment="当前步骤"
+        comment="Current Step"
     )
     total_steps = Column(
         Integer, 
         default=1,
-        comment="总步骤数"
+        comment="Total Steps"
     )
     priority = Column(
         Integer, 
         default=0,
-        comment="任务优先级"
+        comment="Task priority"
     )
     
-    # 执行信息
+    # Execution Information
     started_at = Column(
         DateTime, 
         nullable=True, 
-        comment="开始时间"
+        comment="Start Time"
     )
     completed_at = Column(
         DateTime, 
         nullable=True, 
-        comment="完成时间"
+        comment="Completion Time"
     )
     error_message = Column(
         Text, 
         nullable=True, 
-        comment="错误信息"
+        comment="Error Information"
     )
     
-    # Celery任务信息
+    # Celery task information
     celery_task_id = Column(
         String(255), 
         nullable=True, 
-        comment="Celery任务ID"
+        comment="CeleryTaskID"
     )
     
-    # 配置信息
+    # Configuration Information
     task_config = Column(
         JSON, 
         nullable=True, 
-        comment="任务配置"
+        comment="Task Configuration"
     )
     result_data = Column(
         JSON, 
         nullable=True, 
-        comment="结果数据"
+        comment="Result data"
     )
     task_metadata = Column(
         JSON, 
         nullable=True, 
-        comment="任务元数据"
+        comment="Task metadata"
     )
     
-    # 关联关系
+    # Relationship
     project_id = Column(
         String(36), 
         ForeignKey("projects.id"),
         nullable=False,
-        comment="关联项目ID"
+        comment="Related projectID"
     )
     project = relationship(
         "Project", 
@@ -130,22 +130,22 @@ class Task(BaseModel, TimestampMixin):
     
     @property
     def is_running(self):
-        """是否正在运行"""
+        """Is currently running"""
         return self.status == TaskStatus.RUNNING
     
     @property
     def is_completed(self):
-        """是否已完成"""
+        """Is completed successfully"""
         return self.status == TaskStatus.COMPLETED
     
     @property
     def has_error(self):
-        """是否有错误"""
+        """Has an error"""
         return self.status == TaskStatus.FAILED
     
     @property
     def duration(self):
-        """任务持续时间（秒）"""
+        """Task duration (seconds))"""
         if self.started_at and self.completed_at:
             return (self.completed_at - self.started_at).total_seconds()
         elif self.started_at:
@@ -153,13 +153,13 @@ class Task(BaseModel, TimestampMixin):
         return 0
     
     def start(self):
-        """开始任务"""
+        """Start task"""
         self.status = TaskStatus.RUNNING
         self.started_at = datetime.utcnow()
         self.progress = 0.0
     
     def complete(self, result_data=None):
-        """完成任务"""
+        """Complete task"""
         self.status = TaskStatus.COMPLETED
         self.completed_at = datetime.utcnow()
         self.progress = 100.0
@@ -167,36 +167,36 @@ class Task(BaseModel, TimestampMixin):
             self.result_data = result_data
     
     def fail(self, error_message):
-        """任务失败"""
+        """Task Failure"""
         self.status = TaskStatus.FAILED
         self.completed_at = datetime.utcnow()
         self.error_message = error_message
     
     def cancel(self):
-        """取消任务"""
+        """Cancel Task"""
         self.status = TaskStatus.CANCELLED
         self.completed_at = datetime.utcnow()
     
     def update_progress(self, progress, current_step=None):
-        """更新进度"""
+        """Update progress"""
         self.progress = min(100.0, max(0.0, progress))
         if current_step:
             self.current_step = current_step
     
     def is_completed(self):
-        """检查是否完成"""
+        """Check if succeeded"""
         return self.status in [TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED]
     
     def is_running(self):
-        """检查是否运行中"""
+        """Check if running"""
         return self.status == TaskStatus.RUNNING
     
     def is_pending(self):
-        """检查是否待处理"""
+        """Check if pending"""
         return self.status == TaskStatus.PENDING
     
     def get_duration(self):
-        """获取任务持续时间"""
+        """Get task duration"""
         if not self.started_at:
             return None
         
@@ -204,7 +204,7 @@ class Task(BaseModel, TimestampMixin):
         return (end_time - self.started_at).total_seconds()
     
     def to_dict(self):
-        """转换为字典"""
+        """Convert to dictionary"""
         return {
             "id": self.id,
             "name": self.name,

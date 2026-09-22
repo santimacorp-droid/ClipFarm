@@ -3,15 +3,25 @@ import { projectApi } from '../services/api'
 
 export interface Clip {
   id: string
-  title?: string  // 可能没有原始title
+  title?: string  // Original may not existtitle
   start_time: string
   end_time: string
-  final_score: number  // 匹配后端字段名
-  recommend_reason: string  // 匹配后端字段名
+  final_score: number  // Match backend field name
+  recommend_reason: string  // Match backend field name
   generated_title?: string
   outline: string
   content: string[]
-  chunk_index?: number  // 添加缺失字段
+  chunk_index?: number  // Add missing fields
+  video_url?: string
+  video_path?: string
+  clip_metadata?: any
+  cta_platforms?: Record<string, string>
+  cta_style?: string
+  cta_position?: string
+  platform_advisory?: any
+  social_copy?: any
+  post_caption?: string
+  hashtags?: string[]
 }
 
 export interface Collection {
@@ -25,7 +35,7 @@ export interface Collection {
   thumbnail_path?: string
 }
 
-// 项目状态类型定义，与后端保持一致
+// Project status type definitions, kept in sync with backend
 type ProjectStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'error'
 
 export interface Project {
@@ -49,7 +59,7 @@ export interface Project {
   total_clips?: number
   total_collections?: number
   total_tasks?: number
-  // 前端特有字段
+  // Frontend-specific fields
   video_path?: string
   video_category?: string
   thumbnail?: string
@@ -97,23 +107,16 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   setProjects: (projects) => {
     const state = get()
-    
-    // 确保projects始终是数组
+
+    // Ensure projects is always an array
     const safeProjects = Array.isArray(projects) ? projects : []
-    
-    console.log('setProjects called:', {
-      isDragging: state.isDragging,
-      projectsCount: safeProjects.length,
-      projects: safeProjects
-    })
-    
-    // 如果正在拖拽，则跳过更新以避免冲突
+
+    // Skip update if user is dragging to avoid conflicts
     if (state.isDragging) {
       console.log('Skipping update: dragging in progress')
       return
     }
-    
-    console.log('Applying update with new data')
+
     set({ projects: safeProjects })
   },
   
@@ -148,7 +151,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   })),
   
   deleteProject: (id) => {
-    // 清理缩略图缓存
+    // Clear thumbnail cache
     const thumbnailCacheKey = `thumbnail_${id}`
     localStorage.removeItem(thumbnailCacheKey)
     
@@ -240,13 +243,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const originalClipIds = [...collection.clip_ids]
     const updatedClipIds = collection.clip_ids.filter(id => id !== clipId)
     
-    // 检查是否真的有变化
+    // Check for actual changes
     if (originalClipIds.length === updatedClipIds.length) {
       console.log('Clip not found in collection, skipping update')
       return
     }
     
-    // 乐观更新：立即更新前端状态
+    // Optimistic update: immediately update frontend state
     const updateState = (clipIds: string[]) => {
       set((state) => ({
         projects: state.projects.map(project => 
@@ -281,10 +284,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       }))
     }
     
-    // 立即应用更新
+    // Apply update immediately
     updateState(updatedClipIds)
     
-    // 调用后端API
+    // Call backendAPI
     try {
       console.log('Removing clip from collection:', { projectId, collectionId, clipId })
       await projectApi.updateCollection(projectId, collectionId, { clip_ids: updatedClipIds })
@@ -297,7 +300,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         statusText: (error as any)?.response?.statusText,
         data: (error as any)?.response?.data
       })
-      // 回滚到原始状态
+      // Roll back to original state
       updateState(originalClipIds)
       throw error
     }
@@ -308,16 +311,16 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   reorderCollectionClips: async (projectId: string, collectionId: string, newClipIds: string[]) => {
     console.log('Starting reorderCollectionClips:', { projectId, collectionId, newClipIds })
     
-    // 获取原始状态
+    // Get original state
     const state = get()
     console.log('Current state projects:', state.projects.map(p => ({ id: p.id, collectionsCount: p.collections?.length || 0 })))
     console.log('Current state currentProject:', state.currentProject ? { id: state.currentProject.id, collectionsCount: state.currentProject.collections?.length || 0 } : null)
     
-    // 优先从currentProject中查找，如果找不到再从projects数组中查找
+    // Prioritize items fromcurrentProjectScan here; scan again inprojectsSearch within array
     let originalProject = state.currentProject?.id === projectId ? state.currentProject : null
     let originalCollection = originalProject?.collections?.find(c => c.id === collectionId)
     
-    // 如果currentProject中没有找到，尝试从projects数组中查找
+    // IfcurrentProjectIf not found here, try fromprojectsSearch within array
     if (!originalCollection) {
       const projectFromArray = state.projects.find(p => p.id === projectId)
       if (projectFromArray) {
@@ -342,16 +345,16 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     
     const originalClipIds = [...originalCollection.clip_ids]
     
-    // 检查是否真的有变化
+    // Check for actual changes
     if (JSON.stringify(originalClipIds) === JSON.stringify(newClipIds)) {
       console.log('No changes detected, skipping update')
       return
     }
     
-    // 记录编辑时间戳
+    // Record edit timestamp
     const now = Date.now()
     
-    // 乐观更新：立即更新前端状态
+    // Optimistic update: immediately update frontend state
     const updateState = (clipIds: string[]) => {
       set((state) => ({
         projects: state.projects.map(project => 
@@ -380,17 +383,17 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       }))
     }
     
-    // 立即应用新顺序
+    // Apply new order immediately
     updateState(newClipIds)
     
-    // 调用后端API
+    // Call backendAPI
     try {
       console.log('Calling backend API for reorder...')
       await projectApi.reorderCollectionClips(projectId, collectionId, newClipIds)
       console.log('Backend API call successful')
     } catch (error) {
       console.error('Backend API call failed:', error)
-      // 回滚到原始状态
+      // Roll back to original state
       updateState(originalClipIds)
       throw error
     }
@@ -399,14 +402,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   addClipToCollection: async (projectId: string, collectionId: string, clipIds: string[]) => {
     console.log('Starting addClipToCollection:', { projectId, collectionId, clipIds })
     
-    // 获取原始状态
+    // Get original state
     const state = get()
     
-    // 优先从currentProject中查找，如果找不到再从projects数组中查找
+    // Prioritize items fromcurrentProjectScan here; scan again inprojectsSearch within array
     let originalProject = state.currentProject?.id === projectId ? state.currentProject : null
     let originalCollection = originalProject?.collections?.find(c => c.id === collectionId)
     
-    // 如果currentProject中没有找到，尝试从projects数组中查找
+    // IfcurrentProjectIf not found here, try fromprojectsSearch within array
     if (!originalCollection) {
       const projectFromArray = state.projects.find(p => p.id === projectId)
       if (projectFromArray) {
@@ -422,13 +425,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const originalClipIds = [...originalCollection.clip_ids]
     const updatedClipIds = [...originalClipIds, ...clipIds.filter(id => !originalClipIds.includes(id))]
     
-    // 检查是否真的有变化
+    // Check for actual changes
     if (originalClipIds.length === updatedClipIds.length) {
       console.log('No new clips to add, skipping update')
       return
     }
     
-    // 乐观更新：立即更新前端状态
+    // Optimistic update: immediately update frontend state
     const updateState = (clipIds: string[]) => {
       set((state) => ({
         projects: state.projects.map(project => 
@@ -457,17 +460,17 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       }))
     }
     
-    // 立即应用更新
+    // Apply update immediately
     updateState(updatedClipIds)
     
-    // 调用后端API
+    // Call backendAPI
     try {
       console.log('Adding clips to collection:', { projectId, collectionId, clipIds })
       await projectApi.updateCollection(projectId, collectionId, { clip_ids: updatedClipIds })
       console.log('Clips added to collection successfully')
     } catch (error) {
       console.error('Failed to add clips to collection, rolling back:', error)
-      // 回滚到原始状态
+      // Roll back to original state
       updateState(originalClipIds)
       throw error
     }

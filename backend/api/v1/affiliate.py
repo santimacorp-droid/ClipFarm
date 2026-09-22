@@ -29,6 +29,7 @@ class ProcessVideoRequest(BaseModel):
     cta_style: Optional[str] = "pill"
     cta_position: Optional[str] = "lower_middle"
     watermark: Optional[bool] = True
+    watermark_preset_id: Optional[str] = "none"
     language: Optional[str] = "tl"
     engine: Optional[str] = "gemini"
 
@@ -63,13 +64,18 @@ async def get_caption_styles() -> Dict[str, Any]:
 
 @router.get("/video")
 async def get_affiliate_video(filename: str):
-    """Serve processed video file for playback and download."""
+    """Serve processed video file for playback and download with no-cache headers."""
     p = Path("data/output/affiliate").resolve() / filename
     if not p.exists() or not p.is_file():
         p = Path(filename).resolve()
         if not p.exists() or not p.is_file():
             raise HTTPException(status_code=404, detail="Video file not found")
-    return FileResponse(path=str(p), media_type="video/mp4", filename=p.name)
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+    }
+    return FileResponse(path=str(p), media_type="video/mp4", filename=p.name, headers=headers)
 
 
 @router.get("/recent")
@@ -153,7 +159,8 @@ async def process_video_by_path(req: ProcessVideoRequest) -> Dict[str, Any]:
             cta_position=req.cta_position or "lower_middle",
             language=req.language or "tl",
             engine=req.engine or "auto",
-            watermark=req.watermark if req.watermark is not None else True
+            watermark=req.watermark if req.watermark is not None else True,
+            watermark_preset_id=req.watermark_preset_id or "none"
         )
         result["video_url"] = f"/api/v1/affiliate/video?filename={out_video.name}"
         return result
@@ -172,6 +179,7 @@ async def process_video_upload(
     cta_style: str = Form("pill"),
     cta_position: str = Form("lower_middle"),
     watermark: bool = Form(True),
+    watermark_preset_id: str = Form("none"),
     language: str = Form("tl"),
     engine: str = Form("gemini")
 ) -> Dict[str, Any]:
@@ -213,6 +221,7 @@ async def process_video_upload(
             cta_style=cta_style,
             cta_position=cta_position,
             watermark=watermark,
+            watermark_preset_id=watermark_preset_id,
             language=language,
             engine=engine
         )

@@ -1,0 +1,75 @@
+{
+  "categories": {
+    "podcast": {
+      "min_sec": 120.0,
+      "max_sec": 360.0,
+      "description": "Long-form podcast conversation segment"
+    },
+    "podcast_highlight": {
+      "min_sec": 30.0,
+      "max_sec": 120.0,
+      "description": "Single quotable moment from podcast"
+    },
+    "interview": {
+      "min_sec": 60.0,
+      "max_sec": 240.0,
+      "description": "Structured guest Q&A segment"
+    },
+    "livestream": {
+      "min_sec": 30.0,
+      "max_sec": 180.0,
+      "description": "Livestream highlights, unscripted rants, and chat interactions"
+    },
+    "business_insight": {
+      "min_sec": 45.0,
+      "max_sec": 240.0,
+      "description": "Business, entrepreneurship, finance, career advice"
+    },
+    "tech_take": {
+      "min_sec": 45.0,
+      "max_sec": 180.0,
+      "description": "Tech product review, opinion, or news analysis"
+    },
+    "ai_moment": {
+      "min_sec": 30.0,
+      "max_sec": 240.0,
+      "description": "AI tools, news, implications, or demonstrations"
+    },
+    "gaming_highlight": {
+      "min_sec": 15.0,
+      "max_sec": 90.0,
+      "description": "Gaming moments, reactions, and commentary peaks"
+    },
+    "gaming_commentary": {
+      "min_sec": 60.0,
+      "max_sec": 240.0,
+      "description": "Gaming opinions, news, analysis, game reviews"
+    },
+    "hot_take": {
+      "min_sec": 30.0,
+      "max_sec": 90.0,
+      "description": "Strong opinion or contrarian take"
+    },
+    "funny_moment": {
+      "min_sec": 15.0,
+      "max_sec": 60.0,
+      "description": "Comedic moment — setup and punchline included"
+    },
+    "vlog": {
+      "min_sec": 30.0,
+      "max_sec": 180.0,
+      "description": "Personal narrative and day-in-life content"
+    },
+    "storytelling": {
+      "min_sec": 60.0,
+      "max_sec": 300.0,
+      "description": "Personal story with complete narrative arc"
+    },
+    "default": {
+      "min_sec": 45.0,
+      "max_sec": 180.0,
+      "description": "General fallback"
+    }
+  },
+  "global_max_duration_sec": 600.0
+}

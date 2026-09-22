@@ -33,8 +33,9 @@
   transform: scale(1.05);
 }
 
-/* 幽灵按钮 hover：仅描边/底色微变，保持克制 */
-.clip-card .ant-btn:hover {
+/* Ghost/Text button hover: Outline only/Subtle background color change, keeping it restrained */
+.clip-card .ant-btn-default:hover,
+.clip-card .ant-btn-text:hover {
   border-color: var(--ac-ink) !important;
   color: var(--ac-ink) !important;
   background: var(--ac-line-2) !important;

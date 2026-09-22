@@ -1,6 +1,6 @@
 """
-依赖注入配置
-提供FastAPI的依赖注入服务
+Dependency injection configuration
+Provides dependency injection service for FastAPI
 """
 
 from typing import Generator

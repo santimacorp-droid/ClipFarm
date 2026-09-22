@@ -1,6 +1,6 @@
 """
-并发控制管理器
-管理系统的并发任务和资源使用
+Concurrency control manager
+Concurrency task and resource management
 """
 
 import asyncio
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class TaskPriority(Enum):
-    """任务优先级"""
+    """Task priority"""
     LOW = 1
     NORMAL = 2
     HIGH = 3
@@ -25,7 +25,7 @@ class TaskPriority(Enum):
 
 
 class TaskStatus(Enum):
-    """任务状态"""
+    """Task state"""
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -35,7 +35,7 @@ class TaskStatus(Enum):
 
 @dataclass
 class TaskInfo:
-    """任务信息"""
+    """Task info"""
     task_id: str
     name: str
     priority: TaskPriority
@@ -49,7 +49,7 @@ class TaskInfo:
 
 
 class ResourceLimiter:
-    """资源限制器"""
+    """Resource quota"""
     
     def __init__(self, max_concurrent: int, resource_name: str):
         self.max_concurrent = max_concurrent
@@ -59,33 +59,33 @@ class ResourceLimiter:
         self.lock = asyncio.Lock()
     
     async def acquire(self, task_id: str) -> bool:
-        """获取资源"""
+        """Get resource"""
         
         async with self.lock:
             if self.current_usage < self.max_concurrent:
                 self.current_usage += 1
-                logger.debug(f"任务 {task_id} 获取 {self.resource_name} 资源，当前使用: {self.current_usage}/{self.max_concurrent}")
+                logger.debug(f"Task {task_id} Take {self.resource_name} Resources, current usage: {self.current_usage}/{self.max_concurrent}")
                 return True
             else:
-                logger.debug(f"任务 {task_id} 等待 {self.resource_name} 资源")
+                logger.debug(f"Task {task_id} Wait {self.resource_name} Resource")
                 await self.waiting_queue.put(task_id)
                 return False
     
     async def release(self, task_id: str):
-        """释放资源"""
+        """Release resources"""
         
         async with self.lock:
             if self.current_usage > 0:
                 self.current_usage -= 1
-                logger.debug(f"任务 {task_id} 释放 {self.resource_name} 资源，当前使用: {self.current_usage}/{self.max_concurrent}")
+                logger.debug(f"Task {task_id} Free {self.resource_name} Resources, current usage: {self.current_usage}/{self.max_concurrent}")
                 
-                # 如果有等待的任务，通知下一个
+                # Notify the next when there are pending tasks
                 if not self.waiting_queue.empty():
                     next_task_id = await self.waiting_queue.get()
-                    logger.debug(f"通知等待任务 {next_task_id} 可以获取 {self.resource_name} 资源")
+                    logger.debug(f"Notify waiting tasks {next_task_id} Fetch {self.resource_name} Resource")
     
     def get_status(self) -> Dict[str, Any]:
-        """获取资源状态"""
+        """Get resource status"""
         
         return {
             "resource_name": self.resource_name,
@@ -97,7 +97,7 @@ class ResourceLimiter:
 
 
 class ConcurrencyManager:
-    """并发管理器"""
+    """Concurrency manager"""
     
     def __init__(self):
         self.resource_limiters: Dict[str, ResourceLimiter] = {}
@@ -106,35 +106,35 @@ class ConcurrencyManager:
         self.task_counter = 0
         self.lock = asyncio.Lock()
         
-        # 默认资源限制
+        # Default resource limits
         self._setup_default_limits()
     
     def _setup_default_limits(self):
-        """设置默认资源限制"""
+        """Set default resource limits"""
         
-        # 文件上传限制
+        # File upload limits
         self.add_resource_limiter("file_upload", 3)
         
-        # 视频处理限制
+        # Video processing limits
         self.add_resource_limiter("video_processing", 2)
         
-        # AI处理限制
+        # AI processing limit
         self.add_resource_limiter("ai_processing", 4)
         
-        # 数据库操作限制
+        # Database operation limits
         self.add_resource_limiter("database", 10)
         
-        # 网络请求限制
+        # Network request limits
         self.add_resource_limiter("network", 5)
     
     def add_resource_limiter(self, resource_name: str, max_concurrent: int):
-        """添加资源限制器"""
+        """Add resource limiter"""
         
         self.resource_limiters[resource_name] = ResourceLimiter(max_concurrent, resource_name)
-        logger.info(f"添加资源限制器: {resource_name}, 最大并发: {max_concurrent}")
+        logger.info(f"Add resource limiter: {resource_name}, Maximum concurrency: {max_concurrent}")
     
     def _generate_task_id(self) -> str:
-        """生成任务ID"""
+        """Generate taskID"""
         
         self.task_counter += 1
         return f"task_{self.task_counter}_{int(time.time())}"
@@ -148,11 +148,11 @@ class ConcurrencyManager:
         *args,
         **kwargs
     ) -> str:
-        """提交任务"""
+        """Submit task"""
         
         task_id = self._generate_task_id()
         
-        # 创建任务信息
+        # Create task information
         task_info = TaskInfo(
             task_id=task_id,
             name=name,
@@ -163,10 +163,10 @@ class ConcurrencyManager:
         async with self.lock:
             self.active_tasks[task_id] = task_info
         
-        # 创建并启动任务
+        # Create and start tasks
         asyncio.create_task(self._execute_task(task_id, coro, required_resources or [], *args, **kwargs))
         
-        logger.info(f"提交任务: {task_id}, 名称: {name}, 优先级: {priority.value}")
+        logger.info(f"Submit task: {task_id}, Name: {name}, Priority: {priority.value}")
         
         return task_id
     
@@ -178,16 +178,16 @@ class ConcurrencyManager:
         *args,
         **kwargs
     ):
-        """执行任务"""
+        """Execute task"""
         
         task_info = self.active_tasks.get(task_id)
         if not task_info:
             return
         
-        # 获取所需资源
+        # Get required resources
         acquired_resources = []
         try:
-            # 按优先级获取资源
+            # Get resources by priority
             for resource_name in required_resources:
                 if resource_name in self.resource_limiters:
                     limiter = self.resource_limiters[resource_name]
@@ -195,67 +195,67 @@ class ConcurrencyManager:
                     if acquired:
                         acquired_resources.append(resource_name)
                     else:
-                        # 如果无法获取资源，等待
+                        # Wait if unable to obtain a resource
                         await self._wait_for_resource(task_id, resource_name)
                         acquired_resources.append(resource_name)
             
-            # 更新任务状态
+            # Update task status
             task_info.status = TaskStatus.RUNNING
             task_info.started_at = datetime.now()
             
-            # 执行任务
+            # Execute task
             if asyncio.iscoroutinefunction(coro):
                 result = await coro(*args, **kwargs)
             else:
                 result = coro(*args, **kwargs)
             
-            # 任务完成
+            # Task completed
             task_info.status = TaskStatus.COMPLETED
             task_info.completed_at = datetime.now()
             task_info.result = result
             
-            logger.info(f"任务完成: {task_id}, 耗时: {(task_info.completed_at - task_info.started_at).total_seconds():.2f}秒")
+            logger.info(f"Task completed: {task_id}, Elapsed time: {(task_info.completed_at - task_info.started_at).total_seconds():.2f}seconds")
             
         except Exception as e:
-            # 任务失败
+            # Task failed
             task_info.status = TaskStatus.FAILED
             task_info.completed_at = datetime.now()
             task_info.error = str(e)
             
-            logger.error(f"任务失败: {task_id}, 错误: {e}")
+            logger.error(f"Task failed: {task_id}, Error: {e}")
         
         finally:
-            # 释放资源
+            # Release resources
             for resource_name in acquired_resources:
                 if resource_name in self.resource_limiters:
                     await self.resource_limiters[resource_name].release(task_id)
             
-            # 移动到历史记录
+            # Move to historical record
             async with self.lock:
                 if task_id in self.active_tasks:
                     self.task_history.append(self.active_tasks[task_id])
                     del self.active_tasks[task_id]
     
     async def _wait_for_resource(self, task_id: str, resource_name: str):
-        """等待资源可用"""
+        """Wait for resources available"""
         
         if resource_name not in self.resource_limiters:
             return
         
         limiter = self.resource_limiters[resource_name]
         
-        # 等待资源可用
+        # Wait for resources available
         while True:
             async with limiter.lock:
                 if limiter.current_usage < limiter.max_concurrent:
                     limiter.current_usage += 1
                     break
             
-            # 等待一段时间后重试
+            # Retry after waiting briefly
             await asyncio.sleep(0.1)
     
     async def cancel_task(self, task_id: str) -> bool:
-        """取消任务"""
+        """Cancel task"""
         
         async with self.lock:
             task_info = self.active_tasks.get(task_id)
@@ -265,22 +265,22 @@ class ConcurrencyManager:
             task_info.status = TaskStatus.CANCELLED
             task_info.completed_at = datetime.now()
             
-            # 移动到历史记录
+            # Move to historical record
             self.task_history.append(task_info)
             del self.active_tasks[task_id]
         
-        logger.info(f"取消任务: {task_id}")
+        logger.info(f"Cancel task: {task_id}")
         return True
     
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
-        """获取任务状态"""
+        """Get task status"""
         
-        # 检查活跃任务
+        # Check active tasks
         task_info = self.active_tasks.get(task_id)
         if task_info:
             return self._task_info_to_dict(task_info)
         
-        # 检查历史任务
+        # Check historical tasks
         for task_info in self.task_history:
             if task_info.task_id == task_id:
                 return self._task_info_to_dict(task_info)
@@ -288,7 +288,7 @@ class ConcurrencyManager:
         return None
     
     def _task_info_to_dict(self, task_info: TaskInfo) -> Dict[str, Any]:
-        """将任务信息转换为字典"""
+        """Convert task information to dictionary"""
         
         result = {
             "task_id": task_info.task_id,
@@ -305,7 +305,7 @@ class ConcurrencyManager:
         if task_info.completed_at:
             result["completed_at"] = task_info.completed_at.isoformat()
             
-            # 计算执行时间
+            # Calculate execution time
             if task_info.started_at:
                 execution_time = (task_info.completed_at - task_info.started_at).total_seconds()
                 result["execution_time"] = execution_time
@@ -319,18 +319,18 @@ class ConcurrencyManager:
         return result
     
     def get_active_tasks(self) -> List[Dict[str, Any]]:
-        """获取活跃任务列表"""
+        """Get active task list"""
         
         return [self._task_info_to_dict(task_info) for task_info in self.active_tasks.values()]
     
     def get_task_history(self, limit: int = 100) -> List[Dict[str, Any]]:
-        """获取任务历史"""
+        """Get task history"""
         
         recent_tasks = self.task_history[-limit:] if self.task_history else []
         return [self._task_info_to_dict(task_info) for task_info in recent_tasks]
     
     def get_resource_status(self) -> Dict[str, Any]:
-        """获取资源状态"""
+        """Get resource status"""
         
         status = {}
         for resource_name, limiter in self.resource_limiters.items():
@@ -339,12 +339,12 @@ class ConcurrencyManager:
         return status
     
     def get_system_load(self) -> Dict[str, Any]:
-        """获取系统负载"""
+        """Get system load"""
         
         active_count = len(self.active_tasks)
         total_waiting = sum(limiter.waiting_queue.qsize() for limiter in self.resource_limiters.values())
         
-        # 计算资源利用率
+        # Calculate resource utilization
         resource_utilization = {}
         for resource_name, limiter in self.resource_limiters.items():
             resource_utilization[resource_name] = limiter.get_status()["utilization"]
@@ -357,26 +357,26 @@ class ConcurrencyManager:
         }
     
     def cleanup_old_history(self, max_age_hours: int = 24):
-        """清理旧的历史记录"""
+        """Clean up old historical records"""
         
         cutoff_time = datetime.now() - timedelta(hours=max_age_hours)
         
-        # 过滤历史记录
+        # Filter historical records
         self.task_history = [
             task_info for task_info in self.task_history
             if task_info.created_at >= cutoff_time
         ]
         
-        logger.info(f"清理任务历史记录，保留最近 {max_age_hours} 小时的数据")
+        logger.info(f"Clean up task history, retain the most recent {max_age_hours} Hour's data")
 
 
-# 全局并发管理器实例
+# Global concurrency manager instance
 concurrency_manager = ConcurrencyManager()
 
 
-# 并发控制装饰器
+# Concurrency control decorator
 def limit_concurrency(resource_name: str, priority: TaskPriority = TaskPriority.NORMAL):
-    """并发控制装饰器"""
+    """Concurrency control decorator"""
     
     def decorator(func):
         async def async_wrapper(*args, **kwargs):
@@ -389,7 +389,7 @@ def limit_concurrency(resource_name: str, priority: TaskPriority = TaskPriority.
                 **kwargs
             )
             
-            # 等待任务完成
+            # Wait for task completion
             while True:
                 status = concurrency_manager.get_task_status(task_id)
                 if status and status["status"] in ["completed", "failed", "cancelled"]:
@@ -400,7 +400,7 @@ def limit_concurrency(resource_name: str, priority: TaskPriority = TaskPriority.
                 await asyncio.sleep(0.1)
         
         def sync_wrapper(*args, **kwargs):
-            # 对于同步函数，创建异步包装器
+            # Create asynchronous wrapper for synchronous functions
             async def async_func():
                 return func(*args, **kwargs)
             

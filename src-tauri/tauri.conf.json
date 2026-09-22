@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "AutoClip Desktop",
+  "productName": "ClipFarm",
   "version": "1.2.0",
-  "identifier": "com.autoclip.desktop",
+  "identifier": "com.clipfarm.desktop",
   "build": {
     "beforeDevCommand": "cd ../frontend && npm run dev",
     "devUrl": "http://localhost:3000",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "AutoClip Desktop",
+        "title": "ClipFarm Studio",
         "width": 1200,
         "height": 800,
         "minWidth": 800,
@@ -40,8 +40,8 @@
       "icons/icon.ico"
     ],
     "category": "DeveloperTool",
-    "shortDescription": "AI视频切片工具桌面版",
-    "longDescription": "AutoClip是一款基于AI的智能视频切片工具，支持自动识别精彩片段并生成合集。",
+    "shortDescription": "AI Video Clipping Tool Desktop Edition",
+    "longDescription": "AutoClip is an AI-powered smart video clipping tool that automatically detects highlights and generates viral collections.",
     "copyright": "© 2024 AutoClip Team",
       "resources": [],
     "externalBin": [],

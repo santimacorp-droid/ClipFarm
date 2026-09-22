@@ -1,6 +1,5 @@
 """
-统一的后端应用工厂函数
-支持 web 和 desktop 两种模式
+Single backend application factory function web and desktop two modes
 """
 import logging
 import os
@@ -19,15 +18,15 @@ logger = logging.getLogger(__name__)
 
 def create_app(mode: str = "web") -> FastAPI:
     """
-    创建 FastAPI 应用实例
+    create FastAPI app instance
     
     Args:
-        mode: 运行模式，支持 "web" 或 "desktop"
+        mode: Run mode supports "web" or "desktop"
     """
-    # 设置模式环境变量
+    # Set mode environment variable
     os.environ["AUTOCLIP_MODE"] = mode
     
-    # 配置日志
+    # configure logs
     logging_config = get_logging_config()
     logging.basicConfig(
         level=getattr(logging, logging_config["level"]),
@@ -38,126 +37,103 @@ def create_app(mode: str = "web") -> FastAPI:
         ]
     )
     
-    # 创建 FastAPI 应用
+    # create FastAPI application
     app = FastAPI(
-        title="AutoClip API",
-        description="AI视频切片处理API",
-        version="1.0.0",
+        title="ClipFarm API",
+        description="AI Video Clipping & Studio Processing API",
+        version="2.0.0",
         docs_url="/docs",
         redoc_url="/redoc"
     )
     
-    # 设置应用状态
+    # Set application state
     app.state.mode = mode
     
-    # 配置 CORS
+    # configure CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # 生产环境需要配置具体域名
+        allow_origins=["*"],  # Production environment requires configuration of specific domain name
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["Content-Disposition", "content-disposition", "Accept-Ranges", "Content-Length"],
     )
     
-    # 注册全局异常处理器
+    # Register global exception handler
     app.add_exception_handler(Exception, global_exception_handler)
     
-    # 启动事件
+    # startup event
     @app.on_event("startup")
     async def startup_event():
-        logger.info(f"启动 AutoClip API 服务 (模式: {mode})...")
+        logger.info(f"Starting ClipFarm API Service (mode: {mode})...")
         
-        # 导入所有模型以确保表被创建
+        # Import all models to ensure tables are created
         from backend.models.bilibili import BilibiliAccount, UploadRecord
         Base.metadata.create_all(bind=engine)
-        logger.info("数据库表创建完成")
+        logger.info("Database table creation complete")
+
+        # Auto-sync existing projects from disk if database is empty
+        try:
+            from backend.core.database import SessionLocal
+            from backend.models.project import Project
+            from backend.services.data_sync_service import DataSyncService
+            from backend.core.config import get_data_directory
+            with SessionLocal() as db_session:
+                if db_session.query(Project).count() == 0:
+                    data_dir = get_data_directory()
+                    sync_service = DataSyncService(db_session)
+                    sync_service.sync_all_projects_from_filesystem(data_dir)
+                    db_session.commit()
+                    logger.info("Automatically synced filesystem projects into database on startup")
+        except Exception as sync_err:
+            logger.warning(f"Project startup auto-sync skipped: {sync_err}")
         
-        # 加载 API 密钥到环境变量
+        # load API Key to environment variable
         api_key = get_api_key()
         if api_key:
             os.environ["DASHSCOPE_API_KEY"] = api_key
-            logger.info("API 密钥已加载到环境变量")
+            logger.info("API Key loaded into environment variable")
         else:
-            logger.warning("未找到 API 密钥配置")
+            logger.warning("not found API secret configuration")
         
-        # 根据模式进行不同的初始化
+        # Initialize differently based on mode
         if mode == "desktop":
-            logger.info("桌面模式：使用本地队列和 SQLite")
+            logger.info("Desktop mode: use local queue and SQLite")
         else:
-            logger.info("Web 模式：使用 Redis/Celery")
+            logger.info("Web Mode: Using Redis/Celery")
         
-        logger.info("WebSocket 网关服务已禁用，使用新的简化进度系统")
+        logger.info("WebSocket Gateway service is disabled; using new simplified progress system")
     
-    # 关闭事件
+    # shutdown event
     @app.on_event("shutdown")
     async def shutdown_event():
-        logger.info("正在关闭 AutoClip API 服务...")
-        logger.info("WebSocket 网关服务已禁用")
+        logger.info("Shutting down ClipFarm API service...")
+        logger.info("WebSocket Gateway service is disabled")
     
-    # 注册路由
+    # register routes
     app.include_router(health_router, prefix="/api/health", tags=["health"])
     app.include_router(api_router, prefix="/api/v1")
     
-    # 添加 video-categories 路由（统一到 api_router 中）
+    # add video-categories Route (unified to api_router in progress)
     @app.get("/api/v1/video-categories")
     async def get_video_categories():
-        """获取视频分类配置."""
+        """Get video classification configuration."""
+        from .core.shared_config import VIDEO_CATEGORIES_CONFIG
+        categories_list = []
+        for cat, meta in VIDEO_CATEGORIES_CONFIG.items():
+            categories_list.append({
+                "value": cat.value,
+                "name": meta.get("name", cat.value),
+                "description": meta.get("description", ""),
+                "icon": meta.get("icon", "video"),
+                "color": meta.get("color", "#1890ff")
+            })
         return {
-            "categories": [
-                {
-                    "value": "default",
-                    "name": "默认",
-                    "description": "通用视频内容处理",
-                    "icon": "🎬",
-                    "color": "#4facfe"
-                },
-                {
-                    "value": "knowledge",
-                    "name": "知识科普",
-                    "description": "科学、技术、历史、文化等知识类内容",
-                    "icon": "📚",
-                    "color": "#52c41a"
-                },
-                {
-                    "value": "entertainment",
-                    "name": "娱乐",
-                    "description": "游戏、音乐、电影等娱乐内容",
-                    "icon": "🎮",
-                    "color": "#722ed1"
-                },
-                {
-                    "value": "business",
-                    "name": "商业",
-                    "description": "商业、创业、投资等商业内容",
-                    "icon": "💼",
-                    "color": "#fa8c16"
-                },
-                {
-                    "value": "experience",
-                    "name": "经验分享",
-                    "description": "个人经历、生活感悟等经验内容",
-                    "icon": "🌟",
-                    "color": "#eb2f96"
-                },
-                {
-                    "value": "opinion",
-                    "name": "观点评论",
-                    "description": "时事评论、观点分析等评论内容",
-                    "icon": "💭",
-                    "color": "#13c2c2"
-                },
-                {
-                    "value": "speech",
-                    "name": "演讲",
-                    "description": "公开演讲、讲座等演讲内容",
-                    "icon": "🎤",
-                    "color": "#f5222d"
-                }
-            ],
-            "default_category": "default"
+            "categories": categories_list,
+            "default_category": "podcast"
         }
     
-    # 根健康检查
+    # Root health check endpoint
     @app.get("/health")
     async def root_health():
         try:

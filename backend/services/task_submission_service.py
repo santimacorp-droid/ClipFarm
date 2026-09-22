@@ -1,6 +1,6 @@
 """
-任务提交服务
-避免循环导入问题
+Task submission service
+Avoid circular import issues
 """
 
 import logging
@@ -10,84 +10,84 @@ from ..core.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 class TaskSubmissionService:
-    """任务提交服务"""
+    """Task submission service"""
     
     @staticmethod
     def submit_video_pipeline_task(project_id: str, input_video_path: str, input_srt_path: str) -> Dict[str, Any]:
         """
-        提交视频流水线任务
+        Submit video pipeline task
         
         Args:
-            project_id: 项目ID
-            input_video_path: 输入视频路径
-            input_srt_path: 输入SRT路径
+            project_id: ProjectID
+            input_video_path: Input video file path
+            input_srt_path: Input SRT file path
             
         Returns:
-            任务提交结果
+            Task submission result
         """
         try:
-            logger.info(f"提交视频流水线任务: {project_id}")
+            logger.info(f"Submit video pipeline task: {project_id}")
             
-            # 直接使用celery_app提交任务
+            # Use `celery_app` to submit tasks directly
             celery_task = celery_app.send_task(
                 'tasks.processing.process_video_pipeline',
                 args=[project_id, input_video_path, input_srt_path]
             )
             
-            logger.info(f"视频流水线任务已提交: {celery_task.id}")
+            logger.info(f"Video pipeline task submitted: {celery_task.id}")
             
             return {
                 'success': True,
                 'task_id': celery_task.id,
                 'status': 'PENDING',
-                'message': '视频流水线任务已提交'
+                'message': 'Video pipeline task submitted'
             }
             
         except Exception as e:
-            logger.error(f"提交视频流水线任务失败: {project_id}, 错误: {e}")
+            logger.error(f"Failed to submit video pipeline task: {project_id}, Error: {e}")
             return {
                 'success': False,
                 'error': str(e),
-                'message': '任务提交失败'
+                'message': 'Task submission failed'
             }
     
     @staticmethod
     def submit_single_step_task(project_id: str, step: str, config: Dict[str, Any]) -> Dict[str, Any]:
         """
-        提交单个步骤任务
+        Submit single-step task
         
         Args:
-            project_id: 项目ID
-            step: 步骤名称
-            config: 处理配置
+            project_id: ProjectID
+            step: Step name
+            config: Processing configuration
             
         Returns:
-            任务提交结果
+            Task submission result
         """
         try:
-            logger.info(f"提交单个步骤任务: {project_id}, {step}")
+            logger.info(f"Submit single-step task: {project_id}, {step}")
             
-            # 直接使用celery_app提交任务
+            # Use `celery_app` to submit tasks directly
             celery_task = celery_app.send_task(
                 'tasks.processing.process_single_step',
                 args=[project_id, step, config]
             )
             
-            logger.info(f"单个步骤任务已提交: {celery_task.id}")
+            logger.info(f"Single-step task submitted: {celery_task.id}")
             
             return {
                 'success': True,
                 'task_id': celery_task.id,
                 'step': step,
                 'status': 'PENDING',
-                'message': f'步骤 {step} 任务已提交'
+                'message': f'Step {step} Task submitted'
             }
             
         except Exception as e:
-            logger.error(f"提交单个步骤任务失败: {project_id}, {step}, 错误: {e}")
+            logger.error(f"Failed to submit single-step task: {project_id}, {step}, Error: {e}")
             return {
                 'success': False,
                 'error': str(e),
-                'message': '任务提交失败'
+                'message': 'Task submission failed'
             }
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-清空数据库中的所有项目数据
+Cleared all project data from the database
 """
 import sys
 import os
 from pathlib import Path
 
-# 添加项目根目录到Python路径
+# Added project root directory toPythonPath
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
@@ -18,38 +18,38 @@ from backend.models.task import Task
 from sqlalchemy.orm import Session
 
 def clean_database():
-    """清空数据库中的所有项目相关数据"""
-    print("🧹 开始清理数据库...")
+    """Cleared all project-related data from the database"""
+    print("🧹 Starting database cleanup...")
     
-    # 获取数据库会话
+    # Get database session
     db = next(get_db())
     
     try:
-        # 删除所有数据（按依赖关系顺序）
-        print("删除任务数据...")
+        # Deleted all data (by dependency order))
+        print("Deleting task data...")
         deleted_tasks = db.query(Task).delete()
-        print(f"✅ 删除了 {deleted_tasks} 个任务")
+        print(f"✅ Deleted {deleted_tasks} tasks")
         
-        print("删除合集数据...")
+        print("Deleting collection data...")
         deleted_collections = db.query(Collection).delete()
-        print(f"✅ 删除了 {deleted_collections} 个合集")
+        print(f"✅ Deleted {deleted_collections} collections")
         
-        print("删除切片数据...")
+        print("Deleting slice data...")
         deleted_clips = db.query(Clip).delete()
-        print(f"✅ 删除了 {deleted_clips} 个切片")
+        print(f"✅ Deleted {deleted_clips} slices")
         
-        print("删除项目数据...")
+        print("Deleted project data...")
         deleted_projects = db.query(Project).delete()
-        print(f"✅ 删除了 {deleted_projects} 个项目")
+        print(f"✅ Deleted {deleted_projects} projects")
         
-        # 提交事务
+        # Commit transaction
         db.commit()
         
-        print("\n🎉 数据库清理完成!")
-        print("现在数据库是干净的，没有任何项目数据")
+        print("\n🎉 Database cleanup complete!")
+        print("The database is now clean with no project data")
         
     except Exception as e:
-        print(f"❌ 清理数据库时发生错误: {e}")
+        print(f"❌ An error occurred during database cleanup: {e}")
         db.rollback()
     finally:
         db.close()

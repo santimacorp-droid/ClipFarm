@@ -1,20 +1,19 @@
 """
-桌面模式Celery配置
-使用SQLite作为Broker和Backend，适合单机桌面应用
+Desktop modeCeleryConfiguration UseSQLiteasBrokerandBackend, Suitable for standalone desktop applications
 """
 import os
 
 if os.getenv("AUTOCLIP_DESKTOP_MODE", "").lower() not in {"1", "true", "yes"}:
-    raise RuntimeError("此模块仅在桌面模式下可用")
+    raise RuntimeError("This module is available only in desktop mode")
 
 from celery import Celery
 from pathlib import Path
 
-# 文件系统 broker + sqlite backend（示例）
+# File system broker + sqlite backend(Example)
 app_dir = Path(os.getenv("AUTOCLIP_APP_DIR", "~/Library/Application Support/AutoClip")).expanduser()
 app_dir.mkdir(parents=True, exist_ok=True)
 
-# 创建Celery目录
+# CreateCeleryDirectory
 celery_dir = app_dir / "celery"
 celery_dir.mkdir(parents=True, exist_ok=True)
 (celery_dir / "in").mkdir(exist_ok=True)

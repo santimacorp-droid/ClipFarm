@@ -1,6 +1,6 @@
 """
-切片服务
-提供切片相关的业务逻辑操作
+Slice service
+Provides business logic operations related to slicing
 """
 
 from typing import Optional, List, Dict, Any
@@ -81,6 +81,8 @@ class ClipService(BaseService[Clip, ClipCreate, ClipUpdate, ClipResponse]):
                 video_path=getattr(clip, 'video_path', None),
                 tags=getattr(clip, 'tags', []) or [],
                 clip_metadata=getattr(clip, 'clip_metadata', {}) or {},
+                platform_advisory=getattr(clip, 'platform_advisory', None),
+                social_copy=getattr(clip, 'social_copy', None) or ((getattr(clip, 'clip_metadata', {}) or {}).get('social_copy')),
                 created_at=getattr(clip, 'created_at', None) if isinstance(getattr(clip, 'created_at', None), (type(None), __import__('datetime').datetime)) else None,
                 updated_at=getattr(clip, 'updated_at', None) if isinstance(getattr(clip, 'updated_at', None), (type(None), __import__('datetime').datetime)) else None,
                 collection_ids=[]

@@ -54,23 +54,14 @@ venv_*/
 *.pkl
 *.joblib
 
-# 数据库文件
+# 数据库文件与本地数据
 *.db
 *.sqlite
 *.sqlite3
-data/autoclip.db
-data/progress.db
-data/*.json
-data/*.port
-
-# 项目数据目录（包含用户上传的视频和生成的文件）
-data/projects/
-data/uploads/
-data/temp/
-data/output/
-data/backups/
-data/cache/
+data/*
+!data/.gitkeep
 backend/data/
+scratch/
 
 # 前端依赖与构建产物
 node_modules/

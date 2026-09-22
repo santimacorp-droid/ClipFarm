@@ -1,6 +1,6 @@
 """
-切片模型
-定义视频切片的基本信息和状态
+Slice model
+Defines basic information and status of a video slice
 """
 
 import enum
@@ -10,119 +10,119 @@ from sqlalchemy.orm import relationship
 from .base import BaseModel
 
 class ClipStatus(str, enum.Enum):
-    """切片状态枚举"""
-    PENDING = "pending"           # 待处理
-    PROCESSING = "processing"     # 处理中
-    COMPLETED = "completed"       # 已完成
-    FAILED = "failed"            # 失败
+    """Slice state enumeration"""
+    PENDING = "pending"           # To be processed
+    PROCESSING = "processing"     # In progress
+    COMPLETED = "completed"       # Completed
+    FAILED = "failed"            # Failed
 
 class Clip(BaseModel):
-    """切片模型"""
+    """Slice model"""
     
     __tablename__ = "clips"
     
-    # 基本信息
+    # Basic information
     title = Column(
         String(255), 
         nullable=False, 
-        comment="切片标题"
+        comment="Slice title"
     )
     description = Column(
         Text, 
         nullable=True, 
-        comment="切片描述"
+        comment="Slice description"
     )
     
-    # 状态信息
+    # Status information
     status = Column(
         Enum(ClipStatus), 
         default=ClipStatus.PENDING,
         nullable=False,
-        comment="切片状态"
+        comment="Slice status"
     )
     
-    # 时间信息
+    # Time information
     start_time = Column(
         Integer, 
         nullable=False, 
-        comment="开始时间（秒）"
+        comment="Start time (seconds))"
     )
     end_time = Column(
         Integer, 
         nullable=False, 
-        comment="结束时间（秒）"
+        comment="End time (seconds))"
     )
     duration = Column(
         Integer, 
         nullable=False, 
-        comment="切片时长（秒）"
+        comment="Slice duration (seconds))"
     )
     
-    # 评分信息
+    # Rating information
     score = Column(
         Float, 
         nullable=True, 
-        comment="切片评分"
+        comment="Slice rating"
     )
     recommendation_reason = Column(
         Text, 
         nullable=True, 
-        comment="推荐理由"
+        comment="Recommendation reason"
     )
     
-    # 文件信息
+    # File information
     video_path = Column(
         String(500), 
         nullable=True, 
-        comment="切片视频文件路径"
+        comment="Path to slice video file"
     )
     thumbnail_path = Column(
         String(500), 
         nullable=True, 
-        comment="缩略图文件路径"
+        comment="Path to thumbnail image file"
     )
     
-    # 处理信息
+    # Processing information
     processing_step = Column(
         Integer, 
         nullable=True, 
-        comment="处理步骤（1-6）"
+        comment="Processing steps(1-6)"
     )
     
-    # 标签和元数据
+    # Labels and metadata
     tags = Column(
         JSON, 
         nullable=True, 
-        comment="切片标签"
+        comment="Slice label"
     )
     clip_metadata = Column(
         JSON, 
         nullable=True, 
-        comment="切片元数据（精简版，完整数据存储在文件系统）"
+        comment="Slice metadata (compact version; complete data stored in filesystem))"
     )
     
-    # 添加计算属性
+    # Add computed properties
     @property
     def metadata_file_path(self) -> Optional[str]:
-        """获取完整元数据文件路径"""
+        """Get path to complete metadata file"""
         if self.clip_metadata and 'metadata_file' in self.clip_metadata:
             return self.clip_metadata['metadata_file']
         return None
     
     @property
     def has_full_content(self) -> bool:
-        """是否有完整内容文件"""
+        """Whether a complete content file exists"""
         return self.metadata_file_path is not None
     
-    # 外键关联
+    # Foreign key association
     project_id = Column(
         String(36), 
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
-        comment="所属项目ID"
+        comment="Belongs to projectID"
     )
     
-    # 关联关系
+    # Relationship
     project = relationship(
         "Project", 
         back_populates="clips"
@@ -137,22 +137,37 @@ class Clip(BaseModel):
         return f"<Clip(id={self.id}, title='{self.title}', duration={self.duration}s)>"
     
     @property
+    def platform_advisory(self):
+        """Returns the platform duration advisory dict for this clip."""
+        if self.clip_metadata and isinstance(self.clip_metadata, dict) and "platform_advisory" in self.clip_metadata:
+            return self.clip_metadata["platform_advisory"]
+        from ..core.platform_advisor import get_platform_advisory
+        return get_platform_advisory(float(self.duration or 0.0))
+
+    @property
+    def social_copy(self):
+        """Returns the generated social post caption & hashtags dict for this clip."""
+        if self.clip_metadata and isinstance(self.clip_metadata, dict) and "social_copy" in self.clip_metadata:
+            return self.clip_metadata["social_copy"]
+        return None
+
+    @property
     def is_processing(self):
-        """是否正在处理"""
+        """Is currently processing"""
         return self.status == ClipStatus.PROCESSING
     
     @property
     def is_completed(self):
-        """是否已完成"""
+        """Has finished"""
         return self.status == ClipStatus.COMPLETED
     
     @property
     def has_error(self):
-        """是否有错误"""
+        """Has error"""
         return self.status == ClipStatus.FAILED
     
     def get_time_range(self) -> str:
-        """获取时间范围字符串"""
+        """Get time range string"""
         try:
             start_time = int(self.start_time) if self.start_time else 0
             end_time = int(self.end_time) if self.end_time else 0
@@ -163,6 +178,6 @@ class Clip(BaseModel):
             return "00:00 - 00:00"
     
     def calculate_duration(self):
-        """计算切片时长"""
+        """Compute slice duration"""
         self.duration = self.end_time - self.start_time
         return self.duration

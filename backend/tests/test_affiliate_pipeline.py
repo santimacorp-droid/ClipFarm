@@ -259,3 +259,40 @@ def test_facebook_cta_watermark_lower_middle(tmp_path, sample_video):
     assert res.exists()
     assert res.stat().st_size > 1024
 
+
+def test_process_affiliate_video_with_brand_watermark_preset(tmp_path, sample_video):
+    """Verify processing affiliate video with a brand watermark preset applies both watermark and CTA."""
+    proc = AffiliateVideoProcessor()
+
+    # Create dummy logo
+    from PIL import Image
+    logo_file = tmp_path / "brand_logo.png"
+    img = Image.new("RGBA", (200, 60), color=(255, 120, 0, 220))
+    img.save(logo_file)
+
+    custom_srt = tmp_path / "brand_input.srt"
+    custom_srt.write_text("""1
+00:00:00,000 --> 00:00:01,800
+Affiliate Video with Brand Watermark
+""", encoding="utf-8")
+
+    out_video = tmp_path / "brand_affiliate_output.mp4"
+    result = proc.process_affiliate_video(
+        input_video_path=sample_video,
+        output_video_path=out_video,
+        transcript_source=custom_srt,
+        fb_handle="@BrandAffiliate",
+        caption_style="hormozi_yellow",
+        cta_style="card",
+        cta_position="lower_middle",
+        watermark=True,
+        watermark_preset_id="loudest_minute_fade"
+    )
+
+    assert result["success"] is True
+    assert result["watermark_preset_id"] == "loudest_minute_fade"
+    assert result["brand_watermark_applied"] is True
+    assert Path(result["output_video"]).exists()
+    assert Path(result["output_video"]).stat().st_size > 1024
+
+

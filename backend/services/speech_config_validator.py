@@ -1,6 +1,6 @@
 """
-语音转写配置验证服务
-负责验证配置的有效性和完整性
+Speech-to-Text configuration validation service
+Responsible for validating the validity and integrity of the configuration
 """
 import logging
 from typing import Dict, List, Optional, Tuple
@@ -12,20 +12,20 @@ logger = logging.getLogger(__name__)
 
 
 class SpeechConfigValidator:
-    """语音转写配置验证器"""
+    """Speech-to-Text configuration validator"""
     
     def __init__(self):
         self.model_manager = get_model_manager()
     
     def validate_config(self, config: SpeechRecognitionSettings) -> Dict[str, any]:
         """
-        验证语音转写配置
+        Validate speech-to-text configuration
         
         Args:
-            config: 语音转写配置
+            config: Speech-to-Text configuration
             
         Returns:
-            验证结果字典
+            Validate result dictionary
         """
         result = {
             "valid": True,
@@ -34,13 +34,13 @@ class SpeechConfigValidator:
             "recommendations": []
         }
         
-        # 验证主方法
+        # Validate main method
         method_validation = self._validate_method(config.method)
         if not method_validation["valid"]:
             result["valid"] = False
             result["errors"].extend(method_validation["errors"])
         
-        # 验证具体配置
+        # Validate specific configuration
         if config.method == "whisper_local":
             whisper_validation = self._validate_whisper_config(config.whisper_config)
             if not whisper_validation["valid"]:
@@ -57,7 +57,7 @@ class SpeechConfigValidator:
             result["warnings"].extend(api_validation["warnings"])
             result["recommendations"].extend(api_validation["recommendations"])
         
-        # 验证回退配置
+        # Validate fallback config
         if config.enable_fallback:
             fallback_validation = self._validate_fallback_config(config)
             if not fallback_validation["valid"]:
@@ -66,7 +66,7 @@ class SpeechConfigValidator:
         return result
     
     def _validate_method(self, method: str) -> Dict[str, any]:
-        """验证方法选择"""
+        """Validate method selection"""
         valid_methods = [
             "whisper_local", "openai_api", "azure_speech", 
             "google_speech", "aliyun_speech", "custom_api"
@@ -75,60 +75,60 @@ class SpeechConfigValidator:
         if method not in valid_methods:
             return {
                 "valid": False,
-                "errors": [f"不支持的语音识别方法: {method}"]
+                "errors": [f"Unsupported speech recognition method: {method}"]
             }
         
         return {"valid": True, "errors": []}
     
     def _validate_whisper_config(self, config: WhisperConfig) -> Dict[str, any]:
-        """验证Whisper配置"""
+        """Validate Whisper configuration"""
         result = {"valid": True, "errors": [], "warnings": [], "recommendations": []}
         
-        # 验证模型名称
+        # Validate model name
         valid_models = ["tiny", "base", "small", "medium", "large"]
         if config.model_name not in valid_models:
             result["valid"] = False
-            result["errors"].append(f"不支持的Whisper模型: {config.model_name}")
+            result["errors"].append(f"Not supportedWhisperModel: {config.model_name}")
         
-        # 检查模型是否已下载
+        # Check if model is already downloaded
         model_info = self.model_manager.get_model_info(config.model_name)
         if model_info and model_info.status != ModelStatus.DOWNLOADED:
             if model_info.status == ModelStatus.AVAILABLE:
-                result["warnings"].append(f"模型 {config.model_name} 未下载，首次使用时会自动下载")
+                result["warnings"].append(f"Model {config.model_name} Not downloaded, will be automatically downloaded when used for the first time")
             elif model_info.status == ModelStatus.DOWNLOADING:
-                result["warnings"].append(f"模型 {config.model_name} 正在下载中")
+                result["warnings"].append(f"Model {config.model_name} Downloading in progress")
             elif model_info.status == ModelStatus.ERROR:
-                result["errors"].append(f"模型 {config.model_name} 下载失败")
+                result["errors"].append(f"Model {config.model_name} Download failed")
         
-        # 验证超时时间
+        # Validate timeout
         if config.timeout < 60:
-            result["warnings"].append("超时时间过短，建议至少60秒")
+            result["warnings"].append("The timeout is too short; it is recommended to set at least 60 seconds")
         elif config.timeout > 7200:
-            result["warnings"].append("超时时间过长，建议不超过2小时")
+            result["warnings"].append("The timeout is too long; it is recommended not to exceed 2 hours")
         
-        # 验证自定义模型目录
+        # Validate custom model directory
         if config.custom_models_dir:
             custom_dir = Path(config.custom_models_dir)
             if not custom_dir.exists():
-                result["errors"].append(f"自定义模型目录不存在: {config.custom_models_dir}")
+                result["errors"].append(f"Custom model directory does not exist: {config.custom_models_dir}")
             elif not custom_dir.is_dir():
-                result["errors"].append(f"自定义模型目录不是有效目录: {config.custom_models_dir}")
+                result["errors"].append(f"Custom model directory is not a valid directory: {config.custom_models_dir}")
         
-        # 添加推荐
+        # Add recommendation
         if config.model_name == "tiny":
-            result["recommendations"].append("tiny模型速度最快但准确度较低，建议用于实时处理")
+            result["recommendations"].append("The tiny model is fastest but has lower accuracy; it is recommended for real-time processing")
         elif config.model_name == "base":
-            result["recommendations"].append("base模型是平衡选择，推荐日常使用")
+            result["recommendations"].append("The base model is a balanced choice recommended for everyday use")
         elif config.model_name in ["small", "medium", "large"]:
-            result["recommendations"].append(f"{config.model_name}模型准确度高但速度较慢，适合重要内容")
+            result["recommendations"].append(f"{config.model_name}Model has high accuracy but slower speed, suitable for important content")
         
         return result
     
     def _validate_api_config(self, config: SpeechRecognitionSettings, method: str) -> Dict[str, any]:
-        """验证API配置"""
+        """Validate API configuration"""
         result = {"valid": True, "errors": [], "warnings": [], "recommendations": []}
         
-        # 获取对应的API配置
+        # Get corresponding API configuration
         if method == "openai_api":
             api_config = config.openai_config
         elif method == "azure_speech":
@@ -140,90 +140,90 @@ class SpeechConfigValidator:
         elif method == "custom_api":
             api_config = config.custom_api_config
         else:
-            return {"valid": False, "errors": [f"不支持的API方法: {method}"]}
+            return {"valid": False, "errors": [f"Not supportedAPIMethod: {method}"]}
         
-        # 验证API密钥
+        # Validate API key
         if not api_config.api_key:
             result["valid"] = False
-            result["errors"].append(f"{method} API密钥不能为空")
+            result["errors"].append(f"{method} APIAPI key cannot be empty")
         elif len(api_config.api_key) < 10:
-            result["warnings"].append("API密钥长度过短，请检查是否正确")
+            result["warnings"].append("The API key length is too short; please check if it is correct")
         
-        # 验证Azure区域
+        # Validate Azure region
         if method == "azure_speech" and not api_config.region:
             result["valid"] = False
-            result["errors"].append("Azure Speech服务需要指定区域")
+            result["errors"].append("The Azure Speech service requires specifying the region")
         
-        # 验证自定义API端点
+        # Validate custom API endpoint
         if method == "custom_api":
             if not api_config.endpoint:
                 result["valid"] = False
-                result["errors"].append("自定义API需要指定端点URL")
+                result["errors"].append("Custom API requires specifying the endpoint URL")
             elif not api_config.endpoint.startswith(("http://", "https://")):
-                result["errors"].append("API端点必须是有效的HTTP/HTTPS URL")
+                result["errors"].append("The API endpoint must be a valid HTTP/HTTPS URL")
         
-        # 添加推荐
+        # Add recommendation
         if method == "openai_api":
-            result["recommendations"].append("OpenAI API准确度最高，但需要付费")
+            result["recommendations"].append("OpenAI API has the highest accuracy but requires payment")
         elif method == "azure_speech":
-            result["recommendations"].append("Azure Speech适合企业级应用，支持多种语言")
+            result["recommendations"].append("Azure Speech is suitable for enterprise applications and supports multiple languages")
         elif method == "google_speech":
-            result["recommendations"].append("Google Speech功能丰富，支持实时识别")
+            result["recommendations"].append("Google Speech offers rich functionality and supports real-time recognition")
         elif method == "aliyun_speech":
-            result["recommendations"].append("阿里云语音识别对中文优化较好")
+            result["recommendations"].append("Aliyun Speech Recognition is optimized for Chinese")
         
         return result
     
     def _validate_fallback_config(self, config: SpeechRecognitionSettings) -> Dict[str, any]:
-        """验证回退配置"""
+        """Validate fallback config"""
         result = {"valid": True, "warnings": [], "recommendations": []}
         
-        # 检查回退方法是否与主方法相同
+        # Check whether the fallback method matches the primary method
         if config.fallback_method == config.method:
-            result["warnings"].append("回退方法与主方法相同，建议选择不同的回退方法")
+            result["warnings"].append("Fallback method should match primary method; different fallback methods are suggested")
         
-        # 检查回退方法是否可用
+        # Check if fallback method is available
         if config.fallback_method == "whisper_local":
             model_info = self.model_manager.get_model_info(config.whisper_config.model_name)
             if model_info and model_info.status not in [ModelStatus.DOWNLOADED, ModelStatus.AVAILABLE]:
-                result["warnings"].append("回退方法使用的Whisper模型不可用")
+                result["warnings"].append("The fallback method using the Whisper model is unavailable")
         
-        # 添加推荐
+        # Add recommendation
         if config.method != "whisper_local" and config.fallback_method != "whisper_local":
-            result["recommendations"].append("建议将Whisper本地模型作为回退方法，确保离线可用")
+            result["recommendations"].append("It is recommended to use local Whisper models as fallback for offline availability")
         
         return result
     
     def get_config_recommendations(self, config: SpeechRecognitionSettings) -> List[str]:
-        """获取配置建议"""
+        """Get config suggestions"""
         recommendations = []
         
-        # 根据使用场景推荐
+        # Recommended based on usage scenario
         if config.method == "whisper_local":
             if config.whisper_config.model_name == "tiny":
-                recommendations.append("tiny模型适合快速处理，但准确度较低")
+                recommendations.append("The tiny model is suitable for fast processing but has lower accuracy")
             elif config.whisper_config.model_name in ["medium", "large"]:
-                recommendations.append("大模型准确度高但处理时间长，适合重要内容")
+                recommendations.append("Large models have high accuracy but longer processing times; they are suitable for important content")
         
-        # 网络环境建议
+        # Network environment recommendation
         if config.method != "whisper_local":
-            recommendations.append("使用API服务需要稳定的网络连接")
+            recommendations.append("Using the API service requires a stable network connection")
             if config.enable_fallback and config.fallback_method == "whisper_local":
-                recommendations.append("已配置本地回退，确保离线可用")
+                recommendations.append("Configured local fallback to ensure offline availability")
         
-        # 性能建议
+        # Performance suggestion
         if config.whisper_config.enable_speaker_diarization:
-            recommendations.append("说话人分离功能会增加处理时间")
+            recommendations.append("The speaker separation feature increases processing time")
         
         return recommendations
 
 
-# 全局验证器实例
+# Global validator instance
 _validator: Optional[SpeechConfigValidator] = None
 
 
 def get_config_validator() -> SpeechConfigValidator:
-    """获取配置验证器实例"""
+    """Get configuration validator instance"""
     global _validator
     if _validator is None:
         _validator = SpeechConfigValidator()

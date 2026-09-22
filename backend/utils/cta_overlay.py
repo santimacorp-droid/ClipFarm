@@ -325,7 +325,7 @@ def render_cta_card(
     else:
         icon_w = icon_size
 
-    btn_w = 180 if platform in ("youtube", "youtube_shorts") else 150
+    btn_w = 180 if platform in ("youtube", "youtube_shorts") else 160
     btn_h = 58
     btn_font = _get_font(22, bold=True)
 
@@ -335,7 +335,7 @@ def render_cta_card(
     h_bbox = dummy_draw.textbbox((0, 0), display_handle, font=font_main)
     handle_w = h_bbox[2] - h_bbox[0]
 
-    min_card_w = 600
+    min_card_w = 560
     card_w = max(min_card_w, icon_x + icon_w + 20 + handle_w + 28 + btn_w + 24)
 
     card = Image.new("RGBA", (card_w, card_h), (0, 0, 0, 0))
@@ -403,11 +403,11 @@ def render_cta_card(
         th = bbox[3] - bbox[1]
         check_color = (0, 242, 254, 255) if platform == "tiktok" else (255, 255, 255, 255)
         # Checkmark
-        cm_x = btn_x + 18
+        cm_x = btn_x + 16
         cm_y = btn_y + 20
         pts = [(cm_x, cm_y + 8), (cm_x + 6, cm_y + 14), (cm_x + 16, cm_y)]
         draw.line(pts, fill=check_color, width=3, joint="curve")
-        draw.text((btn_x + 42, btn_y + (btn_h - th)//2 - 2), label, font=btn_font, fill=(255, 255, 255, 240))
+        draw.text((btn_x + 38, btn_y + (btn_h - th)//2 - 2), label, font=btn_font, fill=(255, 255, 255, 240))
 
         if platform in ("youtube", "youtube_shorts"):
             draw_bell_icon(draw, btn_x + btn_w - 24, btn_y + btn_h // 2, 18, angle_deg=bell_angle)
@@ -420,6 +420,73 @@ def render_cta_card(
     return card
 
 
+def render_handle_watermark(
+    platform: str = "facebook",
+    handle: str = "",
+    opacity: float = 0.55,
+    font_size: int = 24
+) -> Image.Image:
+    """
+    Render a subtle, semi-transparent anti-theft handle watermark.
+    Only displays the platform icon and @handle with translucent opacity.
+    No action/follow button or opaque card box.
+    """
+    clean_h = handle.strip()
+    display_handle = clean_h if clean_h.startswith("@") else f"@{clean_h}" if clean_h else "@Channel"
+
+    font = _get_font(font_size, bold=True)
+    icon_size = font_size + 4
+
+    # Measure text width & height
+    dummy = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
+    bbox = ImageDraw.Draw(dummy).textbbox((0, 0), display_handle, font=font)
+    tw = bbox[2] - bbox[0]
+    th = bbox[3] - bbox[1]
+
+    pad_x = 14
+    pad_y = 7
+    w = pad_x * 2 + icon_size + 8 + tw
+    h = max(icon_size, th) + pad_y * 2
+
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    # Translucent rounded glass pill (subtle dark tint with soft edge)
+    bg_alpha = int(140 * opacity)
+    border_alpha = int(90 * opacity)
+    draw.rounded_rectangle(
+        [(0, 0), (w - 1, h - 1)],
+        radius=h // 2,
+        fill=(10, 12, 18, bg_alpha),
+        outline=(255, 255, 255, border_alpha),
+        width=1
+    )
+
+    # Platform Icon
+    icon_y = (h - icon_size) // 2
+    if platform == "facebook":
+        draw_facebook_icon(draw, pad_x, icon_y, icon_size)
+    elif platform in ("youtube", "youtube_shorts"):
+        draw_youtube_icon(draw, pad_x, icon_y, icon_size)
+    elif platform == "tiktok":
+        draw_tiktok_icon(draw, pad_x, icon_y, icon_size)
+    elif platform == "instagram":
+        draw_instagram_icon(img, pad_x, icon_y, icon_size)
+    else:
+        draw_facebook_icon(draw, pad_x, icon_y, icon_size)
+
+    # Handle text with soft shadow for legibility on light backgrounds
+    tx = pad_x + icon_size + 8
+    ty = (h - th) // 2 - 2
+    draw.text((tx + 1, ty + 1), display_handle, font=font, fill=(0, 0, 0, int(180 * opacity)))
+    draw.text((tx, ty), display_handle, font=font, fill=(255, 255, 255, int(230 * opacity)))
+
+    # Apply overall opacity scaling to entire image
+    r, g, b, a = img.split()
+    a = a.point(lambda p: int(p * opacity))
+    return Image.merge("RGBA", (r, g, b, a))
+
+
 # ─── Static Watermark Badge Generator ────────────────────────────────────────
 
 def generate_watermark_canvas(
@@ -428,21 +495,19 @@ def generate_watermark_canvas(
     style: str = "pill",
     video_width: int = 1080,
     video_height: int = 1920,
-    position: str = "lower_middle"
+    position: str = "lower_middle",
+    opacity: float = 0.55
 ) -> Image.Image:
     """
-    Generate a full video-size transparent RGBA image with the initial CTA badge
-    and drop shadow positioned exactly where the CTA animation will play.
-    Serves as persistent anti-theft watermark across the video.
+    Generate a full video-size transparent RGBA image with only the creator handle
+    watermark at subtle/translucent opacity.
+    Serves as persistent anti-theft watermark across the video until the animated CTA starts.
     """
-    is_card = style in ("card", "badge")
-    if is_card:
-        widget = render_cta_card(platform, handle, "initial")
-    else:
-        widget = render_pill_button(platform, handle, "initial")
+    base_font_size = max(18, min(36, int(video_width * 0.038)))
+    widget = render_handle_watermark(platform, handle, opacity=opacity, font_size=base_font_size)
 
     ww, wh = widget.size
-    max_w = int(video_width * 0.80)
+    max_w = int(video_width * 0.70)
     if ww > max_w:
         resp_scale = max_w / float(ww)
         ww = int(ww * resp_scale)
@@ -452,33 +517,27 @@ def generate_watermark_canvas(
     pos = str(position or "lower_middle").lower().replace("-", "_")
     if pos in ("lower_middle", "lower_center"):
         target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.62)
+        target_y = int(video_height * 0.44)
     elif pos == "lower_third":
         target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.68)
+        target_y = int(video_height * 0.58)
     elif pos == "center":
         target_x = (video_width - ww) // 2
         target_y = (video_height - wh) // 2
     elif pos == "bottom_center":
         target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.82)
+        target_y = int(video_height * 0.78)
     elif pos == "bottom_left":
         target_x = int(video_width * 0.08)
-        target_y = int(video_height * 0.62)
+        target_y = int(video_height * 0.44)
     elif pos == "bottom_right":
         target_x = video_width - ww - int(video_width * 0.08)
-        target_y = int(video_height * 0.62)
+        target_y = int(video_height * 0.44)
     else:
         target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.62)
+        target_y = int(video_height * 0.44)
 
     canvas = Image.new("RGBA", (video_width, video_height), (0, 0, 0, 0))
-    # Soft drop shadow
-    shadow_box = Image.new("RGBA", (ww + 30, wh + 30), (0, 0, 0, 0))
-    s_draw = ImageDraw.Draw(shadow_box)
-    s_draw.rounded_rectangle([(15, 15), (ww + 15, wh + 15)], radius=36, fill=(0, 0, 0, 95))
-    shadow_blurred = shadow_box.filter(ImageFilter.GaussianBlur(12))
-    canvas.alpha_composite(shadow_blurred, (target_x - 15, target_y - 5))
     canvas.alpha_composite(widget, (target_x, target_y))
     return canvas
 
@@ -511,7 +570,7 @@ def build_cta_animation_clip(
     if output_mov_path is None:
         cache_dir = Path("data/assets/cta_templates")
         cache_dir.mkdir(parents=True, exist_ok=True)
-        output_mov_path = cache_dir / f"cta_v5_{safe_plat}_{safe_style}_{safe_pos}_{safe_h}_{safe_mode}_{video_width}x{video_height}.mov"
+        output_mov_path = cache_dir / f"cta_v8_{safe_plat}_{safe_style}_{safe_pos}_{safe_h}_{safe_mode}_{video_width}x{video_height}.mov"
 
     if output_mov_path.exists() and output_mov_path.stat().st_size > 1000:
         return output_mov_path
@@ -532,7 +591,7 @@ def build_cta_animation_clip(
         widget_act  = render_pill_button(platform, handle, "active")
 
     ww, wh = widget_init.size
-    max_w = int(video_width * 0.80)
+    max_w = int(video_width * 0.82)
     if ww > max_w:
         resp_scale = max_w / float(ww)
         ww = int(ww * resp_scale)
@@ -544,29 +603,29 @@ def build_cta_animation_clip(
     pos = str(position or "lower_middle").lower().replace("-", "_")
     if pos in ("lower_middle", "lower_center"):
         target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.62)
+        target_y = int(video_height * 0.44)
     elif pos == "lower_third":
         target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.68)
+        target_y = int(video_height * 0.58)
     elif pos == "center":
         target_x = (video_width - ww) // 2
         target_y = (video_height - wh) // 2
     elif pos == "bottom_center":
         target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.82)
+        target_y = int(video_height * 0.78)
     elif pos == "bottom_left":
         target_x = int(video_width * 0.08)
-        target_y = int(video_height * 0.62)
+        target_y = int(video_height * 0.44)
     elif pos == "bottom_right":
         target_x = video_width - ww - int(video_width * 0.08)
-        target_y = int(video_height * 0.62)
+        target_y = int(video_height * 0.44)
     else:
         target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.62)
+        target_y = int(video_height * 0.44)
 
     btn_offset = int((50 if not is_card else 90) * (ww / 600.0))
     cursor_target_x = target_x + ww - max(30, btn_offset)
-    cursor_target_y = target_y + wh // 2 + 10
+    cursor_target_y = target_y + wh // 2
 
     for i in range(total_frames):
         t = i / float(fps)
@@ -594,28 +653,29 @@ def build_cta_animation_clip(
             if platform in ("youtube", "youtube_shorts") and (2.1 <= t <= 2.8):
                 bell_t = (t - 2.1) / 0.7
                 bell_rot = math.sin(bell_t * math.pi * 6) * 16.0 * (1.0 - bell_t)
-
-            if is_card:
-                curr_widget = render_cta_card(platform, handle, "active", bell_angle=bell_rot)
+                if is_card:
+                    curr_widget = render_cta_card(platform, handle, "active", bell_angle=bell_rot)
+                else:
+                    curr_widget = render_pill_button(platform, handle, "active", bell_angle=bell_rot)
+                if curr_widget.size != (ww, wh):
+                    curr_widget = curr_widget.resize((ww, wh), Image.BILINEAR)
             else:
-                curr_widget = render_pill_button(platform, handle, "active", bell_angle=bell_rot)
+                curr_widget = widget_act
             scale = 1.0
 
-        if abs(scale - 1.0) > 0.01:
-            cw, ch = int(ww * scale), int(wh * scale)
+        cw, ch = int(ww * scale), int(wh * scale)
+        if (cw, ch) != curr_widget.size:
             rendered_widget = curr_widget.resize((cw, ch), Image.BILINEAR)
-            px = target_x + (ww - cw) // 2
-            py = curr_y + (wh - ch) // 2
         else:
             rendered_widget = curr_widget
-            px = target_x
-            py = curr_y
+        px = target_x + (ww - cw) // 2
+        py = curr_y + (wh - ch) // 2
 
         # Add soft drop shadow
         shadow_box = Image.new("RGBA", (ww + 30, wh + 30), (0, 0, 0, 0))
         s_draw = ImageDraw.Draw(shadow_box)
-        s_draw.rounded_rectangle([(15, 15), (ww + 15, wh + 15)], radius=36, fill=(0, 0, 0, 95))
-        shadow_blurred = shadow_box.filter(ImageFilter.GaussianBlur(12))
+        s_draw.rounded_rectangle([(15, 15), (ww + 15, wh + 15)], radius=24, fill=(0, 0, 0, 95))
+        shadow_blurred = shadow_box.filter(ImageFilter.GaussianBlur(10))
         frame.alpha_composite(shadow_blurred, (px - 15, py - 5))
 
         # Composite widget
@@ -788,6 +848,7 @@ def apply_cta_overlay(
     is_wm = watermark and (t_start > 0.1)
 
     # Build or fetch transparent animated overlay MOV
+    # as_watermark=False ensures full CTA widget slides in cleanly at t_start
     overlay_mov = build_cta_animation_clip(
         platform=platform,
         handle=handle,
@@ -796,7 +857,7 @@ def apply_cta_overlay(
         video_height=h,
         position=position,
         duration_sec=anim_duration,
-        as_watermark=is_wm
+        as_watermark=False
     )
 
     # Generate static watermark PNG if watermark mode is enabled

@@ -1,6 +1,6 @@
 """
-Celery应用配置
-任务队列配置和初始化
+CeleryApp configuration
+Task queue configuration and initialization.
 """
 
 import os
@@ -8,67 +8,67 @@ from celery import Celery
 from celery.schedules import crontab
 from pathlib import Path
 
-# 设置默认配置模块
+# Sets the default configuration module.
 # os.environ.setdefault('CELERY_CONFIG_MODULE', 'backend.core.celery_app')
 
-# 创建Celery应用
+# Creates a Celery application instance.
 celery_app = Celery('autoclip')
 
-# 配置Celery
+# Configures Celery.
 class CeleryConfig:
-    """Celery配置类"""
+    """CeleryConfiguration class"""
     
-    # 任务序列化格式
+    # Specifies the task serialization format.
     task_serializer = 'json'
     accept_content = ['json']
     result_serializer = 'json'
     timezone = 'Asia/Shanghai'
     enable_utc = True
     
-    # Redis配置
+    # Redis configuration settings.
     broker_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     result_backend = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     
-    # 任务配置
-    task_always_eager = os.getenv('CELERY_ALWAYS_EAGER', 'False').lower() == 'true'  # 生产环境异步执行
+    # Task configuration
+    task_always_eager = os.getenv('CELERY_ALWAYS_EAGER', 'False').lower() == 'true'  # Performs asynchronous execution in production environments.
     task_eager_propagates = True
     
-    # 工作进程配置
+    # Worker process configurations.
     worker_prefetch_multiplier = 1
     worker_max_tasks_per_child = 1000
     worker_disable_rate_limits = True
-    worker_concurrency = 1  # 强制设置并发数为1，防止重复处理
+    worker_concurrency = 1  # Force the number of concurrent workers to 1 to prevent duplicate processing.
     
-    # 任务路由
+    # Job routing
     task_routes = {
         'backend.tasks.processing.*': {'queue': 'processing'},
         'backend.tasks.video.*': {'queue': 'video'},
         'backend.tasks.notification.*': {'queue': 'notification'},
-        'backend.tasks.upload.*': {'queue': 'upload'},  # 添加upload任务路由
-        'backend.tasks.import_processing.*': {'queue': 'processing'},  # 导入任务路由
+        'backend.tasks.upload.*': {'queue': 'upload'},  # Adds upload task routing.
+        'backend.tasks.import_processing.*': {'queue': 'processing'},  # Imports task routing information.
     }
     
-    # 定时任务配置
+    # Crontab-based scheduling for tasks.
     beat_schedule = {
         'cleanup-expired-tasks': {
             'task': 'backend.tasks.maintenance.cleanup_expired_tasks',
-            'schedule': crontab(hour=2, minute=0),  # 每天凌晨2点
+            'schedule': crontab(hour=2, minute=0),  # Runs at 2:00 AM every day.
         },
         'health-check': {
             'task': 'backend.tasks.maintenance.health_check',
-            'schedule': crontab(minute='*/5'),  # 每5分钟
+            'schedule': crontab(minute='*/5'),  # Every 5 minutes
         },
     }
     
-    # 结果配置
-    result_expires = 3600  # 1小时
+    # Result configuration
+    result_expires = 3600  # 1Hours
     task_ignore_result = False
     
-    # 日志配置
+    # Log configuration
     worker_log_format = '[%(asctime)s: %(levelname)s/%(processName)s] %(message)s'
     worker_task_log_format = '[%(asctime)s: %(levelname)s/%(processName)s] [%(task_name)s(%(task_id)s)] %(message)s'
 
-# 应用配置
+# App configuration
 celery_app.config_from_object(CeleryConfig)
 
 
@@ -77,7 +77,7 @@ def _is_desktop_mode() -> bool:
 
 
 class _LocalAsyncResult:
-    """轻量级 AsyncResult 替身，桌面模式本地线程执行时返回。"""
+    """A lightweight substitute for `AsyncResult`, returned when tasks run locally on the desktop in a separate thread.. """
 
     def __init__(self, task_id: str):
         self.id = task_id
@@ -92,13 +92,13 @@ class _LocalAsyncResult:
 
 
 class DesktopAwareTask(celery_app.Task):
-    """桌面安装包里没有 Redis broker，生产 core.celery_app 又指向 redis://localhost。
+    """The desktop installer does not include a Redis broker; in production mode, `core.celery_app` refers to... redis://localhost. 
 
-    所有端点都用 `task.delay(...)` / `apply_async(...)` 派发任务，默认会把任务塞进
-    Redis 队列 —— 桌面模式下没人消费，于是永远卡在 0%「初始化中」。
+    All endpoints use... `task.delay(...)` / `apply_async(...)` By default, dispatching a task adds it to...
+    Redis Queue —— Because nobody consumes the queue on the desktop, it will always be stuck on... 0%「Initializing」. 
 
-    这里在桌面模式下把 apply_async 改成「在后台守护线程里同步执行 apply()」：
-    不依赖任何 broker，立即返回，进度照常写库供前端轮询。生产模式行为不变。
+    Here, under desktop mode, change `apply_async` to...「Executes synchronously in a background daemon thread. apply()」: 
+    No dependencies on any broker; returns immediately, progress is written to the database for polling by the frontend. The behavior in production mode remains unchanged.. 
     """
 
     def apply_async(self, args=None, kwargs=None, task_id=None, **options):
@@ -116,7 +116,7 @@ class DesktopAwareTask(celery_app.Task):
                 except Exception as exc:  # noqa: BLE001
                     import logging
                     logging.getLogger(__name__).error(
-                        f"桌面模式本地执行任务失败 {self.name} ({tid}): {exc}", exc_info=True
+                        f"Local execution of a task fails on the desktop. {self.name} ({tid}): {exc}", exc_info=True
                     )
 
             threading.Thread(target=_run, name=f"task-{self.name}", daemon=True).start()
@@ -125,16 +125,16 @@ class DesktopAwareTask(celery_app.Task):
         return super().apply_async(args=args, kwargs=kwargs, task_id=task_id, **options)
 
 
-# 桌面模式下让所有 @celery_app.task 使用上面的本地执行基类
+# On the desktop, make all `@celery_app.task` decorators use the local execution base class described above.
 celery_app.Task = DesktopAwareTask
 
-# 自动发现任务
+# Enables automatic discovery of tasks.
 celery_app.autodiscover_tasks([
     'backend.tasks.processing',
     'backend.tasks.video', 
     'backend.tasks.notification',
     'backend.tasks.maintenance',
-    'backend.tasks.import_processing'  # 添加导入处理任务
+    'backend.tasks.import_processing'  # Adds import handling task.
 ])
 
 if __name__ == '__main__':

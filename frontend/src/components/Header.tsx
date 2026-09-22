@@ -29,15 +29,15 @@ const Header: React.FC = () => {
         borderBottom: '1px solid var(--ac-line-2)',
       }}
     >
-      {/* Wordmark — The Loudest Minute */}
+      {/* Wordmark — ClipFarm */}
       <div
         style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
         onClick={() => navigate('/')}
       >
         <img
-          src="/the_loudest_minute.png"
-          alt="The Loudest Minute"
-          style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }}
+          src="/logo.png"
+          alt="ClipFarm"
+          style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'contain' }}
         />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span
@@ -50,10 +50,10 @@ const Header: React.FC = () => {
               lineHeight: 1.2
             }}
           >
-            The Loudest Minute
+            ClipFarm
           </span>
           <span style={{ fontSize: '11px', color: 'var(--ac-sub)', letterSpacing: '0.2px' }}>
-            Sharpest 60s Moments
+            AI Short-Form Video Studio
           </span>
         </div>
       </div>

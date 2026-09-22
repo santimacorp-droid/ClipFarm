@@ -1,11 +1,11 @@
 """
-FFmpeg 可执行路径解析工具
+FFmpeg Executable path resolution utility
 
-优先顺序：
-1) 环境变量 AUTOCLIP_FFMPEG_PATH / AUTOCLIP_FFPROBE_PATH / FFMPEG_PATH / FFPROBE_PATH
-2) 系统 PATH 中的 ffmpeg/ffprobe
+Priority order: 
+1) Environment variables have higher precedence over system PATH when resolving commands or paths for dependencies such as `ffmpeg` and `ffprobe`. This allows users to override the default location with custom versions, ensuring compatibility and overriding the bundled defaults if necessary. AUTOCLIP_FFMPEG_PATH / AUTOCLIP_FFPROBE_PATH / FFMPEG_PATH / FFPROBE_PATH
+2) Command name found in system PATH ffmpeg/ffprobe
 
-用途：统一为后端所有调用点提供 ffmpeg/ffprobe 路径，便于在桌面安装包内置二进制并实现零依赖。
+Purpose: Provide unified access for all backend caller points ffmpeg/ffprobe Path, making it easy to bundle a pre-built binary in desktop installers for zero-dependency use. 
 """
 
 import os
@@ -22,8 +22,8 @@ def _resolve_from_env(var_names: list[str]) -> Optional[str]:
 
 
 def get_ffmpeg_path() -> str:
-    """返回 ffmpeg 可执行文件路径（或命令名）。"""
-    # 1) 环境变量优先
+    """Return path to ffmpeg executable (or command name)). """
+    # Environment variables take priority
     env_path = _resolve_from_env([
         "AUTOCLIP_FFMPEG_PATH",
         "FFMPEG_PATH",
@@ -31,18 +31,18 @@ def get_ffmpeg_path() -> str:
     if env_path:
         return env_path
 
-    # 2) 系统 PATH
+    # System PATH
     which = shutil.which("ffmpeg")
     if which:
         return which
 
-    # 3) 兜底返回命令名（可能仍会失败，但保留兼容性）
+    # Return command name as fallback (may still fail but preserve compatibility)
     return "ffmpeg"
 
 
 def get_ffprobe_path() -> str:
-    """返回 ffprobe 可执行文件路径（或命令名）。"""
-    # 1) 环境变量优先
+    """Return path to ffprobe executable (or command name)). """
+    # Environment variables take priority
     env_path = _resolve_from_env([
         "AUTOCLIP_FFPROBE_PATH",
         "FFPROBE_PATH",
@@ -50,12 +50,12 @@ def get_ffprobe_path() -> str:
     if env_path:
         return env_path
 
-    # 2) 系统 PATH
+    # System PATH
     which = shutil.which("ffprobe")
     if which:
         return which
 
-    # 3) 兜底返回命令名
+    # Return command name as fallback
     return "ffprobe"
 
 

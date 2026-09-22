@@ -1,6 +1,6 @@
 """
-B站服务类 - 重构版本
-移除bilitool依赖，使用直接API调用
+Bilibili service class - refactored version
+Remove bility tool dependency. Use direct API calls instead
 """
 
 import asyncio
@@ -25,13 +25,13 @@ logger = logging.getLogger(__name__)
 
 
 class BilibiliAccountService:
-    """B站账号服务"""
+    """Bilibili account service"""
     
     def __init__(self, db: Session):
         self.db = db
     
     async def verify_cookie(self, cookie: str) -> Tuple[bool, Optional[Dict]]:
-        """验证B站Cookie是否有效"""
+        """Validate Bilibili cookie validity"""
         try:
             headers = {
                 "Cookie": cookie,
@@ -40,7 +40,7 @@ class BilibiliAccountService:
             }
             
             async with aiohttp.ClientSession() as session:
-                # 首先检查登录状态
+                # First check login status
                 async with session.get(
                     "https://api.bilibili.com/x/web-interface/nav",
                     headers=headers,
@@ -56,36 +56,36 @@ class BilibiliAccountService:
                             "username": user_info.get("uname"),
                             "face": user_info.get("face"),
                             "level": user_info.get("level_info", {}).get("current_level", 0),
-                            "can_upload": True,  # 暂时设为True，避免额外的API调用
+                            "can_upload": True,  # Temporarily set to True. Avoid extra API calls
                             "vip_status": user_info.get("vipStatus", 0),
                             "verified_at": datetime.now().isoformat()
                         }
                     else:
-                        logger.warning(f"Cookie验证失败: code={data.get('code')}, message={data.get('message')}")
+                        logger.warning(f"CookieValidation failed: code={data.get('code')}, message={data.get('message')}")
                         return False, None
                         
         except asyncio.TimeoutError:
-            logger.error("验证Cookie超时")
+            logger.error("Validate Cookie timeout")
             return False, None
         except Exception as e:
-            logger.error(f"验证Cookie失败: {e}")
+            logger.error(f"Validate Cookiefailed: {e}")
             return False, None
     
     async def create_account(self, account_data: BilibiliAccountCreate) -> BilibiliAccount:
-        """创建B站账号"""
+        """Create Bilibili account"""
         try:
-            # 验证Cookie
+            # Validate Cookie
             is_valid, user_info = await self.verify_cookie(account_data.cookie_content)
             if not is_valid:
-                raise ValueError("无效的Cookie，请检查Cookie是否正确或已过期")
+                raise ValueError("Invalid cookie. Check if the cookie is correct or has expired")
             
-            # 检查账号是否已存在
+            # Check account existence
             existing_account = self.db.query(BilibiliAccount).filter(
                 BilibiliAccount.username == user_info.get("username")
             ).first()
             
             if existing_account:
-                # 更新现有账号信息
+                # Update existing account information
                 existing_account.cookies = encrypt_data(account_data.cookie_content)
                 existing_account.nickname = account_data.nickname or user_info.get("username")
                 existing_account.status = "active"
@@ -94,16 +94,16 @@ class BilibiliAccountService:
                 self.db.commit()
                 self.db.refresh(existing_account)
                 
-                logger.info(f"更新现有B站账号: {existing_account.username}")
+                logger.info(f"Update existingBSite account: {existing_account.username}")
                 return existing_account
             
-            # 加密存储cookies
+            # Encrypt cookies storage
             encrypted_cookies = encrypt_data(account_data.cookie_content)
             
-            # 创建新账号记录
+            # Create new account record
             account = BilibiliAccount(
                 username=user_info.get("username", account_data.username),
-                nickname=account_data.nickname or user_info.get("username", "B站用户"),
+                nickname=account_data.nickname or user_info.get("username", "Bilibili user"),
                 cookies=encrypted_cookies,
                 status="active",
                 created_at=datetime.now(),
@@ -114,28 +114,28 @@ class BilibiliAccountService:
             self.db.commit()
             self.db.refresh(account)
             
-            logger.info(f"B站账号创建成功: {account.username} (UID: {user_info.get('uid')})")
+            logger.info(f"BSite account created successfully: {account.username} (UID: {user_info.get('uid')})")
             return account
             
         except Exception as e:
             self.db.rollback()
-            logger.error(f"创建B站账号失败: {e}")
+            logger.error(f"Create Bilibili accountfailed: {e}")
             raise
     
     async def check_account_health(self, account_id: int) -> Dict[str, Any]:
-        """检查账号健康状态"""
+        """Check account health status"""
         try:
             account = self.db.query(BilibiliAccount).filter(
                 BilibiliAccount.id == account_id
             ).first()
             
             if not account:
-                raise ValueError("账号不存在")
+                raise ValueError("Account does not exist")
             
-            # 解密Cookie
+            # Decrypt Cookie
             decrypted_cookies = decrypt_data(account.cookies)
             
-            # 验证Cookie有效性
+            # Validate Cookie validity
             is_valid, user_info = await self.verify_cookie(decrypted_cookies)
             
             health_status = {
@@ -154,18 +154,18 @@ class BilibiliAccountService:
                     "vip_status": user_info.get("vip_status", 0)
                 })
                 
-                # 更新账号状态
+                # Update account status
                 account.status = "active"
                 account.updated_at = datetime.now()
             else:
-                health_status["error"] = "Cookie已失效或账号异常"
+                health_status["error"] = "Cookie has expired or account is abnormal"
                 account.status = "inactive"
             
             self.db.commit()
             return health_status
             
         except Exception as e:
-            logger.error(f"检查账号健康状态失败: {e}")
+            logger.error(f"Check account health statusfailed: {e}")
             return {
                 "account_id": account_id,
                 "is_valid": False,
@@ -174,7 +174,7 @@ class BilibiliAccountService:
             }
     
     async def batch_check_accounts_health(self) -> List[Dict[str, Any]]:
-        """批量检查所有账号健康状态"""
+        """Batch check health status of all accounts"""
         try:
             accounts = self.db.query(BilibiliAccount).all()
             results = []
@@ -183,18 +183,18 @@ class BilibiliAccountService:
                 health_status = await self.check_account_health(account.id)
                 results.append(health_status)
                 
-                # 避免请求过于频繁
+                # Avoid requests too frequently
                 await asyncio.sleep(1)
             
-            logger.info(f"批量检查完成，共检查 {len(results)} 个账号")
+            logger.info(f"Batch check completed, total checked {len(results)} accounts")
             return results
             
         except Exception as e:
-            logger.error(f"批量检查账号健康状态失败: {e}")
+            logger.error(f"batchCheck account health statusfailed: {e}")
             raise
     
     def get_active_accounts(self) -> List[BilibiliAccount]:
-        """获取所有活跃账号"""
+        """Get all active accounts"""
         try:
             accounts = self.db.query(BilibiliAccount).filter(
                 BilibiliAccount.status == "active"
@@ -203,22 +203,22 @@ class BilibiliAccountService:
             return accounts
             
         except Exception as e:
-            logger.error(f"获取活跃账号失败: {e}")
+            logger.error(f"Failed to retrieve active accounts: {e}")
             return []
     
     def get_account_by_id(self, account_id: int) -> Optional[BilibiliAccount]:
-        """根据ID获取账号"""
+        """Get account by ID"""
         try:
             return self.db.query(BilibiliAccount).filter(
                 BilibiliAccount.id == account_id
             ).first()
             
         except Exception as e:
-            logger.error(f"获取账号失败: {e}")
+            logger.error(f"Failed to retrieve account: {e}")
             return None
     
     def select_best_account(self, exclude_ids: List[int] = None) -> Optional[BilibiliAccount]:
-        """智能选择最佳上传账号"""
+        """Smartly select optimal upload account"""
         try:
             query = self.db.query(BilibiliAccount).filter(
                 BilibiliAccount.status == "active"
@@ -232,35 +232,35 @@ class BilibiliAccountService:
             if not accounts:
                 return None
             
-            # 按优先级排序：VIP > 等级 > 最近使用时间
+            # Sort by priority: VIP > tier > most recent use time
             def account_priority(account):
-                # VIP账号优先
+                # VIP accounts first
                 vip_score = account.vip_status * 1000 if hasattr(account, 'vip_status') else 0
-                # 等级分数
+                # level score
                 level_score = getattr(account, 'level', 0) * 100
-                # 最近使用时间（越久未使用越优先）
+                # Most recent use time (older accounts get higher priority)
                 last_used = account.updated_at or account.created_at
-                time_score = (datetime.now() - last_used).total_seconds() / 3600  # 小时数
+                time_score = (datetime.now() - last_used).total_seconds() / 3600  # hours
                 
                 return vip_score + level_score + time_score
             
             best_account = max(accounts, key=account_priority)
-            logger.info(f"选择账号进行上传: {best_account.username} (ID: {best_account.id})")
+            logger.info(f"Select account for upload: {best_account.username} (ID: {best_account.id})")
             
             return best_account
             
         except Exception as e:
-            logger.error(f"选择最佳账号失败: {e}")
+            logger.error(f"Failed to select optimal account: {e}")
             return None
     
     def get_account_upload_stats(self, account_id: int, days: int = 7) -> Dict[str, Any]:
-        """获取账号上传统计信息"""
+        """Get account upload statistics"""
         try:
             from datetime import timedelta
             
             start_date = datetime.now() - timedelta(days=days)
             
-            # 查询上传记录
+            # Query upload record
             upload_records = self.db.query(UploadRecord).filter(
                 UploadRecord.account_id == account_id,
                 UploadRecord.created_at >= start_date
@@ -283,39 +283,39 @@ class BilibiliAccountService:
             }
             
         except Exception as e:
-            logger.error(f"获取账号统计信息失败: {e}")
+            logger.error(f"Failed to get account statistics: {e}")
             return {
                 "account_id": account_id,
                 "error": str(e)
             }
     
     def rotate_accounts_for_batch_upload(self, video_count: int) -> List[BilibiliAccount]:
-        """为批量上传分配账号（负载均衡）"""
+        """Account allocation for bulk upload (load balancing)"""
         try:
             active_accounts = self.get_active_accounts()
             
             if not active_accounts:
                 return []
             
-            # 如果视频数量少于账号数量，直接分配
+            # If the number of videos is less than the number of accounts, distribute directly
             if video_count <= len(active_accounts):
                 return active_accounts[:video_count]
             
-            # 否则进行轮换分配
+            # Otherwise perform rotation allocation
             allocated_accounts = []
             for i in range(video_count):
                 account_index = i % len(active_accounts)
                 allocated_accounts.append(active_accounts[account_index])
             
-            logger.info(f"为 {video_count} 个视频分配了 {len(set(allocated_accounts))} 个账号")
+            logger.info(f"for {video_count} videos allocated to {len(set(allocated_accounts))} accounts")
             return allocated_accounts
             
         except Exception as e:
-            logger.error(f"账号轮换分配失败: {e}")
+            logger.error(f"Failed to distribute accounts: {e}")
             return []
     
     def update_account_usage(self, account_id: int):
-        """更新账号使用时间"""
+        """Update account usage time"""
         try:
             account = self.get_account_by_id(account_id)
             if account:
@@ -323,85 +323,85 @@ class BilibiliAccountService:
                 self.db.commit()
                 
         except Exception as e:
-            logger.error(f"更新账号使用时间失败: {e}")
+            logger.error(f"Update account usage timefailed: {e}")
     
     def get_accounts(self) -> List[BilibiliAccount]:
-        """获取所有账号"""
+        """Get all accounts"""
         return self.db.query(BilibiliAccount).all()
     
     def get_account(self, account_id: UUID) -> Optional[BilibiliAccount]:
-        """获取指定账号"""
+        """Get specified account"""
         return self.db.query(BilibiliAccount).filter(BilibiliAccount.id == account_id).first()
     
     def delete_account(self, account_id: UUID) -> bool:
-        """删除账号"""
+        """delete account"""
         account = self.get_account(account_id)
         if not account:
             return False
         
         try:
-            # 先删除所有相关的投稿记录
+            # First delete all related post records
             from ..models.bilibili import UploadRecord
             upload_records = self.db.query(UploadRecord).filter(UploadRecord.account_id == account_id).all()
             
             for record in upload_records:
-                logger.info(f"删除相关投稿记录: {record.id}")
+                logger.info(f"Deleting related posts: {record.id}")
                 self.db.delete(record)
             
-            # 删除账号
+            # delete account
             self.db.delete(account)
             self.db.commit()
             
-            logger.info(f"B站账号删除成功: {account.username}，同时删除了 {len(upload_records)} 条相关投稿记录")
+            logger.info(f"BSite account deleted successfully: {account.username}, Also deleted {len(upload_records)} records found")
             return True
             
         except Exception as e:
             self.db.rollback()
-            logger.error(f"删除账号失败: {str(e)}")
+            logger.error(f"delete accountfailed: {str(e)}")
             return False
     
     def check_account_status(self, account_id: UUID) -> bool:
-        """检查账号状态"""
+        """Check account status"""
         account = self.get_account(account_id)
         if not account:
             return False
         
         try:
-            # 尝试解密cookies
+            # Attempt to decrypt cookies
             try:
                 cookies_data_str = decrypt_data(account.cookies)
-                # 验证cookie字符串格式
+                # Validate cookie string format
                 if not cookies_data_str or not isinstance(cookies_data_str, str):
                     return False
                 return True
             except Exception as e:
-                logger.warning(f"解密cookies失败: {str(e)}")
+                logger.warning(f"decryptcookiesfailed: {str(e)}")
                 return False
                     
         except Exception as e:
-            logger.error(f"检查账号状态失败: {str(e)}")
+            logger.error(f"Check account statusfailed: {str(e)}")
             return False
 
 
 class BilibiliUploadService:
-    """B站投稿服务 - 使用直接API调用"""
+    """Bilibili upload service. Use direct API calls"""
     
     def __init__(self, db: Session):
         self.db = db
         self.account_service = BilibiliAccountService(db)
     
     def create_upload_record(self, project_id: UUID, upload_data: UploadRequest) -> UploadRecord:
-        """创建投稿记录"""
-        # 验证账号
+        """Create post record"""
+        # Validate account
         account = self.account_service.get_account(upload_data.account_id)
         if not account:
-            raise ValueError("账号不存在")
+            raise ValueError("Account does not exist")
         
-        # 创建投稿记录
+        # Create post record
         record = UploadRecord(
             project_id=project_id,
             account_id=upload_data.account_id,
-            clip_id=",".join(upload_data.clip_ids),  # 暂存为逗号分隔
+            clip_id=",".join(upload_data.clip_ids),  # Temporarily store as comma-separated
             title=upload_data.title,
             description=upload_data.description,
             tags=json.dumps(upload_data.tags),
@@ -413,31 +413,31 @@ class BilibiliUploadService:
         self.db.commit()
         self.db.refresh(record)
         
-        logger.info(f"投稿记录创建成功: {record.id}")
+        logger.info(f"Posting record created successfully: {record.id}")
         return record
     
     async def upload_clip(self, record_id: int, video_path: str, max_retries: int = 3) -> bool:
-        """上传单个切片 - 使用内置上传实现"""
+        """Upload a single slice. Use built-in upload implementation"""
         try:
-            # 获取投稿记录
+            # Get post record
             record = self.db.query(UploadRecord).filter(UploadRecord.id == record_id).first()
             if not record:
-                logger.error(f"投稿记录不存在: {record_id}")
+                logger.error(f"Post record does not exist: {record_id}")
                 return False
             
-            # 获取账号信息
+            # Get account information
             account = self.db.query(BilibiliAccount).filter(BilibiliAccount.id == record.account_id).first()
             if not account:
-                logger.error(f"账号不存在: {record.account_id}")
+                logger.error(f"Account does not exist: {record.account_id}")
                 return False
             
-            # 解密Cookie
+            # Decrypt Cookie
             cookies = decrypt_data(account.cookies)
             if not cookies:
-                logger.error("Cookie解密失败")
+                logger.error("Cookie decryption failed")
                 return False
             
-            # 使用直接上传器
+            # Use direct uploader
             uploader = BilibiliDirectUploader(cookies)
             success = await uploader.upload_video(
                 video_path=video_path,
@@ -465,8 +465,8 @@ class BilibiliUploadService:
             return success
             
         except Exception as e:
-            logger.error(f"上传切片失败: {e}")
-            # 更新记录状态
+            logger.error(f"Upload slice failed: {e}")
+            # Update record status
             try:
                 record = self.db.query(UploadRecord).filter(UploadRecord.id == record_id).first()
                 if record:
@@ -479,7 +479,7 @@ class BilibiliUploadService:
             return False
     
     def update_upload_status(self, record_id, status: str, error_message: str = None) -> bool:
-        """更新投稿状态"""
+        """Update post status"""
         try:
             record = self.db.query(UploadRecord).filter(UploadRecord.id == record_id).first()
             if not record:
@@ -493,27 +493,27 @@ class BilibiliUploadService:
             self.db.commit()
             return True
         except Exception as e:
-            logger.error(f"更新投稿状态失败: {str(e)}")
+            logger.error(f"Update post statusfailed: {str(e)}")
             self.db.rollback()
             return False
 
     def retry_upload_task(self, record_id: int) -> bool:
-        """重试失败的投稿任务"""
+        """Retry failed posting tasks"""
         try:
             record = self.db.query(UploadRecord).filter(UploadRecord.id == record_id).first()
             if not record:
-                raise ValueError("投稿记录不存在")
+                raise ValueError("Post record does not exist")
             
             if record.status != "failed":
-                raise ValueError("只有失败的任务可以重试")
+                raise ValueError("Only failed tasks can be retried")
             
-            # 重置状态为待处理
+            # Reset status to pending
             record.status = "pending"
             record.error_message = None
             record.updated_at = datetime.utcnow()
             self.db.commit()
             
-            # 重新启动上传任务
+            # Restart upload task
             clip_ids = record.clip_id.split(",") if record.clip_id else []
             for clip_id in clip_ids:
                 clip_id = clip_id.strip()
@@ -521,62 +521,62 @@ class BilibiliUploadService:
                     from ..tasks.upload import upload_clip_task
                     upload_clip_task.delay(str(record.id), clip_id)
             
-            logger.info(f"投稿任务重试已启动: {record_id}")
+            logger.info(f"Posting task retry started: {record_id}")
             return True
             
         except Exception as e:
-            logger.error(f"重试投稿任务失败: {str(e)}")
+            logger.error(f"Failed to retry posting task: {str(e)}")
             self.db.rollback()
             return False
 
     def cancel_upload_task(self, record_id: int) -> bool:
-        """取消进行中的投稿任务"""
+        """Cancel in-progress posting task"""
         try:
             record = self.db.query(UploadRecord).filter(UploadRecord.id == record_id).first()
             if not record:
-                raise ValueError("投稿记录不存在")
+                raise ValueError("Post record does not exist")
             
             if record.status not in ["pending", "processing"]:
-                raise ValueError("只有待处理或处理中的任务可以取消")
+                raise ValueError("Only pending or in-progress tasks can be cancelled")
             
-            # 更新状态为已取消
+            # Update status to canceled
             record.status = "cancelled"
             record.updated_at = datetime.utcnow()
             self.db.commit()
             
-            logger.info(f"投稿任务已取消: {record_id}")
+            logger.info(f"Posting task cancelled: {record_id}")
             return True
             
         except Exception as e:
-            logger.error(f"取消投稿任务失败: {str(e)}")
+            logger.error(f"Canceling post failed: {str(e)}")
             self.db.rollback()
             return False
     
     def delete_upload_task(self, record_id: int) -> bool:
-        """删除投稿任务"""
+        """Delete post job"""
         try:
             record = self.db.query(UploadRecord).filter(UploadRecord.id == record_id).first()
             if not record:
-                raise ValueError("投稿记录不存在")
+                raise ValueError("Post record does not exist")
             
-            # 只有已完成、失败或取消的任务可以删除
+            # Only completed, failed, or cancelled tasks can be deleted
             if record.status in ["pending", "processing"]:
-                raise ValueError("进行中的任务不能删除，请先取消")
+                raise ValueError("In-progress tasks cannot be deleted. Please cancel first")
             
-            # 删除记录
+            # delete record
             self.db.delete(record)
             self.db.commit()
             
-            logger.info(f"投稿任务已删除: {record_id}")
+            logger.info(f"Posting task deleted: {record_id}")
             return True
             
         except Exception as e:
-            logger.error(f"删除投稿任务失败: {str(e)}")
+            logger.error(f"Delete post jobfailed: {str(e)}")
             self.db.rollback()
             return False
     
     def get_upload_records(self, project_id: Optional[UUID] = None) -> List[dict]:
-        """获取投稿记录，包含关联信息"""
+        """Get post record with associated information"""
         from ..models.project import Project
         
         query = self.db.query(
@@ -595,7 +595,7 @@ class BilibiliUploadService:
         
         results = query.order_by(UploadRecord.created_at.desc()).all()
         
-        # 转换为字典格式，包含关联信息
+        # Convert to dictionary format. Includes related information
         records = []
         for record, account_username, account_nickname, project_name in results:
             record_dict = {
@@ -627,35 +627,35 @@ class BilibiliUploadService:
         return records
     
     def get_upload_record(self, record_id: UUID) -> Optional[UploadRecord]:
-        """获取指定投稿记录"""
+        """Get post record by ID"""
         return self.db.query(UploadRecord).filter(UploadRecord.id == record_id).first()
     
     def get_upload_record_by_id(self, record_id: int) -> Optional[UploadRecord]:
-        """根据整数ID获取指定投稿记录"""
+        """Retrieve post record by integer ID"""
         return self.db.query(UploadRecord).filter(UploadRecord.id == record_id).first()
     
     def upload_clip_sync(self, record_id: int, video_path: str, max_retries: int = 3) -> bool:
-        """同步版本的上传单个切片"""
+        """Synchronous upload of a single segment"""
         try:
-            # 获取投稿记录
+            # Get post record
             record = self.db.query(UploadRecord).filter(UploadRecord.id == record_id).first()
             if not record:
-                logger.error(f"投稿记录不存在: {record_id}")
+                logger.error(f"Post record does not exist: {record_id}")
                 return False
             
-            # 获取账号信息
+            # Get account information
             account = self.db.query(BilibiliAccount).filter(BilibiliAccount.id == record.account_id).first()
             if not account:
-                logger.error(f"账号不存在: {record.account_id}")
+                logger.error(f"Account does not exist: {record.account_id}")
                 return False
             
-            # 解密Cookie
+            # Decrypt Cookie
             cookies = decrypt_data(account.cookies)
             if not cookies:
-                logger.error("Cookie解密失败")
+                logger.error("Cookie decryption failed")
                 return False
             
-            # 使用直接上传器（同步版本）
+            # Use direct uploader (synchronous version)
             uploader = BilibiliDirectUploader(cookies)
             success = uploader.upload_video_sync(
                 video_path=video_path,
@@ -683,8 +683,8 @@ class BilibiliUploadService:
             return success
             
         except Exception as e:
-            logger.error(f"上传切片失败: {e}")
-            # 更新记录状态
+            logger.error(f"Upload slice failed: {e}")
+            # Update record status
             try:
                 record = self.db.query(UploadRecord).filter(UploadRecord.id == record_id).first()
                 if record:
@@ -698,7 +698,7 @@ class BilibiliUploadService:
 
 
 class BilibiliDirectUploader:
-    """B站直接API上传器"""
+    """Bilibili direct API uploader"""
     
     def __init__(self, cookies: str):
         self.cookies = cookies
@@ -707,33 +707,33 @@ class BilibiliDirectUploader:
         self.session = None
     
     async def upload_video(self, video_path: str, metadata: dict, max_retries: int = 3) -> bool:
-        """上传视频 - 简化版本，暂时返回失败状态"""
+        """Upload video - simplified version. Temporarily return failure status"""
         try:
-            # 暂时返回失败，因为需要重新实现上传逻辑
-            self.error_message = "上传功能正在开发中，请稍后再试"
-            logger.warning("上传功能暂未实现，返回失败状态")
+            # Temporarily return failure. Need to reimplement upload logic
+            self.error_message = "Upload feature under development. Please try again later"
+            logger.warning("Upload feature temporarily unavailable. Return failure status")
             return False
                 
         except Exception as e:
             self.error_message = str(e)
-            logger.error(f"上传视频失败: {e}")
+            logger.error(f"Upload video failed: {e}")
             return False
     
     def upload_video_sync(self, video_path: str, metadata: dict, max_retries: int = 3) -> bool:
-        """同步版本的上传视频"""
+        """Synchronous upload of video"""
         try:
-            # 暂时返回失败，因为需要重新实现上传逻辑
-            self.error_message = "上传功能正在开发中，请稍后再试"
-            logger.warning("上传功能暂未实现，返回失败状态")
+            # Temporarily return failure. Need to reimplement upload logic
+            self.error_message = "Upload feature under development. Please try again later"
+            logger.warning("Upload feature temporarily unavailable. Return failure status")
             return False
                 
         except Exception as e:
             self.error_message = str(e)
-            logger.error(f"上传视频失败: {e}")
+            logger.error(f"Upload video failed: {e}")
             return False
     
     async def _pre_upload(self, video_path: str) -> Optional[str]:
-        """预上传，获取upload_id"""
+        """Pre-upload. Get upload ID"""
         try:
             file_size = os.path.getsize(video_path)
             file_name = os.path.basename(video_path)
@@ -759,20 +759,20 @@ class BilibiliDirectUploader:
                 
                 if result.get("code") == 0:
                     upload_id = result.get("data", {}).get("id")
-                    logger.info(f"预上传成功，upload_id: {upload_id}")
+                    logger.info(f"Presign succeed, upload_id: {upload_id}")
                     return upload_id
                 else:
-                    self.error_message = f"预上传失败: {result.get('message', '未知错误')}"
+                    self.error_message = f"Presign failed: {result.get('message', 'Unknown error')}"
                     logger.error(self.error_message)
                     return None
                     
         except Exception as e:
-            self.error_message = f"预上传异常: {str(e)}"
+            self.error_message = f"Presign error: {str(e)}"
             logger.error(self.error_message)
             return None
     
     async def _chunk_upload(self, video_path: str, upload_id: str, max_retries: int = 3) -> bool:
-        """分片上传"""
+        """multipart upload"""
         try:
             chunk_size = 2 * 1024 * 1024  # 2MB per chunk
             file_size = os.path.getsize(video_path)
@@ -790,7 +790,7 @@ class BilibiliDirectUploader:
                     if not chunk_data:
                         break
                     
-                    # 重试逻辑
+                    # retry logic
                     for attempt in range(max_retries):
                         try:
                             form_data = aiohttp.FormData()
@@ -807,11 +807,11 @@ class BilibiliDirectUploader:
                                 result = await response.json()
                                 
                                 if result.get("code") == 0:
-                                    logger.info(f"分片 {chunk_index} 上传成功")
+                                    logger.info(f"shard {chunk_index} Upload succeed")
                                     break
                                 else:
                                     if attempt == max_retries - 1:
-                                        self.error_message = f"分片 {chunk_index} 上传失败: {result.get('message', '未知错误')}"
+                                        self.error_message = f"shard {chunk_index} Upload failed: {result.get('message', 'Unknown error')}"
                                         logger.error(self.error_message)
                                         return False
                                     else:
@@ -819,7 +819,7 @@ class BilibiliDirectUploader:
                                         
                         except Exception as e:
                             if attempt == max_retries - 1:
-                                self.error_message = f"分片 {chunk_index} 上传异常: {str(e)}"
+                                self.error_message = f"shard {chunk_index} Upload error: {str(e)}"
                                 logger.error(self.error_message)
                                 return False
                             else:
@@ -827,16 +827,16 @@ class BilibiliDirectUploader:
                     
                     chunk_index += 1
             
-            logger.info(f"所有分片上传完成，共 {chunk_index} 个分片")
+            logger.info(f"Allmultipart uploadDone, total {chunk_index} shards")
             return True
             
         except Exception as e:
-            self.error_message = f"分片上传异常: {str(e)}"
+            self.error_message = f"multipart uploadError: {str(e)}"
             logger.error(self.error_message)
             return False
     
     async def _merge_chunks(self, upload_id: str) -> bool:
-        """合并分片"""
+        """merge shard"""
         try:
             headers = {
                 "Cookie": self.cookies,
@@ -857,20 +857,20 @@ class BilibiliDirectUploader:
                 result = await response.json()
                 
                 if result.get("code") == 0:
-                    logger.info("分片合并成功")
+                    logger.info("Chunk merge succeeded")
                     return True
                 else:
-                    self.error_message = f"分片合并失败: {result.get('message', '未知错误')}"
+                    self.error_message = f"Merging shards failed: {result.get('message', 'Unknown error')}"
                     logger.error(self.error_message)
                     return False
                     
         except Exception as e:
-            self.error_message = f"分片合并异常: {str(e)}"
+            self.error_message = f"Sharding merge error: {str(e)}"
             logger.error(self.error_message)
             return False
     
     async def _submit_video(self, upload_id: str, metadata: dict) -> bool:
-        """提交投稿"""
+        """submit upload"""
         try:
             headers = {
                 "Cookie": self.cookies,
@@ -879,9 +879,9 @@ class BilibiliDirectUploader:
                 "Content-Type": "application/json"
             }
             
-            # 构建投稿数据
+            # Build post data
             submit_data = {
-                "copyright": 1,  # 自制
+                "copyright": 1,  # original production
                 "videos": [{
                     "filename": upload_id,
                     "title": metadata.get('title', ''),
@@ -916,22 +916,22 @@ class BilibiliDirectUploader:
                 
                 if result.get("code") == 0:
                     self.bv_id = result.get("data", {}).get("bvid")
-                    logger.info(f"投稿提交成功，BV号: {self.bv_id}")
+                    logger.info(f"Submission succeeded, BVnumber: {self.bv_id}")
                     return True
                 else:
-                    self.error_message = f"投稿提交失败: {result.get('message', '未知错误')}"
+                    self.error_message = f"Posting submission failed: {result.get('message', 'Unknown error')}"
                     logger.error(self.error_message)
                     return False
                     
         except Exception as e:
-            self.error_message = f"投稿提交异常: {str(e)}"
+            self.error_message = f"Submission failed: unknown error: {str(e)}"
             logger.error(self.error_message)
             return False
     
     def get_bv_id(self) -> Optional[str]:
-        """获取BV号"""
+        """Get BV code"""
         return self.bv_id
     
     def get_error_message(self) -> Optional[str]:
-        """获取错误信息"""
+        """Get error message"""
         return self.error_message

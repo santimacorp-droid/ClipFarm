@@ -1,5 +1,5 @@
 """
-任务管理API路由
+Task managementAPIRoute
 """
 import logging
 from fastapi import APIRouter, HTTPException, Depends, Query
@@ -27,7 +27,7 @@ async def get_tasks(
     project_id: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """获取任务列表"""
+    """Getting task list"""
     try:
         task_service = TaskService(db)
         tasks = task_service.get_tasks(
@@ -38,54 +38,54 @@ async def get_tasks(
         )
         return tasks
     except Exception as e:
-        logger.exception("获取任务列表失败")
-        raise HTTPException(status_code=500, detail="获取任务列表失败，请稍后重试")
+        logger.exception("Failed to retrieve task list")
+        raise HTTPException(status_code=500, detail="Failed to retrieve task list. Please try again later")
 
 @router.get("/project/{project_id}", response_model=List[TaskResponse])
 async def get_project_tasks(
     project_id: str,
     db: Session = Depends(get_db)
 ):
-    """获取指定项目的任务列表"""
+    """Get task list for specified project"""
     try:
         task_service = TaskService(db)
         tasks = task_service.get_tasks_by_project_id(project_id)
         return tasks
     except Exception as e:
-        logger.exception("获取项目任务失败: %s", project_id)
-        raise HTTPException(status_code=500, detail="获取项目任务失败，请稍后重试")
+        logger.exception("Failed to retrieve project tasks: %s", project_id)
+        raise HTTPException(status_code=500, detail="Failed to retrieve project tasks. Please try again later")
 
 @router.get("/{task_id}", response_model=TaskResponse)
 async def get_task(
     task_id: str,
     db: Session = Depends(get_db)
 ):
-    """获取单个任务详情"""
+    """Retrieve single task details"""
     try:
         task_service = TaskService(db)
         task = task_service.get_task_by_id(task_id)
         if not task:
-            raise HTTPException(status_code=404, detail="任务不存在")
+            raise HTTPException(status_code=404, detail="Task does not exist")
         return task
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("获取任务详情失败: %s", task_id)
-        raise HTTPException(status_code=500, detail="获取任务详情失败，请稍后重试")
+        logger.exception("Failed to retrieve task details: %s", task_id)
+        raise HTTPException(status_code=500, detail="Failed to retrieve task details. Please try again later")
 
 @router.post("/", response_model=TaskResponse)
 async def create_task(
     task_data: TaskCreate,
     db: Session = Depends(get_db)
 ):
-    """创建新任务"""
+    """Create new task"""
     try:
         task_service = TaskService(db)
         task = task_service.create_task(task_data)
         return task
     except Exception as e:
-        logger.exception("创建任务失败")
-        raise HTTPException(status_code=500, detail="创建任务失败，请稍后重试")
+        logger.exception("Failed to create task")
+        raise HTTPException(status_code=500, detail="Failed to create task. Please try again later")
 
 @router.put("/{task_id}", response_model=TaskResponse)
 async def update_task(
@@ -93,48 +93,48 @@ async def update_task(
     task_data: TaskUpdate,
     db: Session = Depends(get_db)
 ):
-    """更新任务"""
+    """Updating task"""
     try:
         task_service = TaskService(db)
         task = task_service.update_task(task_id, task_data)
         if not task:
-            raise HTTPException(status_code=404, detail="任务不存在")
+            raise HTTPException(status_code=404, detail="Task does not exist")
         return task
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("更新任务失败: %s", task_id)
-        raise HTTPException(status_code=500, detail="更新任务失败，请稍后重试")
+        logger.exception("Failed to update task: %s", task_id)
+        raise HTTPException(status_code=500, detail="Failed to update task. Please try again later")
 
 @router.delete("/{task_id}")
 async def delete_task(
     task_id: str,
     db: Session = Depends(get_db)
 ):
-    """删除任务"""
+    """Deleting task"""
     try:
         task_service = TaskService(db)
         success = task_service.delete_task(task_id)
         if not success:
-            raise HTTPException(status_code=404, detail="任务不存在")
-        return {"message": "任务删除成功"}
+            raise HTTPException(status_code=404, detail="Task does not exist")
+        return {"message": "Task deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("删除任务失败: %s", task_id)
-        raise HTTPException(status_code=500, detail="删除任务失败，请稍后重试")
+        logger.exception("Failed to delete task: %s", task_id)
+        raise HTTPException(status_code=500, detail="Failed to delete task. Please try again later")
 
 @router.post("/{task_id}/submit")
 async def submit_task(
     task_id: str,
     db: Session = Depends(get_db)
 ):
-    """提交任务到队列"""
+    """Submit task to queue"""
     try:
         task_service = TaskService(db)
         task = task_service.get_task_by_id(task_id)
         if not task:
-            raise HTTPException(status_code=404, detail="任务不存在")
+            raise HTTPException(status_code=404, detail="Task does not exist")
         
         queue_service = TaskQueueService(db)
         task_type = str(task.task_type.value if hasattr(task.task_type, "value") else task.task_type)
@@ -143,7 +143,7 @@ async def submit_task(
             input_video_path = _get_task_config_value(task, "input_video_path")
             input_srt_path = _get_task_config_value(task, "input_srt_path")
             if not input_video_path:
-                raise HTTPException(status_code=400, detail="任务缺少 input_video_path 配置")
+                raise HTTPException(status_code=400, detail="Task missing input_video_path Configuration")
             result = queue_service.submit_video_processing_task(
                 project_id=task.project_id,
                 input_video_path=input_video_path,
@@ -156,10 +156,10 @@ async def submit_task(
             collection_data = _get_task_config_value(task, "collection_data", [])
             result = queue_service.submit_collection_generation_task(task.project_id, collection_data)
         else:
-            raise HTTPException(status_code=400, detail=f"不支持的任务类型: {task_type}")
+            raise HTTPException(status_code=400, detail=f"Unsupported task type: {task_type}")
         
         return {
-            "message": "任务已提交到队列",
+            "message": "Task submitted to queue",
             "task_id": task_id,
             "queue_task_id": result.get("task_id"),
             "celery_task_id": result.get("celery_task_id"),
@@ -167,22 +167,22 @@ async def submit_task(
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("提交任务失败: %s", task_id)
-        raise HTTPException(status_code=500, detail="提交任务失败，请稍后重试")
+        logger.exception("Failed to submit task: %s", task_id)
+        raise HTTPException(status_code=500, detail="Failed to submit task. Please try again later")
 
 @router.post("/{task_id}/retry")
 async def retry_task(
     task_id: str,
     db: Session = Depends(get_db)
 ):
-    """重试失败的任务"""
+    """Retry failed task"""
     try:
         task_service = TaskService(db)
         task = task_service.get_task_by_id(task_id)
         if not task:
-            raise HTTPException(status_code=404, detail="任务不存在")
+            raise HTTPException(status_code=404, detail="Task does not exist")
         
-        # 重置任务状态并重新提交
+        # Reset task status and resubmit
         task_service.update_task(task_id, TaskUpdate(status="pending", progress=0))
         
         queue_service = TaskQueueService(db)
@@ -192,7 +192,7 @@ async def retry_task(
             input_video_path = _get_task_config_value(task, "input_video_path")
             input_srt_path = _get_task_config_value(task, "input_srt_path")
             if not input_video_path:
-                raise HTTPException(status_code=400, detail="任务缺少 input_video_path 配置")
+                raise HTTPException(status_code=400, detail="Task missing input_video_path Configuration")
             result = queue_service.submit_video_processing_task(
                 project_id=task.project_id,
                 input_video_path=input_video_path,
@@ -205,10 +205,10 @@ async def retry_task(
             collection_data = _get_task_config_value(task, "collection_data", [])
             result = queue_service.submit_collection_generation_task(task.project_id, collection_data)
         else:
-            raise HTTPException(status_code=400, detail=f"不支持的任务类型: {task_type}")
+            raise HTTPException(status_code=400, detail=f"Unsupported task type: {task_type}")
         
         return {
-            "message": "任务已重新提交",
+            "message": "Task has been resent",
             "task_id": task_id,
             "queue_task_id": result.get("task_id"),
             "celery_task_id": result.get("celery_task_id"),
@@ -216,20 +216,20 @@ async def retry_task(
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("重试任务失败: %s", task_id)
-        raise HTTPException(status_code=500, detail="重试任务失败，请稍后重试")
+        logger.exception("Failed to retry task: %s", task_id)
+        raise HTTPException(status_code=500, detail="Failed to retry task. Please try again later")
 
 @router.get("/{task_id}/status")
 async def get_task_status(
     task_id: str,
     db: Session = Depends(get_db)
 ):
-    """获取任务状态"""
+    """Getting task status"""
     try:
         task_service = TaskService(db)
         task = task_service.get_task_by_id(task_id)
         if not task:
-            raise HTTPException(status_code=404, detail="任务不存在")
+            raise HTTPException(status_code=404, detail="Task does not exist")
         
         return {
             "task_id": task_id,
@@ -242,6 +242,6 @@ async def get_task_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("获取任务状态失败: %s", task_id)
-        raise HTTPException(status_code=500, detail="获取任务状态失败，请稍后重试")
+        logger.exception("Failed to retrieve task status: %s", task_id)
+        raise HTTPException(status_code=500, detail="Failed to retrieve task status. Please try again later")
 

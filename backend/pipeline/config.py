@@ -1,42 +1,42 @@
 """
-Pipeline模块配置文件
+Pipeline module configuration file
 """
 
 import os
 from pathlib import Path
 
-# 获取项目根目录
+# Project root directories
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 BACKEND_ROOT = Path(__file__).parent.parent
 
-# 数据目录
+# Data directories
 DATA_DIR = PROJECT_ROOT / "data"
 METADATA_DIR = DATA_DIR / "output" / "metadata"
 
-# 提示词文件路径
+# Prompt file paths
 PROMPT_DIR = PROJECT_ROOT / "prompt"
 PROMPT_FILES = {
-    'outline': PROMPT_DIR / "大纲.txt",
-    'timeline': PROMPT_DIR / "时间点.txt", 
-    'scoring': PROMPT_DIR / "推荐理由.txt",
-    'recommendation': PROMPT_DIR / "推荐理由.txt",  # 添加别名
-    'title': PROMPT_DIR / "标题生成.txt",
-    'clustering': PROMPT_DIR / "主题聚类.txt"
+    'outline': PROMPT_DIR / "outline.txt",
+    'timeline': PROMPT_DIR / "timeline.txt", 
+    'scoring': PROMPT_DIR / "recommendation.txt",
+    'recommendation': PROMPT_DIR / "recommendation.txt",
+    'title': PROMPT_DIR / "title.txt",
+    'clustering': PROMPT_DIR / "clustering.txt"
 }
 
-# 确保目录存在
+# Ensure directories exist
 METADATA_DIR.mkdir(parents=True, exist_ok=True)
 PROMPT_DIR.mkdir(parents=True, exist_ok=True)
 
-# API密钥配置
+# API key configuration
 DASHSCOPE_API_KEY = os.getenv('DASHSCOPE_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
-# 默认API密钥
+# Default API key
 DEFAULT_API_KEY = DASHSCOPE_API_KEY or OPENAI_API_KEY
 
-# 评分阈值
+# Scoring threshold
 MIN_SCORE_THRESHOLD = 7.0
 
-# 聚类配置
+# Clustering configuration
 MAX_CLIPS_PER_COLLECTION = 10

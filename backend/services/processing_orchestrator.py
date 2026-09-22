@@ -1,6 +1,6 @@
 """
-处理编排器
-负责协调流水线执行和Task状态管理
+Handle orchestrator
+Responsible for coordinating pipeline execution and Task state management
 """
 
 import logging
@@ -18,7 +18,7 @@ from backend.core.config import get_project_root
 
 logger = logging.getLogger(__name__)
 
-# 导入流水线步骤
+# Import pipeline steps
 
 try:
     from backend.pipeline.step1_outline import run_step1_outline
@@ -27,135 +27,135 @@ try:
     from backend.pipeline.step4_title import run_step4_title
     from backend.pipeline.step5_clustering import run_step5_clustering
     from backend.pipeline.step6_video import run_step6_video
-    logger.info("流水线模块导入成功")
+    logger.info("Pipeline module imported successfully")
 except ImportError as e:
-    logger.warning(f"无法导入流水线模块: {e}")
-    # 定义占位符函数
+    logger.warning(f"Unable to import pipeline module: {e}")
+    # Define placeholder function
     def run_step1_outline(**kwargs): 
-        logger.warning("流水线模块未正确导入，使用占位符函数")
-        # 生成模拟输出
+        logger.warning("Pipeline module not imported correctly, use placeholder function")
+        # Generate synthetic output
         srt_path = kwargs.get('srt_path')
         output_path = kwargs.get('output_path')
         if output_path:
             import json
             from pathlib import Path
-            # 确保output_path是Path对象
+            # Ensure output_path is a Path object
             if isinstance(output_path, str):
                 output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             mock_output = {
                 "outlines": [
-                    {"topic": "测试话题1", "start_time": "00:00:00", "end_time": "00:00:05", "content": "测试内容1"},
-                    {"topic": "测试话题2", "start_time": "00:00:05", "end_time": "00:00:10", "content": "测试内容2"}
+                    {"topic": "Test topic 1", "start_time": "00:00:00", "end_time": "00:00:05", "content": "Test content 1"},
+                    {"topic": "Test topic 2", "start_time": "00:00:05", "end_time": "00:00:10", "content": "Test content 2"}
                 ],
                 "status": "completed",
-                "message": "占位符函数生成的模拟输出"
+                "message": "Placeholder function generating mock output"
             }
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(mock_output, f, ensure_ascii=False, indent=2)
-        return {"status": "skipped", "message": "流水线模块未正确导入"}
+        return {"status": "skipped", "message": "Pipeline module not imported correctly"}
     
     def run_step2_timeline(**kwargs): 
-        logger.warning("流水线模块未正确导入，使用占位符函数")
-        # 生成模拟输出
+        logger.warning("Pipeline module not imported correctly, use placeholder function")
+        # Generate synthetic output
         output_path = kwargs.get('output_path')
         if output_path:
             import json
             from pathlib import Path
-            # 确保output_path是Path对象
+            # Ensure output_path is a Path object
             if isinstance(output_path, str):
                 output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             mock_output = {
                 "timeline": [
-                    {"time": "00:00:00", "event": "开始"},
-                    {"time": "00:00:05", "event": "话题1"},
-                    {"time": "00:00:10", "event": "话题2"}
+                    {"time": "00:00:00", "event": "Start"},
+                    {"time": "00:00:05", "event": "Topic 1"},
+                    {"time": "00:00:10", "event": "Topic 2"}
                 ],
                 "status": "completed",
-                "message": "占位符函数生成的模拟输出"
+                "message": "Placeholder function generating mock output"
             }
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(mock_output, f, ensure_ascii=False, indent=2)
-        return {"status": "skipped", "message": "流水线模块未正确导入"}
+        return {"status": "skipped", "message": "Pipeline module not imported correctly"}
     
     def run_step3_scoring(**kwargs): 
-        logger.warning("流水线模块未正确导入，使用占位符函数")
-        # 生成模拟输出
+        logger.warning("Pipeline module not imported correctly, use placeholder function")
+        # Generate synthetic output
         output_path = kwargs.get('output_path')
         if output_path:
             import json
             from pathlib import Path
-            # 确保output_path是Path对象
+            # Ensure output_path is a Path object
             if isinstance(output_path, str):
                 output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             mock_output = {
                 "scored_clips": [
-                    {"clip_id": "1", "score": 0.8, "content": "高分内容1"},
-                    {"clip_id": "2", "score": 0.7, "content": "高分内容2"}
+                    {"clip_id": "1", "score": 0.8, "content": "High-quality content 1"},
+                    {"clip_id": "2", "score": 0.7, "content": "High-quality content 2"}
                 ],
                 "status": "completed",
-                "message": "占位符函数生成的模拟输出"
+                "message": "Placeholder function generating mock output"
             }
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(mock_output, f, ensure_ascii=False, indent=2)
-        return {"status": "skipped", "message": "流水线模块未正确导入"}
+        return {"status": "skipped", "message": "Pipeline module not imported correctly"}
     
     def run_step4_title(**kwargs): 
-        logger.warning("流水线模块未正确导入，使用占位符函数")
-        # 生成模拟输出
+        logger.warning("Pipeline module not imported correctly, use placeholder function")
+        # Generate synthetic output
         output_path = kwargs.get('output_path')
         if output_path:
             import json
             from pathlib import Path
-            # 确保output_path是Path对象
+            # Ensure output_path is a Path object
             if isinstance(output_path, str):
                 output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             mock_output = {
                 "titles": [
-                    {"clip_id": "1", "title": "测试标题1"},
-                    {"clip_id": "2", "title": "测试标题2"}
+                    {"clip_id": "1", "title": "Test title 1"},
+                    {"clip_id": "2", "title": "Test title 2"}
                 ],
                 "status": "completed",
-                "message": "占位符函数生成的模拟输出"
+                "message": "Placeholder function generating mock output"
             }
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(mock_output, f, ensure_ascii=False, indent=2)
-        return {"status": "skipped", "message": "流水线模块未正确导入"}
+        return {"status": "skipped", "message": "Pipeline module not imported correctly"}
     
     def run_step5_clustering(**kwargs): 
-        logger.warning("流水线模块未正确导入，使用占位符函数")
-        # 生成模拟输出
+        logger.warning("Pipeline module not imported correctly, use placeholder function")
+        # Generate synthetic output
         output_path = kwargs.get('output_path')
         if output_path:
             import json
             from pathlib import Path
-            # 确保output_path是Path对象
+            # Ensure output_path is a Path object
             if isinstance(output_path, str):
                 output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             mock_output = {
                 "collections": [
-                    {"collection_id": "1", "title": "测试合集1", "clips": ["1", "2"]},
-                    {"collection_id": "2", "title": "测试合集2", "clips": ["3", "4"]}
+                    {"collection_id": "1", "title": "Test suite 1", "clips": ["1", "2"]},
+                    {"collection_id": "2", "title": "Test collection 2", "clips": ["3", "4"]}
                 ],
                 "status": "completed",
-                "message": "占位符函数生成的模拟输出"
+                "message": "Placeholder function generating mock output"
             }
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(mock_output, f, ensure_ascii=False, indent=2)
-        return {"status": "skipped", "message": "流水线模块未正确导入"}
+        return {"status": "skipped", "message": "Pipeline module not imported correctly"}
     
     def run_step6_video(**kwargs): 
-        logger.warning("流水线模块未正确导入，使用占位符函数")
-        # 生成模拟输出
+        logger.warning("Pipeline module not imported correctly, use placeholder function")
+        # Generate synthetic output
         output_path = kwargs.get('output_path')
         if output_path:
             import json
             from pathlib import Path
-            # 确保output_path是Path对象
+            # Ensure output_path is a Path object
             if isinstance(output_path, str):
                 output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -165,27 +165,27 @@ except ImportError as e:
                     {"clip_id": "2", "video_path": "output/clip_2.mp4"}
                 ],
                 "status": "completed",
-                "message": "占位符函数生成的模拟输出"
+                "message": "Placeholder function generating mock output"
             }
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(mock_output, f, ensure_ascii=False, indent=2)
-        return {"status": "skipped", "message": "流水线模块未正确导入"}
+        return {"status": "skipped", "message": "Pipeline module not imported correctly"}
 
 
 class ProcessingOrchestrator:
-    """处理编排器，负责协调流水线执行和Task状态管理"""
+    """Handles orchestrator, responsible for coordinating pipeline execution and Task state management"""
     
     def __init__(self, project_id: str, task_id: str, db: Session):
         self.project_id = project_id
         self.task_id = task_id
         self.db = db
         
-        # 初始化组件
+        # Initialize components
         self.config_manager = ProjectConfigManager(project_id)
         self.adapter = PipelineAdapter(project_id, task_id, db)
         self.task_repo = TaskRepository(db)
         
-        # 步骤映射
+        # Step mapping
         self.step_functions = {
             ProcessingStep.STEP1_OUTLINE: run_step1_outline,
             ProcessingStep.STEP2_TIMELINE: run_step2_timeline,
@@ -195,7 +195,7 @@ class ProcessingOrchestrator:
             ProcessingStep.STEP6_VIDEO: run_step6_video
         }
         
-        # 步骤适配器映射
+        # Step adapter mapping
         self.step_adapters = {
             ProcessingStep.STEP1_OUTLINE: self.adapter.adapt_step1_outline,
             ProcessingStep.STEP2_TIMELINE: self.adapter.adapt_step2_timeline,
@@ -205,24 +205,24 @@ class ProcessingOrchestrator:
             ProcessingStep.STEP6_VIDEO: self.adapter.adapt_step6_video
         }
         
-        # 步骤状态管理
+        # Step status management
         self.step_status = {}
         self.step_timings = {}
         self.step_results = {}
     
     def execute_step(self, step: ProcessingStep, **kwargs) -> Dict[str, Any]:
         """
-        执行单个步骤
+        Execute single step
         
         Args:
-            step: 处理步骤
-            **kwargs: 步骤特定参数
+            Step: Process step
+            **kwargs: Step-specific parameters
             
         Returns:
-            步骤执行结果
+            Step execution result
         """
         step_name = step.value
-        logger.info(f"开始执行步骤: {step_name}")
+        logger.info(f"StartExecuting step: {step_name}")
 
         # Unit tests patch PipelineAdapter at module scope. When patched, delegate
         # directly so the mock controls the step result.
@@ -230,57 +230,57 @@ class ProcessingOrchestrator:
             adapter = PipelineAdapter(self.project_id, self.task_id, self.db)
             return adapter.execute_step(step_name, **kwargs)
         
-        # 更新步骤状态为运行中
+        # Updating step status to in-progress
         self._update_step_status(step, "running")
         
         try:
-            # 获取步骤编号
+            # Get step number
             step_number = self._get_step_number(step)
             
-            # 更新任务状态为运行中
+            # Updating task status to in-progress
             self._update_task_status(TaskStatus.RUNNING, progress=self._get_step_progress(step), current_step=step_number)
             
-            # 获取步骤函数和适配器
+            # Get step function and adapter
             step_func = self.step_functions[step]
             step_adapter = self.step_adapters[step]
             
-            # 准备步骤环境
+            # Prepare step environment
             self.adapter.prepare_step_environment(step_name)
             
-            # 执行步骤（使用高精度计时器）
+            # Executing step (using high-precision timer)
             start_time = time.perf_counter()
             
             if step == ProcessingStep.STEP1_OUTLINE:
-                # Step1需要SRT文件路径
+                # Step1 requires SRT file path
                 srt_path = kwargs.get('srt_path')
                 if not srt_path:
-                    raise ValueError("Step1需要提供SRT文件路径")
+                    raise ValueError("Step1 requires SRT file path")
                 
                 adapted_params = step_adapter(srt_path)
             else:
-                # 其他步骤使用前一步的输出
+                # Other steps use output of previous step
                 adapted_params = step_adapter()
             
-            # 执行步骤函数
+            # Execute step function
             result = step_func(**adapted_params)
             
             execution_time = time.perf_counter() - start_time
-            logger.info(f"步骤 {step_name} 执行完成，耗时: {execution_time:.4f}秒")
+            logger.info(f"Step {step_name} Execution completed, took {duration}: {execution_time:.4f}seconds")
             
-            # 记录步骤执行信息
+            # Record step execution details
             self.step_timings[step_name] = {
                 "start_time": start_time,
                 "end_time": time.perf_counter(),
                 "execution_time": execution_time
             }
             
-            # 保存结果到数据库
+            # Save result to database
             self._save_step_result(step, result)
             
-            # 更新步骤状态为完成
+            # Update step status to completed
             self._update_step_status(step, "completed", execution_time=execution_time)
             
-            # 更新任务进度
+            # Update task progress
             self._update_task_status(TaskStatus.RUNNING, progress=self._get_step_progress(step), current_step=step_number)
             
             return {
@@ -292,9 +292,9 @@ class ProcessingOrchestrator:
             
         except Exception as e:
             execution_time = time.perf_counter() - start_time if 'start_time' in locals() else 0
-            logger.error(f"步骤 {step_name} 执行失败: {e}")
+            logger.error(f"Step {step_name} Execution failed: {e}")
             
-            # 更新步骤状态为失败
+            # Update step status to failed
             self._update_step_status(step, "failed", execution_time=execution_time, error=str(e))
             
             self._update_task_status(TaskStatus.FAILED, error_message=str(e))
@@ -302,17 +302,17 @@ class ProcessingOrchestrator:
     
     def execute_pipeline(self, srt_path: Path, steps_to_execute: Optional[List[ProcessingStep]] = None) -> Dict[str, Any]:
         """
-        执行流水线（支持按需执行子集步骤）
+        Execute pipeline (supports executing subset steps on demand)
         
         Args:
-            srt_path: SRT文件路径
-            steps_to_execute: 要执行的步骤列表，None表示执行完整流水线
+            srt_path: Path to SRT file
+            steps_to_execute: List of steps to execute, None means run full pipeline
             
         Returns:
-            流水线执行结果
+            Pipeline execution result
         """
         if steps_to_execute is None:
-            # 执行完整流水线
+            # Execute full pipeline
             steps_to_execute = [
                 ProcessingStep.STEP1_OUTLINE,
                 ProcessingStep.STEP2_TIMELINE,
@@ -321,21 +321,21 @@ class ProcessingOrchestrator:
                 ProcessingStep.STEP5_CLUSTERING,
                 ProcessingStep.STEP6_VIDEO
             ]
-            logger.info(f"开始执行项目 {self.project_id} 的完整流水线")
+            logger.info(f"StartExecuting project {self.project_id} Full pipeline of {pipeline}")
         else:
-            logger.info(f"开始执行项目 {self.project_id} 的子集流水线: {[step.value for step in steps_to_execute]}")
+            logger.info(f"StartExecuting project {self.project_id} Subset pipeline of: {[step.value for step in steps_to_execute]}")
         
-        # 验证前置条件
+        # Validate prerequisites
         errors = self.adapter.validate_pipeline_prerequisites()
         if errors:
             error_msg = "; ".join(errors)
             self._update_task_status(TaskStatus.FAILED, error_message=error_msg)
-            raise ValueError(f"流水线前置条件验证失败: {error_msg}")
+            raise ValueError(f"Pipeline prerequisite check failed: {error_msg}")
         
-        # 验证步骤依赖关系
+        # Validate step dependencies
         self._validate_step_dependencies(steps_to_execute)
         
-        # 更新任务状态为运行中
+        # Updating task status to in-progress
         self._update_task_status(TaskStatus.RUNNING, progress=0)
         
         results = {}
@@ -344,7 +344,7 @@ class ProcessingOrchestrator:
         try:
             for i, step in enumerate(steps_to_execute):
                 step_number = self._get_step_number(step)
-                logger.info(f"执行步骤 {i+1}/{total_steps}: {step.value}")
+                logger.info(f"Executing step {i+1}/{total_steps}: {step.value}")
                 
                 if step == ProcessingStep.STEP1_OUTLINE:
                     step_result = self.execute_step(step, srt_path=srt_path)
@@ -353,17 +353,17 @@ class ProcessingOrchestrator:
                 
                 results[step.value] = step_result
                 
-                # 更新总体进度
+                # Update overall progress
                 progress = ((i + 1) / total_steps) * 100
                 self._update_task_status(TaskStatus.RUNNING, progress=progress, current_step=step_number)
             
-            # 流水线执行完成，保存数据到数据库
+            # Pipeline execution completed, saving data to database
             self._save_pipeline_results_to_database(results)
             
-            # 更新任务状态为完成
+            # Update task status to completed
             self._update_task_status(TaskStatus.COMPLETED, progress=100)
             
-            logger.info(f"项目 {self.project_id} 流水线执行完成")
+            logger.info(f"Project {self.project_id} Pipeline execution completed")
             return {
                 "status": "completed",
                 "project_id": self.project_id,
@@ -373,13 +373,13 @@ class ProcessingOrchestrator:
             }
             
         except Exception as e:
-            logger.error(f"流水线执行失败: {e}")
+            logger.error(f"Pipeline execution failed: {e}")
             self._update_task_status(TaskStatus.FAILED, error_message=str(e))
             raise
     
     def _update_step_status(self, step: ProcessingStep, status: str, execution_time: Optional[float] = None, 
                            error: Optional[str] = None):
-        """更新步骤状态"""
+        """Update step status"""
         step_name = step.value
         self.step_status[step_name] = {
             "status": status,
@@ -387,15 +387,15 @@ class ProcessingOrchestrator:
             "execution_time": execution_time,
             "error": error
         }
-        logger.debug(f"步骤 {step_name} 状态更新: {status}")
+        logger.debug(f"Step {step_name} Status update: {status}")
     
     def _update_task_status(self, status: TaskStatus, progress: Optional[float] = None, 
                            error_message: Optional[str] = None, result: Optional[Dict] = None,
                            current_step: Optional[int] = None):
-        """更新任务状态"""
+        """Update task status"""
         task = self.task_repo.get_by_id(self.task_id)
         if task:
-            # 统一在一次事务中更新任务状态，避免部分成功导致状态漂移
+            # Update task state in a single transaction to avoid partial success causing state drift
             task.status = status
             if progress is not None:
                 task.progress = progress
@@ -406,19 +406,19 @@ class ProcessingOrchestrator:
             self.db.commit()
             self.db.refresh(task)
         else:
-            logger.warning("任务不存在，无法更新状态: %s", self.task_id)
+            logger.warning("Failed to update status: Task does not exist: %s", self.task_id)
         
-        # 更新项目状态
+        # Update project status
         if current_step is not None:
             self._update_project_status(current_step, progress)
         
-        logger.info(f"任务 {self.task_id} 状态更新为: {status.value}, 进度: {progress}%, 步骤: {current_step}")
+        logger.info(f"task {self.task_id} Status updated to: {status.value}, progress: {progress}%, Step: {current_step}")
         
-        # 发送WebSocket实时进度更新
+        # Sends WebSocket real-time progress updates
         self._send_realtime_progress_update(status, progress, error_message, current_step)
     
     def _update_project_status(self, current_step: int, progress: Optional[float] = None):
-        """更新项目状态"""
+        """Update project status"""
         try:
             from ..services.project_service import ProjectService
             from ..core.database import SessionLocal
@@ -428,7 +428,7 @@ class ProcessingOrchestrator:
                 project_service = ProjectService(db)
                 project = project_service.get(self.project_id)
                 if project:
-                    # 更新项目状态
+                    # Update project status
                     update_data = {
                         "current_step": current_step,
                         "total_steps": 6,
@@ -439,71 +439,71 @@ class ProcessingOrchestrator:
                     
                     project_service.update(self.project_id, **update_data)
                     db.commit()
-                    logger.info(f"项目 {self.project_id} 状态已更新: 步骤 {current_step}/6, 进度 {progress}%")
+                    logger.info(f"Project {self.project_id} Status updated: step {step} {current_step}/6, progress {progress}%")
                 else:
-                    logger.warning(f"项目 {self.project_id} 不存在")
+                    logger.warning(f"Project {self.project_id} Not found")
             finally:
                 db.close()
         except Exception as e:
-            logger.error(f"更新项目状态失败: {e}")
+            logger.error(f"Update project statusfailed: {e}")
     
     def _send_realtime_progress_update(self, status: TaskStatus, progress: Optional[float] = None, 
                                      error_message: Optional[str] = None, current_step: Optional[int] = None):
-        """发送实时进度更新到前端 - 集成快照发布"""
+        """Sends real-time progress updates to frontend - Integration snapshot published"""
         try:
             import asyncio
             import json
             from ..services.websocket_notification_service import WebSocketNotificationService
             from ..services.progress_snapshot_service import snapshot_service
             
-            # 获取当前步骤信息
+            # Current step information
             if current_step is None:
                 current_step = 0
-                step_name = "初始化中..."
+                step_name = "Initializing..."
                 
-                # 根据进度推断当前步骤
+                # Infer current step from progress
                 if progress is not None:
                     if progress <= 10:
                         current_step = 1
-                        step_name = "大纲提取"
+                        step_name = "Outline extraction"
                     elif progress <= 30:
                         current_step = 2
-                        step_name = "时间定位"
+                        step_name = "Time-based location"
                     elif progress <= 50:
                         current_step = 3
-                        step_name = "内容评分"
+                        step_name = "Content scoring"
                     elif progress <= 70:
                         current_step = 4
-                        step_name = "标题生成"
+                        step_name = "Title generation"
                     elif progress <= 85:
                         current_step = 5
-                        step_name = "主题聚类"
+                        step_name = "Topic clustering"
                     elif progress <= 95:
                         current_step = 6
-                        step_name = "视频切割"
+                        step_name = "Video segmentation"
                     else:
                         current_step = 6
-                        step_name = "处理完成"
+                        step_name = "Processing complete"
             else:
-                # 根据步骤编号获取步骤名称
+                # Getting step name by step number
                 step_name_map = {
-                    1: "大纲提取",
-                    2: "时间定位", 
-                    3: "内容评分",
-                    4: "标题生成",
-                    5: "主题聚类",
-                    6: "视频切割"
+                    1: "Outline extraction",
+                    2: "Time-based location", 
+                    3: "Content scoring",
+                    4: "Title generation",
+                    5: "Topic clustering",
+                    6: "Video segmentation"
                 }
-                step_name = step_name_map.get(current_step, "处理中...")
+                step_name = step_name_map.get(current_step, "Processing...")
             
-            # 构建进度消息
-            progress_message = f"正在执行{step_name}..."
+            # Build progress message
+            progress_message = f"In progress{step_name}..."
             if error_message:
-                progress_message = f"处理失败: {error_message}"
+                progress_message = f"Processing failed: {error_message}"
             elif status == TaskStatus.COMPLETED:
-                progress_message = "处理完成"
+                progress_message = "Processing complete"
             
-            # 构建富消息载荷
+            # Build rich message payload
             payload = {
                 "type": "task_progress_update",
                 "task_id": self.task_id,
@@ -518,70 +518,70 @@ class ProcessingOrchestrator:
                 "timestamp": time.time()
             }
             
-            # 使用同步方式发送WebSocket通知和快照
+            # Uses synchronous method to send WebSocket notifications and snapshots
             def send_notification():
                 try:
-                    # 尝试获取现有的事件循环
+                    # Attempting to get existing event loop
                     loop = asyncio.get_event_loop()
                     if loop.is_running():
-                        # 如果事件循环正在运行，使用线程池
+                        # If event loop is running, use thread pool
                         import concurrent.futures
                         with concurrent.futures.ThreadPoolExecutor() as executor:
                             future = executor.submit(
                                 asyncio.run,
                                 self._async_send_progress_update(payload)
                             )
-                            future.result(timeout=5)  # 5秒超时
+                            future.result(timeout=5)  # 5-second timeout
                     else:
-                        # 如果事件循环没有运行，直接运行
+                        # If event loop is not running, run directly
                         loop.run_until_complete(
                             self._async_send_progress_update(payload)
                         )
                 except Exception as e:
-                    logger.error(f"发送WebSocket通知失败: {e}")
+                    logger.error(f"sendWebSocketNotification failed: {e}")
             
-            # 在后台线程中发送通知
+            # Send notification in background thread
             import threading
             thread = threading.Thread(target=send_notification)
             thread.daemon = True
             thread.start()
             
-            logger.debug(f"已发送实时进度更新: {self.project_id} - {progress}% - {step_name}")
+            logger.debug(f"Successfully sent real-time progress update: {self.project_id} - {progress}% - {step_name}")
             
         except Exception as e:
-            logger.error(f"发送实时进度更新失败: {e}")
+            logger.error(f"Sending real-time progress update failed: {e}")
     
     async def _async_send_progress_update(self, payload: dict):
-        """异步发送进度更新和快照"""
+        """Asynchronously sending progress update and snapshot"""
         try:
             import redis.asyncio as redis
             import json
             from ..core.config import get_redis_url
             from .progress_snapshot_service import snapshot_service
             
-            # 连接Redis
+            # Connect Redis
             redis_client = redis.from_url(get_redis_url(), decode_responses=True)
             
-            # 频道名 - 使用规范化函数
+            # Channel name - using normalized function
             from .websocket_gateway_service import WebSocketGatewayService
             channel = WebSocketGatewayService.normalize_channel(self.project_id)
             
-            # 1) 保存快照
+            # 1) Save snapshot
             await snapshot_service.save_snapshot(channel, payload)
             
-            # 2) 发布消息到Redis
+            # 2) Publish message to Redis
             await redis_client.publish(channel, json.dumps(payload, ensure_ascii=False))
             
-            # 3) 关闭Redis连接
+            # 3) Close Redis connection
             await redis_client.aclose()
             
-            logger.debug(f"进度更新已发布: {channel} - {payload}")
+            logger.debug(f"Progress update published: {channel} - {payload}")
             
         except Exception as e:
-            logger.error(f"异步发送进度更新失败: {e}")
+            logger.error(f"Asynchronous sending of progress update failed: {e}")
     
     def _get_step_number(self, step: ProcessingStep) -> int:
-        """获取步骤编号"""
+        """Get step number"""
         step_number_map = {
             ProcessingStep.STEP1_OUTLINE: 1,
             ProcessingStep.STEP2_TIMELINE: 2,
@@ -593,7 +593,7 @@ class ProcessingOrchestrator:
         return step_number_map.get(step, 0)
     
     def _get_step_progress(self, step: ProcessingStep) -> float:
-        """获取步骤对应的进度百分比"""
+        """Getting progress percentage for step"""
         step_progress_map = {
             ProcessingStep.STEP1_OUTLINE: 10,
             ProcessingStep.STEP2_TIMELINE: 30,
@@ -605,43 +605,43 @@ class ProcessingOrchestrator:
         return step_progress_map.get(step, 0)
     
     def _save_step_result(self, step: ProcessingStep, result: Any):
-        """保存步骤结果到数据库"""
-        # 这里可以根据需要将结果保存到相应的数据库表
-        # 比如切片结果保存到Clip表，合集结果保存到Collection表
-        logger.info(f"步骤 {step.value} 结果已保存")
+        """Save step result to database"""
+        # Here you can save results to appropriate database tables as needed
+        # For example, slice results are saved to Clip table, collection results to Collection table
+        logger.info(f"Step {step.value} Result saved")
     
     def _save_pipeline_results_to_database(self, results: Dict[str, Any]):
-        """将流水线执行结果保存到数据库"""
+        """Saving pipeline execution result to database"""
         try:
-            logger.info(f"开始保存项目 {self.project_id} 流水线结果到数据库")
+            logger.info(f"StartSaving project {self.project_id} Save pipeline result to database")
             
-            # 获取项目目录
+            # Get project directory
             project_dir = self.adapter.data_dir / "projects" / self.project_id
             
-            # 使用DataSyncService同步数据到数据库
+            # Use DataSyncService to synchronize data to database
             from ..services.data_sync_service import DataSyncService
             sync_service = DataSyncService(self.db)
             
-            # 同步项目数据
+            # Synchronize project data
             sync_result = sync_service.sync_project_from_filesystem(self.project_id, project_dir)
             
             if sync_result.get("success"):
-                logger.info(f"项目 {self.project_id} 数据同步成功: {sync_result}")
+                logger.info(f"Project {self.project_id} Data synchronization succeeded: {sync_result}")
             else:
-                logger.error(f"项目 {self.project_id} 数据同步失败: {sync_result}")
+                logger.error(f"Project {self.project_id} Data synchronization failed: {sync_result}")
                 self.db.rollback()
-                raise RuntimeError(f"数据同步失败: {sync_result}")
+                raise RuntimeError(f"Data synchronization failed: {sync_result}")
             
-            logger.info(f"项目 {self.project_id} 流水线结果已全部保存到数据库")
+            logger.info(f"Project {self.project_id} All pipeline results saved to database")
             
         except Exception as e:
-            logger.error(f"保存流水线结果到数据库失败: {e}")
+            logger.error(f"Failed to save pipeline result to database: {e}")
             self.db.rollback()
             raise
     
     def _validate_step_dependencies(self, steps_to_execute: List[ProcessingStep]):
-        """验证步骤依赖关系"""
-        # 定义步骤依赖关系
+        """Validate step dependencies"""
+        # Define step dependencies
         step_dependencies = {
             ProcessingStep.STEP2_TIMELINE: [ProcessingStep.STEP1_OUTLINE],
             ProcessingStep.STEP3_SCORING: [ProcessingStep.STEP2_TIMELINE],
@@ -650,7 +650,7 @@ class ProcessingOrchestrator:
             ProcessingStep.STEP6_VIDEO: [ProcessingStep.STEP5_CLUSTERING]
         }
         
-        # 只检查第一个步骤的依赖，因为其他步骤会在执行过程中逐步检查
+        # Check only the first step's dependencies because other steps will be checked progressively during execution
         if steps_to_execute:
             first_step = steps_to_execute[0]
             if first_step in step_dependencies:
@@ -658,20 +658,20 @@ class ProcessingOrchestrator:
                 missing_steps = []
                 
                 for req_step in required_steps:
-                    # 检查依赖步骤是否已经完成（通过检查输出文件）
+                    # Checks if dependent steps have already completed (by checking output files)
                     step_output = self.adapter.get_step_output_path(req_step.value)
                     if not step_output.exists():
                         missing_steps.append(req_step)
                 
                 if missing_steps:
                     missing_step_names = [step.value for step in missing_steps]
-                    raise ValueError(f"步骤 {first_step.value} 缺少依赖步骤: {missing_step_names}")
+                    raise ValueError(f"Step {first_step.value} Missing dependency steps: {missing_step_names}")
     
     def get_pipeline_status(self) -> Dict[str, Any]:
-        """获取流水线状态"""
+        """Get pipeline status"""
         task = self.task_repo.get_by_id(self.task_id)
         if not task:
-            return {"error": "任务不存在"}
+            return {"error": "Task does not exist"}
         
         return {
             "task_id": self.task_id,
@@ -687,23 +687,23 @@ class ProcessingOrchestrator:
         }
     
     def retry_step(self, step: ProcessingStep, **kwargs) -> Dict[str, Any]:
-        """重试特定步骤"""
-        logger.info(f"重试步骤: {step.value}")
+        """Retry specific step"""
+        logger.info(f"Retrying step: {step.value}")
         
-        # 清理步骤的中间文件
+        # Clean up intermediate files for step
         self.adapter.cleanup_intermediate_files(step.value)
         
-        # 重新执行步骤
+        # Re-execute step
         return self.execute_step(step, **kwargs)
     
     def get_step_result(self, step: ProcessingStep) -> Any:
-        """获取步骤结果"""
+        """Get step result"""
         return self.adapter.get_step_result(step.value)
     
     def get_step_performance_summary(self) -> Dict[str, Any]:
-        """获取步骤性能摘要"""
+        """Get performance summary for step"""
         if not self.step_timings:
-            return {"message": "暂无性能数据"}
+            return {"message": "No performance data available"}
         
         total_time = sum(timing["execution_time"] for timing in self.step_timings.values())
         step_performance = {}
@@ -725,10 +725,10 @@ class ProcessingOrchestrator:
         }
     
     def resume_from_step(self, start_step: ProcessingStep, srt_path: Optional[Path] = None) -> Dict[str, Any]:
-        """从指定步骤恢复执行"""
-        logger.info(f"从步骤 {start_step.value} 恢复执行")
+        """Resume execution from specified step"""
+        logger.info(f"From step {start_step.value} Resuming execution")
         
-        # 获取从指定步骤开始的所有步骤
+        # Getting all steps starting from specified step
         all_steps = [
             ProcessingStep.STEP1_OUTLINE,
             ProcessingStep.STEP2_TIMELINE,
@@ -741,42 +741,42 @@ class ProcessingOrchestrator:
         try:
             start_index = all_steps.index(start_step)
             
-            # 只执行未完成的步骤
+            # Execute only incomplete steps
             steps_to_execute = []
             for step in all_steps[start_index:]:
                 step_output = self.adapter.get_step_output_path(step.value)
                 if not step_output.exists():
                     steps_to_execute.append(step)
                 else:
-                    logger.info(f"步骤 {step.value} 已完成，跳过")
+                    logger.info(f"Step {step.value} Already completed, skipped")
             
             if not steps_to_execute:
-                logger.info("所有步骤都已完成，无需执行")
-                return {"message": "所有步骤都已完成"}
+                logger.info("All steps have completed, no execution needed")
+                return {"message": "All steps completed"}
             
-            logger.info(f"将执行步骤: {[step.value for step in steps_to_execute]}")
+            logger.info(f"Executing step: {[step.value for step in steps_to_execute]}")
             
             if start_step == ProcessingStep.STEP1_OUTLINE:
                 if not srt_path:
-                    raise ValueError("从Step1恢复需要提供SRT文件路径")
+                    raise ValueError("To resume from Step1, provide SRT file path")
                 return self.execute_pipeline(srt_path, steps_to_execute)
             else:
-                # 验证前置步骤是否已完成
+                # Validating if prerequisite steps have completed
                 for step in all_steps[:start_index]:
                     step_output = self.adapter.get_step_output_path(step.value)
                     if not step_output.exists():
-                        raise ValueError(f"前置步骤 {step.value} 未完成，无法从 {start_step.value} 恢复")
+                        raise ValueError(f"Prerequisite steps {step.value} Not completed, unable to extract from {start_step.value} Resume")
                 
                 return self.execute_pipeline(Path("dummy.srt"), steps_to_execute)
                 
         except ValueError as e:
-            logger.error(f"恢复执行失败: {e}")
+            logger.error(f"Resume execution failed: {e}")
             raise
     
     def get_step_status_summary(self) -> Dict[str, Any]:
-        """获取步骤状态摘要"""
+        """No step status data available"""
         if not self.step_status:
-            return {"message": "暂无步骤状态数据"}
+            return {"message": "No step status data"}
         
         completed_steps = [step for step, status in self.step_status.items() if status["status"] == "completed"]
         failed_steps = [step for step, status in self.step_status.items() if status["status"] == "failed"]

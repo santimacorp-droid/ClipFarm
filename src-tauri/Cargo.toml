@@ -1,10 +1,10 @@
 [package]
-name = "autoclip-desktop"
+name = "clipfarm-desktop"
 version = "1.1.0"
-description = "AutoClip Desktop Application"
-authors = ["AutoClip Team"]
+description = "ClipFarm Desktop Application"
+authors = ["ClipFarm Team"]
 license = "MIT"
-repository = "https://github.com/zhouxiaoka/autoclip"
+repository = "https://github.com/clipfarm/clipfarm"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

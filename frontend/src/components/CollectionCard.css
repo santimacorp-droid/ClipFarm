@@ -33,13 +33,13 @@
   transform: scale(1.05);
 }
 
-/* 自定义按钮悬停效果 */
+/* Custom button hover effect */
 .collection-card .ant-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
 }
 
-/* 类型标签动画 */
+/* Type label animation */
 .collection-card:hover [style*="collection_type"] {
   transform: scale(1.05);
   transition: transform 0.2s ease;

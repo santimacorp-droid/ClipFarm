@@ -1,6 +1,6 @@
 """
-数据库配置
-包含数据库连接、会话管理和依赖注入
+Database configuration
+Includes database connection, session management, and dependency injection
 """
 
 import os
@@ -10,24 +10,24 @@ from sqlalchemy.pool import StaticPool
 from typing import Generator
 from backend.models.base import Base
 
-# 数据库配置
+# Database configuration
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
     "sqlite:///autoclip.db"
 )
 
-# 如果没有设置环境变量，使用配置函数获取数据库URL
+# If the environment variable is not set, use the configuration function to get the database URL
 if DATABASE_URL == "sqlite:///autoclip.db":
     try:
         from .config import get_database_url
         DATABASE_URL = get_database_url()
     except ImportError:
-        # 如果导入失败，保持默认值
+        # If import fails, keep default value
         pass
 
-# 创建数据库引擎
+# Create database engine
 if "sqlite" in DATABASE_URL:
-    # SQLite配置
+    # SQLite configuration
     engine = create_engine(
         DATABASE_URL,
         connect_args={
@@ -36,10 +36,10 @@ if "sqlite" in DATABASE_URL:
         },
         poolclass=StaticPool,
         pool_pre_ping=True,
-        echo=False  # 设置为True可以看到SQL语句
+        echo=False  # Set to True to see SQL statements
     )
 else:
-    # PostgreSQL配置
+    # PostgreSQL configuration
     engine = create_engine(
         DATABASE_URL,
         pool_pre_ping=True,
@@ -47,7 +47,7 @@ else:
         echo=False
     )
 
-# 创建会话工厂
+# Create session factory
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
@@ -56,8 +56,8 @@ SessionLocal = sessionmaker(
 
 def get_db() -> Generator[Session, None, None]:
     """
-    数据库会话依赖注入
-    用于FastAPI的依赖注入系统
+    Database session dependency injection
+    For FastAPI's dependency injection system
     """
     db = SessionLocal()
     try:
@@ -66,49 +66,49 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 def create_tables():
-    """创建所有数据库表"""
+    """Create all database tables"""
     Base.metadata.create_all(bind=engine)
 
 def drop_tables():
-    """删除所有数据库表"""
+    """Drop all database tables"""
     Base.metadata.drop_all(bind=engine)
 
 def reset_database():
-    """重置数据库"""
+    """Reset database"""
     drop_tables()
     create_tables()
 
 from sqlalchemy import text
 
 def test_connection() -> bool:
-    """测试数据库连接"""
+    """Test database connection"""
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1")).fetchone()
         return True
     except Exception as e:
-        print(f"数据库连接测试失败: {e}")
+        print(f"Database connection test failed: {e}")
         return False
 
-# 数据库初始化
+# Database initialization
 def init_database():
-    """初始化数据库"""
-    print("正在初始化数据库...")
+    """Initialize database"""
+    print("Initializing database...")
     
-    # 测试连接
+    # Test connection
     if not test_connection():
-        print("❌ 数据库连接失败")
+        print("❌ Database connection failed")
         return False
     
-    # 创建表
+    # Create table
     try:
         create_tables()
-        print("✅ 数据库表创建成功")
+        print("✅ Database table creation successful")
         return True
     except Exception as e:
-        print(f"❌ 数据库表创建失败: {e}")
+        print(f"❌ Database table creation failed: {e}")
         return False
 
 if __name__ == "__main__":
-    # 直接运行此文件时初始化数据库
+    # When running this file directly, initialize the database
     init_database()

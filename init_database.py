@@ -1,56 +1,56 @@
 #!/usr/bin/env python3
 """
-数据库初始化脚本
+Database initialization script
 """
 
 import sys
 from pathlib import Path
 
-# 添加项目根目录到路径
+# Add project root directory to path
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
 sys.path.insert(0, str(current_dir / "backend"))
 
-# 设置工作目录
+# Set working directory
 import os
 os.chdir(current_dir)
 
 def init_database():
-    """初始化数据库"""
-    print("🚀 开始初始化数据库...")
+    """Initialize database"""
+    print("🚀 Beginning database initialization...")
     
     try:
-        # 导入所有模型确保表被创建
+        # Import all models to ensure tables are created
         from backend.models import Base, BilibiliAccount, UploadRecord
         from backend.core.database import init_database, create_tables
         
-        print("✅ 所有模型导入成功")
+        print("✅ All models imported successfully")
         
-        # 初始化数据库
+        # Initialize database
         if init_database():
-            print("✅ 数据库初始化成功")
+            print("✅ Database initialization successful")
         else:
-            print("❌ 数据库初始化失败")
+            print("❌ Database initialization failed")
             return False
         
-        # 创建表
+        # Create table
         create_tables()
-        print("✅ 数据库表创建成功")
+        print("✅ Database table creation successful")
         
         return True
         
     except Exception as e:
-        print(f"❌ 数据库初始化失败: {e}")
+        print(f"❌ Database initialization failed: {e}")
         return False
 
 if __name__ == "__main__":
     success = init_database()
     if success:
-        print("\n🎉 数据库初始化完成！")
-        print("现在可以启动系统了：")
+        print("\n🎉 Database initialization complete! ")
+        print("Now you can start the system: ")
         print("1. ./start_autoclip_with_upload.sh")
-        print("2. 或者手动启动各个服务")
+        print("2. Or manually start individual services")
     else:
-        print("\n❌ 数据库初始化失败，请检查错误信息")
+        print("\n❌ Database initialization failed. Please check error information")
         sys.exit(1)
 

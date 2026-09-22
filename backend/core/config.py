@@ -1,6 +1,6 @@
 """
-统一配置管理
-集中管理应用的所有配置项
+Unified configuration management
+Manage all app configurations in a single place
 """
 
 import os
@@ -9,48 +9,53 @@ from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field, AliasChoices
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from dotenv import load_dotenv
+load_dotenv()
+
 class APISettings(BaseModel):
-    """API配置"""
+    """APIConfigure"""
     dashscope_api_key: str = Field(default='', validation_alias=AliasChoices('API_DASHSCOPE_API_KEY'))
     model_name: str = Field(default='qwen-plus', validation_alias=AliasChoices('API_MODEL_NAME'))
     max_tokens: int = Field(default=4096, validation_alias=AliasChoices('API_MAX_TOKENS'))
     timeout: int = Field(default=30, validation_alias=AliasChoices('API_TIMEOUT'))
 
 class DatabaseSettings(BaseModel):
-    """数据库配置"""
+    """Database configuration"""
     url: str = Field(default='sqlite:///./data/autoclip.db', validation_alias=AliasChoices('DATABASE_URL'))
 
 class RedisSettings(BaseModel):
-    """Redis配置"""
+    """RedisConfigure"""
     url: str = Field(default='redis://localhost:6379/0', validation_alias=AliasChoices('REDIS_URL'))
 
 class ProcessingSettings(BaseModel):
-    """处理配置"""
+    """Processing configuration"""
     chunk_size: int = Field(default=5000, validation_alias=AliasChoices('PROCESSING_CHUNK_SIZE'))
     min_score_threshold: float = Field(default=0.7, validation_alias=AliasChoices('PROCESSING_MIN_SCORE_THRESHOLD'))
     max_clips_per_collection: int = Field(default=5, validation_alias=AliasChoices('PROCESSING_MAX_CLIPS_PER_COLLECTION'))
     max_retries: int = Field(default=3, validation_alias=AliasChoices('PROCESSING_MAX_RETRIES'))
 
 class LoggingSettings(BaseModel):
-    """日志配置"""
+    """Logging configuration"""
     level: str = Field(default='INFO', validation_alias=AliasChoices('LOG_LEVEL'))
     fmt: str = Field(default='%(asctime)s - %(name)s - %(levelname)s - %(message)s', validation_alias=AliasChoices('LOG_FORMAT'))
     file: str = Field(default='backend.log', validation_alias=AliasChoices('LOG_FILE'))
 
 class Settings(BaseSettings):
-    """应用设置"""
-    # 允许 .env + 忽略未声明的键，避免"Extra inputs are not permitted"
+    """Application settings"""
+    # Allow .env + Ignore undefined keys to avoid "Extra inputs are not permitted"
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
 
     environment: str = Field(default='development', validation_alias=AliasChoices('ENVIRONMENT'))
     debug: bool = Field(default=True, validation_alias=AliasChoices('DEBUG'))
     encryption_key: str = Field(default='', validation_alias=AliasChoices('ENCRYPTION_KEY'))
 
-    # 直接定义字段，不使用嵌套的BaseModel
+    # Define fields directly, without using nested BaseModel
     database_url: str = Field(default='sqlite:///./data/autoclip.db', validation_alias=AliasChoices('DATABASE_URL'))
     redis_url: str = Field(default='redis://localhost:6379/0', validation_alias=AliasChoices('REDIS_URL'))
     api_dashscope_api_key: str = Field(default='', validation_alias=AliasChoices('API_DASHSCOPE_API_KEY'))
     api_model_name: str = Field(default='qwen-plus', validation_alias=AliasChoices('API_MODEL_NAME'))
+    dashscope_mode: str = Field(default='native', validation_alias=AliasChoices('DASHSCOPE_MODE'))
+    dashscope_base_url: str = Field(default='https://dashscope.aliyuncs.com/compatible-mode/v1', validation_alias=AliasChoices('DASHSCOPE_BASE_URL'))
     api_max_tokens: int = Field(default=4096, validation_alias=AliasChoices('API_MAX_TOKENS'))
     api_timeout: int = Field(default=30, validation_alias=AliasChoices('API_TIMEOUT'))
     processing_chunk_size: int = Field(default=5000, validation_alias=AliasChoices('PROCESSING_CHUNK_SIZE'))
@@ -61,49 +66,49 @@ class Settings(BaseSettings):
     log_format: str = Field(default='%(asctime)s - %(name)s - %(levelname)s - %(message)s', validation_alias=AliasChoices('LOG_FORMAT'))
     log_file: str = Field(default='backend.log', validation_alias=AliasChoices('LOG_FILE'))
 
-# 全局配置实例
+# Global configuration instance
 settings = Settings()
 
 def get_project_root() -> Path:
-    """获取项目根目录"""
-    # 使用新的路径工具
+    """Get project root directory"""
+    # Use new path utilities
     from ..core.path_utils import get_project_root as get_root
     return get_root()
 
 def get_data_directory() -> Path:
-    """获取数据目录"""
+    """Get data directory"""
     from ..core.path_utils import get_data_directory as get_dir
     return get_dir()
 
 def get_uploads_directory() -> Path:
-    """获取上传文件目录"""
+    """Get upload file directory"""
     from ..core.path_utils import get_uploads_directory as get_dir
     return get_dir()
 
 def get_temp_directory() -> Path:
-    """获取临时文件目录"""
+    """Get temporary file directory"""
     from ..core.path_utils import get_temp_directory as get_dir
     return get_dir()
 
 def get_output_directory() -> Path:
-    """获取输出文件目录"""
+    """Get output file directory"""
     from ..core.path_utils import get_output_directory as get_dir
     return get_dir()
 
 def get_database_url() -> str:
-    """获取数据库URL"""
+    """Get databaseURL"""
     return settings.database_url
 
 def get_redis_url() -> str:
-    """获取Redis URL"""
+    """GettingRedis URL"""
     return settings.redis_url
 
 def get_api_key() -> Optional[str]:
-    """获取API密钥"""
+    """Get API key"""
     return settings.api_dashscope_api_key if settings.api_dashscope_api_key else None
 
 def get_model_config() -> Dict[str, Any]:
-    """获取模型配置"""
+    """Get model configuration"""
     return {
         "model_name": settings.api_model_name,
         "max_tokens": settings.api_max_tokens,
@@ -111,7 +116,7 @@ def get_model_config() -> Dict[str, Any]:
     }
 
 def get_processing_config() -> Dict[str, Any]:
-    """获取处理配置"""
+    """Get processing configuration"""
     return {
         "chunk_size": settings.processing_chunk_size,
         "min_score_threshold": settings.processing_min_score_threshold,
@@ -120,7 +125,7 @@ def get_processing_config() -> Dict[str, Any]:
     }
 
 def get_logging_config() -> Dict[str, Any]:
-    """获取日志配置"""
+    """Get logging configuration"""
     log_format = settings.log_format
     if log_format.lower() == "json":
         log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -130,25 +135,25 @@ def get_logging_config() -> Dict[str, Any]:
         "file": settings.log_file
     }
 
-# 初始化路径配置
+# Initialize path configuration
 def init_paths():
-    """初始化路径配置"""
+    """Initialize path configuration"""
     project_root = get_project_root()
     data_dir = get_data_directory()
     uploads_dir = get_uploads_directory()
     temp_dir = get_temp_directory()
     output_dir = get_output_directory()
     
-    print(f"项目根目录: {project_root}")
-    print(f"数据目录: {data_dir}")
-    print(f"上传目录: {uploads_dir}")
-    print(f"临时目录: {temp_dir}")
-    print(f"输出目录: {output_dir}")
+    print(f"Project root directory: {project_root}")
+    print(f"Data directory: {data_dir}")
+    print(f"Upload directory: {uploads_dir}")
+    print(f"Temporary directory: {temp_dir}")
+    print(f"Output directory: {output_dir}")
 
 if __name__ == "__main__":
-    # 测试配置加载
+    # Test configuration loading
     init_paths()
-    print(f"数据库URL: {get_database_url()}")
+    print(f"DatabaseURL: {get_database_url()}")
     print(f"Redis URL: {get_redis_url()}")
-    print(f"API配置: {get_model_config()}")
-    print(f"处理配置: {get_processing_config()}") 
+    print(f"APIConfigure: {get_model_config()}")
+    print(f"Processing configuration: {get_processing_config()}") 

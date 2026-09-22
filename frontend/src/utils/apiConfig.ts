@@ -1,6 +1,6 @@
 /**
- * API 配置管理器
- * 处理动态后端地址和端口配置
+ * API Configuration manager
+ * Handle dynamic backend address and port configuration
  */
 
 interface ApiConfig {
@@ -30,10 +30,10 @@ class ApiConfigManager {
   }
 
   private async initializeConfig() {
-    // 检查是否在 Tauri 环境中
+    // Check if in Tauri Environment
     if (typeof window !== 'undefined' && ((window as any).__TAURI__ || (window as any).__TAURI_INTERNALS__)) {
       try {
-        // 监听后端启动事件
+        // Listen for backend start event
         const { listen } = await import('@tauri-apps/api/event');
         const { invoke } = await import('@tauri-apps/api/core');
         
@@ -49,7 +49,7 @@ class ApiConfigManager {
           this.updateFromPort(backendStatus.port);
         }
 
-        // 尝试从全局变量获取配置
+        // Try to get configuration from global variable
         if ((window as any).__BACKEND_BASE__) {
           this.updateConfig({
             baseUrl: (window as any).__BACKEND_BASE__,
@@ -58,7 +58,7 @@ class ApiConfigManager {
           });
         }
       } catch (error) {
-        console.warn('无法初始化 Tauri 事件监听:', error);
+        console.warn('Unable to initialize Tauri Event listener:', error);
       }
     }
   }
@@ -86,28 +86,28 @@ class ApiConfigManager {
   }
 
   /**
-   * 获取当前 API 配置
+   * Get current API Configuration
    */
   getConfig(): ApiConfig {
     return { ...this.config };
   }
 
   /**
-   * 获取 API 基础 URL
+   * Retrieve API Base URL
    */
   getBaseUrl(): string {
     return this.config.baseUrl;
   }
 
   /**
-   * 检查 API 是否就绪
+   * Check API Is ready
    */
   isReady(): boolean {
     return this.config.isReady;
   }
 
   /**
-   * 添加配置变化监听器
+   * Add configuration change listener
    */
   addListener(listener: (config: ApiConfig) => void): () => void {
     this.listeners.push(listener);
@@ -120,7 +120,7 @@ class ApiConfigManager {
   }
 
   /**
-   * 等待 API 就绪
+   * Wait API Ready
    */
   async waitForReady(timeout: number = 30000): Promise<boolean> {
     if (this.isReady()) {
@@ -143,7 +143,7 @@ class ApiConfigManager {
   }
 
   /**
-   * 构建完整的 API URL
+   * Build complete API URL
    */
   buildUrl(path: string): string {
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
@@ -151,7 +151,7 @@ class ApiConfigManager {
   }
 
   /**
-   * 健康检查
+   * Health check
    */
   async healthCheck(): Promise<boolean> {
     try {
@@ -161,16 +161,16 @@ class ApiConfigManager {
       } as any);
       return response.ok;
     } catch (error) {
-      console.warn('API 健康检查失败:', error);
+      console.warn('API Health check failed:', error);
       return false;
     }
   }
 }
 
-// 导出单例实例
+// Export singleton instance
 export const apiConfigManager = ApiConfigManager.getInstance();
 
-// 导出便捷函数
+// Export convenience function
 export const getApiBaseUrl = () => apiConfigManager.getBaseUrl();
 export const isApiReady = () => apiConfigManager.isReady();
 export const waitForApiReady = (timeout?: number) => apiConfigManager.waitForReady(timeout);

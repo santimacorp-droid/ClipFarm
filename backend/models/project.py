@@ -1,6 +1,6 @@
 """
-项目模型
-定义项目的基本信息和状态
+Project Model
+Defines project metadata and status
 """
 
 import enum
@@ -10,116 +10,127 @@ from sqlalchemy.orm import relationship
 from .base import BaseModel
 
 class ProjectStatus(str, enum.Enum):
-    """项目状态枚举"""
-    PENDING = "pending"           # 等待中
-    PROCESSING = "processing"     # 处理中
-    COMPLETED = "completed"       # 已完成
-    FAILED = "failed"            # 失败
+    """Project status enumeration"""
+    PENDING = "pending"           # Pending
+    PROCESSING = "processing"     # Processing
+    COMPLETED = "completed"       # Completed
+    FAILED = "failed"            # Failed
 
 class ProjectType(str, enum.Enum):
-    """项目类型枚举"""
-    DEFAULT = "default"           # 默认
-    KNOWLEDGE = "knowledge"       # 知识科普
-    BUSINESS = "business"         # 商业财经
-    OPINION = "opinion"          # 观点评论
-    EXPERIENCE = "experience"    # 经验分享
-    SPEECH = "speech"            # 演讲脱口秀
-    CONTENT_REVIEW = "content_review"  # 内容解说
-    ENTERTAINMENT = "entertainment"    # 娱乐内容
+    """Project type enumeration"""
+    DEFAULT = "default"           # Default
+    PODCAST = "podcast"           # Podcast
+    PODCAST_HIGHLIGHT = "podcast_highlight"  # Podcast Highlight
+    INTERVIEW = "interview"       # Interview
+    VLOG = "vlog"                 # Vlog
+    STORYTELLING = "storytelling" # Storytelling
+    KNOWLEDGE = "knowledge"       # Knowledge
+    BUSINESS = "business"         # Business & Finance
+    BUSINESS_INSIGHT = "business_insight"  # Business Insight
+    TECH_TAKE = "tech_take"       # Tech & Dev
+    AI_MOMENT = "ai_moment"       # AI & Future Tech
+    OPINION = "opinion"          # Opinions & Commentary
+    EXPERIENCE = "experience"    # Experience & How-To
+    SPEECH = "speech"            # Speeches & Talks
+    CONTENT_REVIEW = "content_review"  # Reviews & Breakdowns
+    ENTERTAINMENT = "entertainment"    # Entertainment
+    FUNNY_MOMENT = "funny_moment"      # Comedy & Fails
+    HOT_TAKE = "hot_take"              # Hot Takes
+    GAMING_HIGHLIGHT = "gaming_highlight"  # Gaming Highlight
 
 class Project(BaseModel):
-    """项目模型"""
+    """Project model"""
     
     __tablename__ = "projects"
     
-    # 基本信息
+    # Basic info
     name = Column(
         String(255), 
         nullable=False, 
-        comment="项目名称"
+        comment="Project name"
     )
     description = Column(
         Text, 
         nullable=True, 
-        comment="项目描述"
+        comment="Project description"
     )
     
-    # 状态信息
+    # Status info
     status = Column(
         Enum(ProjectStatus), 
         default=ProjectStatus.PENDING,
         nullable=False,
-        comment="项目状态"
+        comment="Project status"
     )
     
-    # 项目类型
+    # Project type
     project_type = Column(
         Enum(ProjectType), 
         default=ProjectType.DEFAULT,
         nullable=False,
-        comment="项目类型"
+        comment="Project category"
     )
     video_path = Column(
         String(500), 
         nullable=True, 
-        comment="视频文件路径"
+        comment="Video file path"
     )
     subtitle_path = Column(
         String(500), 
         nullable=True, 
-        comment="字幕文件路径"
+        comment="Subtitle file path"
     )
     video_duration = Column(
         Integer, 
         nullable=True, 
-        comment="视频时长（秒）"
+        comment="Video duration in seconds"
     )
     thumbnail = Column(
         Text, 
         nullable=True, 
-        comment="项目缩略图（base64编码）"
+        comment="Project thumbnail (base64 encoded)"
     )
     
-    # 处理配置
+    # Processing configuration
     processing_config = Column(
         JSON, 
         nullable=True, 
-        comment="处理配置参数"
+        comment="Processing configuration parameters"
     )
     
-    # 元数据
+    # Metadata
     project_metadata = Column(
         JSON, 
         nullable=True, 
-        comment="项目元数据（精简版，完整数据存储在文件系统）"
+        comment="Project metadata (concise, full metadata in filesystem)"
     )
     
-    # 添加计算属性
+    # Computed properties
     @property
     def storage_initialized(self) -> bool:
-        """存储服务是否已初始化"""
+        """Whether storage service is initialized"""
         if self.project_metadata and 'storage_service_initialized' in self.project_metadata:
             return self.project_metadata['storage_service_initialized']
         return False
     
     @property
     def has_video_file(self) -> bool:
-        """是否有视频文件"""
+        """Whether video file exists"""
         return self.video_path is not None
     
     @property
     def has_subtitle_file(self) -> bool:
-        """是否有字幕文件"""
+        """Whether subtitle file exists"""
         return self.subtitle_path is not None
     
-    # 完成时间
+    # Completion timestamp
     completed_at = Column(
         DateTime, 
         nullable=True, 
-        comment="项目完成时间"
+        comment="Project completion time"
     )
     
-    # 关联关系
+    # Relationships
     clips = relationship(
         "Clip", 
         back_populates="project",
@@ -141,25 +152,25 @@ class Project(BaseModel):
     
     @property
     def clips_count(self):
-        """获取切片数量"""
+        """Get clip count"""
         return len(self.clips) if self.clips else 0
     
     @property
     def collections_count(self):
-        """获取合集数量"""
+        """Get collection count"""
         return len(self.collections) if self.collections else 0
     
     @property
     def is_processing(self):
-        """是否正在处理"""
+        """Whether project is processing"""
         return self.status == ProjectStatus.PROCESSING
     
     @property
     def is_completed(self):
-        """是否已完成"""
+        """Whether project is completed"""
         return self.status == ProjectStatus.COMPLETED
     
     @property
     def has_error(self):
-        """是否有错误"""
+        """Whether project has failed"""
         return self.status == ProjectStatus.FAILED

@@ -1,5 +1,5 @@
 """
-处理API路由
+ProcessAPIRoute
 """
 
 from typing import List, Optional
@@ -21,20 +21,20 @@ async def process_project(
     project_id: str,
     processing_service: ProcessingService = Depends(get_processing_service)
 ):
-    """开始处理项目"""
+    """Start processing project"""
     try:
         result = processing_service.process_project(project_id)
         return {
-            "message": "项目处理已开始",
+            "message": "Project processing has started",
             "project_id": project_id,
             "result": result
         }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except FileNotFoundError as e:
-        raise HTTPException(status_code=400, detail=f"缺少必要文件: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Missing required file: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"处理失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
 
 
 @router.get("/projects/{project_id}/processing-status")
@@ -42,12 +42,12 @@ async def get_processing_status(
     project_id: str,
     processing_service: ProcessingService = Depends(get_processing_service)
 ):
-    """获取项目处理状态"""
+    """Get project processing status"""
     try:
         status = processing_service.get_processing_status(project_id)
         return status
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
 
 
 @router.post("/projects/{project_id}/process/step/{step_number}")
@@ -56,18 +56,18 @@ async def process_step(
     step_number: int,
     processing_service: ProcessingService = Depends(get_processing_service)
 ):
-    """处理单个步骤"""
+    """Process single step"""
     if step_number < 1 or step_number > 6:
-        raise HTTPException(status_code=400, detail="步骤编号必须在1-6之间")
+        raise HTTPException(status_code=400, detail="Step number must be in1-6Between")
     
     try:
-        # 这里可以扩展为处理单个步骤
+        # Here you can extend for handling a single step
         result = processing_service.process_project(project_id)
         return {
-            "message": f"步骤 {step_number} 处理完成",
+            "message": f"Step {step_number} Processing completed",
             "project_id": project_id,
             "step": step_number,
             "result": result
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"步骤处理失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Step processing failed: {str(e)}")

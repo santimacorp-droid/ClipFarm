@@ -1,6 +1,6 @@
 """
-任务进度查询API
-提供实时任务进度查询功能
+Task progress queryAPI
+Provide real-time task progress query functionality
 """
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -13,16 +13,23 @@ from datetime import datetime
 
 router = APIRouter()
 
+@router.get("")
+@router.get("/")
+def get_all_projects_progress():
+    """Returns progress snapshot for all active projects."""
+    from ...core.progress_tracker import get_all_progress
+    return {"projects": get_all_progress()}
+
 @router.get("/task/{task_id}")
 async def get_task_progress(task_id: str, db: Session = Depends(get_db)):
-    """获取指定任务的进度"""
+    """Get progress for a specific task"""
     try:
-        # 从数据库获取任务信息
+        # Get task information from database
         task = db.query(Task).filter(Task.id == task_id).first()
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         
-        # 获取实时进度信息
+        # Get real-time progress information
         realtime_progress = progress_update_service.get_task_progress(task_id)
         
         response = {
@@ -38,7 +45,7 @@ async def get_task_progress(task_id: str, db: Session = Depends(get_db)):
             'updated_at': task.updated_at.isoformat() if task.updated_at else None
         }
         
-        # 如果有实时进度信息，合并进去
+        # If there is real-time progress information, merge it in
         if realtime_progress:
             response.update({
                 'realtime_progress': realtime_progress['progress'],
@@ -56,14 +63,14 @@ async def get_task_progress(task_id: str, db: Session = Depends(get_db)):
 
 @router.get("/project/{project_id}")
 async def get_project_tasks_progress(project_id: str, db: Session = Depends(get_db)):
-    """获取指定项目的所有任务进度"""
+    """Get all task progress for a specified project"""
     try:
-        # 获取项目的所有任务
+        # Get all tasks for a project
         tasks = db.query(Task).filter(Task.project_id == project_id).all()
         
         tasks_progress = []
         for task in tasks:
-            # 获取实时进度信息
+            # Get real-time progress information
             realtime_progress = progress_update_service.get_task_progress(task.id)
             
             task_info = {
@@ -78,7 +85,7 @@ async def get_project_tasks_progress(project_id: str, db: Session = Depends(get_
                 'updated_at': task.updated_at.isoformat() if task.updated_at else None
             }
             
-            # 如果有实时进度信息，合并进去
+            # If there is real-time progress information, merge it in
             if realtime_progress:
                 task_info.update({
                     'realtime_progress': realtime_progress['progress'],
@@ -103,11 +110,11 @@ async def get_project_tasks_progress(project_id: str, db: Session = Depends(get_
 
 @router.get("/active")
 async def get_active_tasks():
-    """获取所有活动任务的进度"""
+    """Get overall progress of all active tasks"""
     try:
         active_tasks = progress_update_service.get_all_active_tasks()
         
-        # 转换为前端友好的格式
+        # Convert to front-end friendly format
         formatted_tasks = []
         for task_id, progress_info in active_tasks.items():
             formatted_tasks.append({
@@ -129,16 +136,16 @@ async def get_active_tasks():
 
 @router.get("/summary")
 async def get_progress_summary(db: Session = Depends(get_db)):
-    """获取进度摘要信息"""
+    """Get progress summary information"""
     try:
-        # 统计各种状态的任务数量
+        # Count tasks by various status
         total_tasks = db.query(Task).count()
         running_tasks = db.query(Task).filter(Task.status == TaskStatus.RUNNING).count()
         completed_tasks = db.query(Task).filter(Task.status == TaskStatus.COMPLETED).count()
         failed_tasks = db.query(Task).filter(Task.status == TaskStatus.FAILED).count()
         pending_tasks = db.query(Task).filter(Task.status == TaskStatus.PENDING).count()
         
-        # 获取活动任务的实时进度
+        # Get real-time progress of active tasks
         active_tasks = progress_update_service.get_all_active_tasks()
         
         return {
@@ -155,3 +162,14 @@ async def get_progress_summary(db: Session = Depends(get_db)):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get("/{project_id}")
+def get_granular_project_progress(project_id: str):
+    """Returns granular progress for a specific project."""
+    from ...core.progress_tracker import get_progress
+    progress = get_progress(project_id)
+    if not progress:
+        return {"status": "unknown", "overall_percent": 0}
+    return progress
+

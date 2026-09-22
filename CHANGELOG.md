@@ -1,87 +1,65 @@
-# 更新日志
+# ChangelogAutoClipAll major changes to the project. [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/), 
+Project follows [Semantic versioning](https://semver.org/lang/zh-CN/). 
 
-本文档记录了AutoClip项目的所有重要变更。
-
-格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
-项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
-
-## [未发布]
+## [Not published]
 
 ## [1.2.0] - 2026-06-03
 
-> 接入产品分析,为后续账号 / 商业化打数据地基。
+> Integrated product analytics, for后续 account functionality / Building data foundation for commercialization. 
 
-### 新增
-- 接入 PostHog 匿名产品分析：覆盖安装/启动/更新、素材导入、出片导出、流程失败、设置 API key 等关键事件，每条事件自动携带应用版本/系统/架构等全局属性
-- 设置页新增「隐私与数据」开关，可随时关闭匿名使用统计（关闭立即停止上报，重启仍生效）
-- 新增埋点体系文档 `docs/ANALYTICS.md` 与中英文隐私政策 `docs/PRIVACY.md` / `docs/PRIVACY.en.md`
-- 添加视频标题编辑功能
-- 支持B站多账号管理
-- 添加账号健康状态监控
-- 实现拖拽排序功能
-- 添加视频分类支持
-- 完善Docker部署支持
-- 添加Docker管理脚本
+### Added - integrated PostHog Anonymous product analytics: covered install/Startup/Update, import assets, output creation, failed workflow, settings API key Event, each event automatically carries app version information/System/Architecture-wide global attributes「Privacy and data」Toggle, can be disabled at any time to disable anonymous usage statistics (disabled immediately stops reporting, effective after restart) `docs/ANALYTICS.md` Updated privacy policies (Chinese/English) `docs/PRIVACY.md` / `docs/PRIVACY.en.md`
+- Add video title edit featureBMultiaccount managementDockerDeployment support - addedDockerManagement script
 
-### 开发中
-- B站上传功能（预计下个版本发布）
-- 字幕编辑功能（预计下个版本发布）
+### Under development
+- BSite upload feature (to be released in the next version))
 
 ## [1.1.0] - 2026-05-31
 
-> 让 macOS 桌面客户端真正可装、可用、能出片。
+> Let/make... macOS Desktop client truly installable, usable, and capable of creating outputs. 
 
-### 新增
-- 🖥️ 桌面客户端零依赖安装：内置便携 Python 运行时 + 静态 ffmpeg/ffprobe，用户无需预装 Python/ffmpeg
-- 🗣️ 本地字幕转写（按需安装）：无字幕视频可在「设置 → 语音转写」一键安装 faster-whisper 并自选模型
+### Added
+- 🖥️ Desktop client zero-dependency installer: portable included Python Runtime + Static ffmpeg/ffprobe, User does not need to preinstall Python/ffmpeg
+- 🗣️ Local subtitle transcribing (install as needed): No subtitles video in「Settings → Speech transcription」One-click install faster-whisper And self-select models
 
-### 修复
-- 修复桌面应用启动黑屏（前端 vendor chunk 加载顺序导致 React 未挂载）
-- 修复项目列表一直「加载中」（运行时缺少 pytz 等依赖导致接口 500）
-- 修复导入/重试时「重试失败 / 已开始重试」提示疯狂弹窗的循环
-- 修复处理一直卡在 0%「初始化中」（桌面模式流水线改为本地执行，不再依赖 Redis）
-- 修复换机后无法处理视频（内置 ffmpeg 改为静态自包含版本并正确接入后端）
+### Fix vendor chunk Loading sequence causing error React Not mounted)「Loading...」(Runtime missing pytz Dependency issues caused by interface 500)
+- Fix import/On retry「Retry failed / Started retrying」Prompt pop-up loop 0%「Initializing」(Desktop mode pipeline changed to local execution, no longer dependent on Redis)
+- Fixed video processing failure after device switch (built-in) ffmpeg Change to static self-contained version and correctly integrate backend)
 
-### 改进
-- AI 提供商 Gemini 迁移到官方新版 `google-genai` SDK
-- CI 桌面构建统一为一条经过验证的流程（python-build-standalone）
-- 仓库清理：移除大量历史脚本与一次性文档，整理项目结构
+### Improved
+- AI Provider Gemini Migrated to official new version `google-genai` SDK
+- CI Unified desktop build to one validated process(python-build-standalone)
+- Repository cleanup: remove numerous historical scripts and one-time documentation, organize project structure
 
 ## [1.0.0] - 2024-01-15
 
-### 新增
-- 🎬 支持YouTube视频下载
-- 🎬 支持B站视频下载
-- 🎬 支持本地文件上传
-- 🤖 AI智能视频分析
-- ✂️ 自动视频切片
-- 📚 智能合集生成
-- 🎨 现代化Web界面
-- 🚀 异步任务处理
-- 📊 实时进度监控
-- 🔐 B站账号管理
-- 📱 响应式设计
-- 🛠️ 一键启动脚本
+### Added
+- 🎬 SupportYouTubeVideo download
+- 🎬 SupportBSite video download
+- 🎬 Supported local file upload
+- 🤖 AIIntelligent video analysis
+- ✂️ Automatic video segmentation
+- 📚 Intelligent collection generation
+- 🎨 ModernizationWebInterface
+- 🚀 Asynchronous task processing
+- 📊 Real-time progress monitoring
+- 🔐 BSite account management
+- 📱 Responsive design
+- 🛠️ One-click startup script
 
-### 技术特性
-- FastAPI后端框架
-- React + TypeScript前端
-- Celery异步任务队列
-- Redis消息代理
-- SQLite数据库
-- WebSocket实时通信
-- 通义千问AI集成
+### Technical features
+- FastAPIBackend framework
+- React + TypeScriptFrontend
+- CeleryAsynchronous task queue
+- RedisMessage broker
+- SQLiteDatabase
+- WebSocketReal-time communication - Tongyi QianwenAIIntegration
 
 ## [0.9.0] - 2024-01-01
 
-### 新增
-- 基础项目架构
-- 核心API接口
-- 基础前端界面
-- 视频处理流水线
-- AI分析服务
+### AddAPIInterface
+- AIAnalysis service
 
-### 技术栈
+### Technology stack
 - Python 3.8+
 - React 18
 - FastAPI
@@ -91,25 +69,23 @@
 
 ---
 
-## 版本说明
+## Version notes
 
-### 版本号格式
+### Version number format (SemVer): 
 
-我们使用语义化版本控制 (SemVer)：
+- **Major version number**: IncompatibleAPIModify
+- **Minor version number**: Functional enhancements with backward compatibility
+- **Revision number**: Backward compatibility bug fixes
 
-- **主版本号**: 不兼容的API修改
-- **次版本号**: 向下兼容的功能性新增
-- **修订号**: 向下兼容的问题修正
+### Change type
 
-### 变更类型
+- **Added**: New feature
+- **Improved**: Improved existing functionality
+- **Fix/Resolved**: BugFix/Resolved
+- **Remove**: Removed features
+- **Security**: Security-related fixes
 
-- **新增**: 新功能
-- **改进**: 现有功能的改进
-- **修复**: Bug修复
-- **移除**: 移除的功能
-- **安全**: 安全相关的修复
-
-### 链接
+### Link
 
 - [Unreleased]: https://github.com/your-username/autoclip/compare/v1.0.0...HEAD
 - [1.0.0]: https://github.com/your-username/autoclip/releases/tag/v1.0.0

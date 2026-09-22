@@ -1,6 +1,6 @@
 """
-定期任务调度器
-配置和管理定期执行的维护任务
+Periodic task scheduler
+Configure and manage regularly scheduled maintenance tasks
 """
 
 import logging
@@ -12,85 +12,85 @@ from ..core.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 
-# 配置定期任务
+# Configure periodic task
 @celery_app.on_after_configure.connect
 def setup_periodic_tasks(sender, **kwargs):
-    """配置定期任务"""
+    """Configure periodic task"""
     
-    # 每天凌晨2点执行数据清理
+    # Execute data cleanup at 2:00 AM daily
     sender.add_periodic_task(
         crontab(hour=2, minute=0),
         cleanup_expired_data.s(days=30),
         name='daily_data_cleanup'
     )
     
-    # 每小时执行数据一致性检查
+    # Execute data consistency check hourly
     sender.add_periodic_task(
         crontab(minute=0),
         check_data_consistency.s(),
         name='hourly_consistency_check'
     )
     
-    # 每周日凌晨3点执行孤立数据清理
+    # Purge stale data (retaining 30 days)
     sender.add_periodic_task(
         crontab(hour=3, minute=0, day_of_week=0),
         cleanup_orphaned_data.s(),
         name='weekly_orphaned_cleanup'
     )
     
-    # 每天凌晨1点执行系统健康检查
+    # Execute system health check at 1:00 AM daily
     sender.add_periodic_task(
         crontab(hour=1, minute=0),
         health_check.s(),
         name='daily_health_check'
     )
     
-    logger.info("定期任务配置完成")
+    logger.info("Periodic task configuration complete")
 
 
 def get_scheduled_tasks() -> dict:
-    """获取所有已配置的定期任务"""
+    """Get all configured periodic tasks"""
     return {
         'daily_data_cleanup': {
-            'schedule': '每天凌晨2点',
+            'schedule': 'Every day at 2:00 AM',
             'task': 'cleanup_expired_data',
-            'description': '清理过期数据（保留30天）'
+            'description': 'Purge expired data (retain 30 days))'
         },
         'hourly_consistency_check': {
-            'schedule': '每小时',
+            'schedule': 'Hourly',
             'task': 'check_data_consistency',
-            'description': '检查数据一致性'
+            'description': 'Data consistency check'
         },
         'weekly_orphaned_cleanup': {
-            'schedule': '每周日凌晨3点',
+            'schedule': 'Every Sunday at 3:00 AM',
             'task': 'cleanup_orphaned_data',
-            'description': '清理孤立数据'
+            'description': 'Purge orphaned data'
         },
         'daily_health_check': {
-            'schedule': '每天凌晨1点',
+            'schedule': 'Every day at 1:00 AM',
             'task': 'health_check',
-            'description': '系统健康检查'
+            'description': 'System health check'
         }
     }
 
 
 def enable_scheduled_tasks():
-    """启用定期任务"""
+    """Enable periodic task"""
     try:
-        # 这里可以添加启用定期任务的逻辑
-        logger.info("定期任务已启用")
+        # Add logic here to enable periodic tasks
+        logger.info("Periodic task enabled")
         return True
     except Exception as e:
-        logger.error(f"启用定期任务失败: {e}")
+        logger.error(f"Failed to enable periodic task: {e}")
         return False
 
 
 def disable_scheduled_tasks():
-    """禁用定期任务"""
+    """Disable periodic task"""
     try:
-        # 这里可以添加禁用定期任务的逻辑
-        logger.info("定期任务已禁用")
+        # Add logic here to disable periodic tasks
+        logger.info("Periodic task disabled")
         return True
     except Exception as e:
-        logger.error(f"禁用定期任务失败: {e}")
+        logger.error(f"Failed to disable periodic task: {e}")
         return False

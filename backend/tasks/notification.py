@@ -1,5 +1,5 @@
 """
-通知任务
+Notification task
 """
 
 import os
@@ -19,28 +19,28 @@ logger = logging.getLogger(__name__)
 @shared_task(bind=True, name='backend.tasks.notification.send_processing_notification')
 def send_processing_notification(self, project_id: str, task_id: str, message: str, notification_type: str = 'info') -> Dict[str, Any]:
     """
-    发送处理通知
+    Sending processing notification
     
     Args:
-        project_id: 项目ID
-        task_id: 任务ID
-        message: 通知消息
-        notification_type: 通知类型 (info, warning, error, success)
+        project_id: ProjectID
+        task_id: TaskID
+        message: Notification message
+        notification_type: Notification type (info, warning, error, success)
         
     Returns:
-        通知结果
+        Notification result
     """
-    logger.info(f"发送处理通知: {project_id}, {task_id}, {notification_type}")
+    logger.info(f"Sending processing notification: {project_id}, {task_id}, {notification_type}")
     
     try:
-        # 创建数据库会话
+        # Creating database session
         db = SessionLocal()
         
         try:
-            # 这里可以集成实际的通知系统
-            # 例如：WebSocket、邮件、短信等
+            # Here you can integrate an actual notification system.
+            # For example: WebSocket, email, SMS, etc.
             
-            # 模拟通知发送
+            # Simulating notification sending
             notification_data = {
                 'project_id': project_id,
                 'task_id': task_id,
@@ -49,46 +49,46 @@ def send_processing_notification(self, project_id: str, task_id: str, message: s
                 'timestamp': datetime.utcnow().isoformat()
             }
             
-            logger.info(f"通知已发送: {notification_data}")
+            logger.info(f"Notification sent: {notification_data}")
             
             return {
                 'success': True,
                 'project_id': project_id,
                 'task_id': task_id,
                 'notification': notification_data,
-                'message': '通知发送成功'
+                'message': 'Notification sent successfully'
             }
             
         finally:
             db.close()
             
     except Exception as e:
-        logger.error(f"通知发送失败: {project_id}, {task_id}, 错误: {e}")
+        logger.error(f"Notification sent failed: {project_id}, {task_id}, Error: {e}")
         raise
 
 
 @shared_task(bind=True, name='backend.tasks.notification.send_error_notification')
 def send_error_notification(self, project_id: str, task_id: str, error_message: str, error_details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    发送错误通知
+    Sending error notification
     
     Args:
-        project_id: 项目ID
-        task_id: 任务ID
-        error_message: 错误消息
-        error_details: 错误详情
+        project_id: ProjectID
+        task_id: TaskID
+        error_message: Error message
+        error_details: Error details
         
     Returns:
-        通知结果
+        Notification result
     """
-    logger.error(f"发送错误通知: {project_id}, {task_id}, {error_message}")
+    logger.error(f"Sending error notification: {project_id}, {task_id}, {error_message}")
     
     try:
-        # 创建数据库会话
+        # Creating database session
         db = SessionLocal()
         
         try:
-            # 更新任务状态
+            # Updating task status
             # task_repo = TaskRepository(db) # This line was removed as per the new_code
             # task = task_repo.get_by_id(task_id) # This line was removed as per the new_code
             # if task: # This line was removed as per the new_code
@@ -96,7 +96,7 @@ def send_error_notification(self, project_id: str, task_id: str, error_message: 
             #     task.error_message = error_message # This line was removed as per the new_code
             #     db.commit() # This line was removed as per the new_code
             
-            # 发送错误通知
+            # Sending error notification
             notification_data = {
                 'project_id': project_id,
                 'task_id': task_id,
@@ -106,45 +106,45 @@ def send_error_notification(self, project_id: str, task_id: str, error_message: 
                 'timestamp': datetime.utcnow().isoformat()
             }
             
-            logger.error(f"错误通知已发送: {notification_data}")
+            logger.error(f"Error notification sent: {notification_data}")
             
             return {
                 'success': True,
                 'project_id': project_id,
                 'task_id': task_id,
                 'notification': notification_data,
-                'message': '错误通知发送成功'
+                'message': 'Successfully sent error notification'
             }
             
         finally:
             db.close()
             
     except Exception as e:
-        logger.error(f"错误通知发送失败: {project_id}, {task_id}, 错误: {e}")
+        logger.error(f"Failed to send error notification: {project_id}, {task_id}, Error: {e}")
         raise
 
 
 @shared_task(bind=True, name='backend.tasks.notification.send_completion_notification')
 def send_completion_notification(self, project_id: str, task_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
     """
-    发送完成通知
+    Sending completion notification
     
     Args:
-        project_id: 项目ID
-        task_id: 任务ID
-        result: 处理结果
+        project_id: ProjectID
+        task_id: TaskID
+        result: Processing result
         
     Returns:
-        通知结果
+        Notification result
     """
-    logger.info(f"发送完成通知: {project_id}, {task_id}")
+    logger.info(f"Sending completion notification: {project_id}, {task_id}")
     
     try:
-        # 创建数据库会话
+        # Creating database session
         db = SessionLocal()
         
         try:
-            # 更新任务状态
+            # Updating task status
             # task_repo = TaskRepository(db) # This line was removed as per the new_code
             # task = task_repo.get_by_id(task_id) # This line was removed as per the new_code
             # if task: # This line was removed as per the new_code
@@ -152,29 +152,29 @@ def send_completion_notification(self, project_id: str, task_id: str, result: Di
             #     task.result = result # This line was removed as per the new_code
             #     db.commit() # This line was removed as per the new_code
             
-            # 发送完成通知
+            # Sending completion notification
             notification_data = {
                 'project_id': project_id,
                 'task_id': task_id,
                 'type': 'success',
-                'message': '处理完成',
+                'message': 'Processing complete',
                 'result': result,
                 'timestamp': datetime.utcnow().isoformat()
             }
             
-            logger.info(f"完成通知已发送: {notification_data}")
+            logger.info(f"Completion notification sent: {notification_data}")
             
             return {
                 'success': True,
                 'project_id': project_id,
                 'task_id': task_id,
                 'notification': notification_data,
-                'message': '完成通知发送成功'
+                'message': 'Successfully sent completion notification'
             }
             
         finally:
             db.close()
             
     except Exception as e:
-        logger.error(f"完成通知发送失败: {project_id}, {task_id}, 错误: {e}")
+        logger.error(f"Failed to send completion notification: {project_id}, {task_id}, Error: {e}")
         raise

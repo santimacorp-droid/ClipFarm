@@ -1,6 +1,6 @@
 /**
- * React 错误边界组件
- * 捕获子组件中的 JavaScript 错误，记录错误信息，并显示降级 UI
+ * React Error boundary component
+ * Catch subcomponent JavaScript Error, log error information, and display degraded UI
  */
 
 import { Component, ErrorInfo, ReactNode } from 'react'
@@ -37,7 +37,7 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): Partial<State> {
-    // 更新 state 使下一次渲染能够显示降级后的 UI
+    // Update state Make the next render able to show degraded UI
     return {
       hasError: true,
       error,
@@ -46,18 +46,18 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // 记录错误信息
+    // Record error information
     this.setState({ errorInfo })
     
-    // 使用错误处理器处理错误
+    // Process error using error handler
     errorHandler.handleError(error, 'ReactErrorBoundary')
     
-    // 调用自定义错误处理函数
+    // Call custom error handling function
     if (this.props.onError) {
       this.props.onError(error, errorInfo)
     }
     
-    // 记录详细的错误信息
+    // Log detailed error information
     console.group('🚨 React Error Boundary')
     console.error('Error:', error)
     console.error('Error Info:', errorInfo)
@@ -66,7 +66,7 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   handleReload = () => {
-    // 清除错误状态
+    // Clear error state
     this.setState({
       hasError: false,
       error: null,
@@ -74,12 +74,12 @@ class ErrorBoundary extends Component<Props, State> {
       errorId: ''
     })
     
-    // 刷新页面
+    // Refresh page
     window.location.reload()
   }
 
   handleGoHome = () => {
-    // 清除错误状态
+    // Clear error state
     this.setState({
       hasError: false,
       error: null,
@@ -87,7 +87,7 @@ class ErrorBoundary extends Component<Props, State> {
       errorId: ''
     })
     
-    // 跳转到首页
+    // Go to home page
     window.location.href = '/'
   }
 
@@ -96,7 +96,7 @@ class ErrorBoundary extends Component<Props, State> {
     
     if (!error) return
     
-    // 创建错误报告
+    // Create error report
     const errorReport = {
       id: errorId,
       message: error.message,
@@ -108,16 +108,16 @@ class ErrorBoundary extends Component<Props, State> {
       userId: localStorage.getItem('userId') || 'anonymous'
     }
     
-    // 这里可以发送错误报告到服务器
+    // Here you can send an error report to the server
     console.log('Error Report:', errorReport)
     
-    // 显示成功消息
-    // message.success('错误报告已提交，感谢您的反馈！')
+    // Display success message
+    // message.success('Error report submitted. Thank you for your feedback! ')
   }
 
   render() {
     if (this.state.hasError) {
-      // 如果有自定义的降级 UI，使用它
+      // If there is a custom degradation UI, Use it
       if (this.props.fallback) {
         return this.props.fallback
       }
@@ -143,8 +143,8 @@ class ErrorBoundary extends Component<Props, State> {
           >
             <Result
               status="error"
-              title="页面出现错误"
-              subTitle="抱歉，页面遇到了一个意外错误。我们已经记录了这个问题，请尝试以下解决方案："
+              title="Page encountered an error"
+              subTitle="Sorry, an unexpected error occurred on this page.: "
               extra={
                 <Space direction="vertical" size="middle" style={{ width: '100%' }}>
                   <Space>
@@ -153,13 +153,13 @@ class ErrorBoundary extends Component<Props, State> {
                       icon={<ReloadOutlined />} 
                       onClick={this.handleReload}
                     >
-                      刷新页面
+                      Refresh page
                     </Button>
                     <Button 
                       icon={<HomeOutlined />} 
                       onClick={this.handleGoHome}
                     >
-                      返回首页
+                      Return to home page
                     </Button>
                   </Space>
                   
@@ -168,22 +168,22 @@ class ErrorBoundary extends Component<Props, State> {
                     icon={<BugOutlined />}
                     onClick={this.handleReportError}
                   >
-                    报告此错误
+                    Report this error
                   </Button>
                 </Space>
               }
             />
             
-            {/* 错误详情 */}
+            {/* Error details */}
             {this.props.showDetails && error && (
               <div style={{ marginTop: '24px' }}>
-                <Title level={5}>错误详情</Title>
+                <Title level={5}>Error details</Title>
                 <Paragraph>
-                  <Text code>错误 ID: {errorId}</Text>
+                  <Text code>Error ID: {errorId}</Text>
                 </Paragraph>
                 
-                <Collapse size="small">
-                  <Panel header="错误信息" key="1">
+                <Collapse size="small" defaultActiveKey={['1']}>
+                  <Panel header="Error message" key="1">
                     <pre style={{ 
                       background: '#f5f5f5', 
                       padding: '12px', 
@@ -197,7 +197,7 @@ class ErrorBoundary extends Component<Props, State> {
                   </Panel>
                   
                   {error.stack && (
-                    <Panel header="错误堆栈" key="2">
+                    <Panel header="Error stack" key="2">
                       <pre style={{ 
                         background: '#f5f5f5', 
                         padding: '12px', 
@@ -212,7 +212,7 @@ class ErrorBoundary extends Component<Props, State> {
                   )}
                   
                   {errorInfo?.componentStack && (
-                    <Panel header="组件堆栈" key="3">
+                    <Panel header="Component stack" key="3">
                       <pre style={{ 
                         background: '#f5f5f5', 
                         padding: '12px', 
@@ -229,15 +229,15 @@ class ErrorBoundary extends Component<Props, State> {
               </div>
             )}
             
-            {/* 常见解决方案 */}
+            {/* Common solutions */}
             <div style={{ marginTop: '24px' }}>
-              <Title level={5}>常见解决方案</Title>
+              <Title level={5}>Common solutions</Title>
               <ul style={{ paddingLeft: '20px' }}>
-                <li>刷新页面重试</li>
-                <li>清除浏览器缓存和 Cookie</li>
-                <li>检查网络连接</li>
-                <li>尝试使用其他浏览器</li>
-                <li>如果问题持续存在，请联系技术支持</li>
+                <li>Refresh page to retry</li>
+                <li>Clear browser cache and Cookie</li>
+                <li>Check network connection</li>
+                <li>Try using another browser</li>
+                <li>If the problem persists, please contact support</li>
               </ul>
             </div>
           </Card>

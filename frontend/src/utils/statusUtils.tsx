@@ -1,6 +1,6 @@
 /**
- * 统一的状态处理工具
- * 解决前端项目中状态处理不一致的问题
+ * Unified state handling utilities
+ * Resolve inconsistencies in frontend state handling
  */
 
 import { 
@@ -12,12 +12,12 @@ import {
   PlayCircleOutlined
 } from '@ant-design/icons'
 
-// 统一的状态类型定义
+// Unified status type definitions
 export type ProjectStatus = 'pending' | 'processing' | 'completed' | 'failed'
 export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
 export type UploadStatus = 'pending' | 'processing' | 'success' | 'failed'
 
-// 项目状态配置
+// Project status configuration
 export interface ProjectStatusConfig {
   color: string
   icon: any
@@ -27,7 +27,7 @@ export interface ProjectStatusConfig {
   borderColor: string
 }
 
-// 任务状态配置
+// Task status configuration
 export interface TaskStatusConfig {
   color: string
   icon: any
@@ -35,7 +35,7 @@ export interface TaskStatusConfig {
   badgeStatus: 'default' | 'processing' | 'success' | 'error'
 }
 
-// 上传状态配置
+// Upload status configuration
 export interface UploadStatusConfig {
   color: string
   icon: any
@@ -44,7 +44,7 @@ export interface UploadStatusConfig {
 }
 
 /**
- * 获取项目状态配置
+ * Get project status configuration
  */
 export const getProjectStatusConfig = (status: ProjectStatus): ProjectStatusConfig => {
   switch (status) {
@@ -52,7 +52,7 @@ export const getProjectStatusConfig = (status: ProjectStatus): ProjectStatusConf
       return {
         color: '#1890ff',
         icon: ClockCircleOutlined,
-        text: '等待中',
+        text: 'Pending',
         badgeStatus: 'processing',
         backgroundColor: 'rgba(217, 217, 217, 0.15)',
         borderColor: 'rgba(217, 217, 217, 0.3)'
@@ -61,7 +61,7 @@ export const getProjectStatusConfig = (status: ProjectStatus): ProjectStatusConf
       return {
         color: '#1890ff',
         icon: LoadingOutlined,
-        text: '处理中',
+        text: 'Processing',
         badgeStatus: 'processing',
         backgroundColor: 'rgba(24, 144, 255, 0.15)',
         borderColor: 'rgba(24, 144, 255, 0.3)'
@@ -70,7 +70,7 @@ export const getProjectStatusConfig = (status: ProjectStatus): ProjectStatusConf
       return {
         color: '#52c41a',
         icon: CheckCircleOutlined,
-        text: '已完成',
+        text: 'Completed',
         badgeStatus: 'success',
         backgroundColor: 'rgba(82, 196, 26, 0.15)',
         borderColor: 'rgba(82, 196, 26, 0.3)'
@@ -79,7 +79,7 @@ export const getProjectStatusConfig = (status: ProjectStatus): ProjectStatusConf
       return {
         color: '#ff4d4f',
         icon: ExclamationCircleOutlined,
-        text: '失败',
+        text: 'Failed',
         badgeStatus: 'error',
         backgroundColor: 'rgba(255, 77, 79, 0.15)',
         borderColor: 'rgba(255, 77, 79, 0.3)'
@@ -88,7 +88,7 @@ export const getProjectStatusConfig = (status: ProjectStatus): ProjectStatusConf
       return {
         color: '#d9d9d9',
         icon: ClockCircleOutlined,
-        text: '未知状态',
+        text: 'Unknown',
         badgeStatus: 'default',
         backgroundColor: 'rgba(217, 217, 217, 0.15)',
         borderColor: 'rgba(217, 217, 217, 0.3)'
@@ -97,7 +97,7 @@ export const getProjectStatusConfig = (status: ProjectStatus): ProjectStatusConf
 }
 
 /**
- * 获取任务状态配置
+ * Get task status configuration
  */
 export const getTaskStatusConfig = (status: TaskStatus): TaskStatusConfig => {
   switch (status) {
@@ -105,49 +105,49 @@ export const getTaskStatusConfig = (status: TaskStatus): TaskStatusConfig => {
       return {
         color: '#1890ff',
         icon: ClockCircleOutlined,
-        text: '等待中',
+        text: 'Pending',
         badgeStatus: 'processing'
       }
     case 'running':
       return {
         color: '#1890ff',
         icon: PlayCircleOutlined,
-        text: '执行中',
+        text: 'Running',
         badgeStatus: 'processing'
       }
     case 'completed':
       return {
         color: '#52c41a',
         icon: CheckCircleOutlined,
-        text: '已完成',
+        text: 'Completed',
         badgeStatus: 'success'
       }
     case 'failed':
       return {
         color: '#ff4d4f',
         icon: CloseCircleOutlined,
-        text: '失败',
+        text: 'Failed',
         badgeStatus: 'error'
       }
     case 'cancelled':
       return {
         color: '#d9d9d9',
         icon: CloseCircleOutlined,
-        text: '已取消',
+        text: 'Cancelled',
         badgeStatus: 'default'
       }
     default:
       return {
         color: '#d9d9d9',
         icon: ClockCircleOutlined,
-        text: '未知状态',
+        text: 'Unknown',
         badgeStatus: 'default'
       }
   }
 }
 
 /**
- * 获取上传状态配置
+ * Get upload status configuration
  */
 export const getUploadStatusConfig = (status: UploadStatus): UploadStatusConfig => {
   switch (status) {
@@ -155,42 +155,42 @@ export const getUploadStatusConfig = (status: UploadStatus): UploadStatusConfig 
       return {
         color: '#1890ff',
         icon: ClockCircleOutlined,
-        text: '待处理',
+        text: 'Pending',
         badgeStatus: 'processing'
       }
     case 'processing':
       return {
         color: '#1890ff',
         icon: LoadingOutlined,
-        text: '处理中',
+        text: 'Processing',
         badgeStatus: 'processing'
       }
     case 'success':
       return {
         color: '#52c41a',
         icon: CheckCircleOutlined,
-        text: '成功',
+        text: 'Success',
         badgeStatus: 'success'
       }
     case 'failed':
       return {
         color: '#ff4d4f',
         icon: CloseCircleOutlined,
-        text: '失败',
+        text: 'Failed',
         badgeStatus: 'error'
       }
     default:
       return {
         color: '#d9d9d9',
         icon: ClockCircleOutlined,
-        text: '未知状态',
+        text: 'Unknown',
         badgeStatus: 'default'
       }
   }
 }
 
 /**
- * 获取进度条状态
+ * Get progress bar status
  */
 export const getProgressStatus = (status: ProjectStatus | TaskStatus | UploadStatus): 'normal' | 'active' | 'success' | 'exception' => {
   switch (status) {
@@ -208,7 +208,7 @@ export const getProgressStatus = (status: ProjectStatus | TaskStatus | UploadSta
 }
 
 /**
- * 计算项目进度百分比
+ * Calculate project progress percentage
  */
 export const calculateProjectProgress = (
   status: ProjectStatus, 
@@ -224,8 +224,8 @@ export const calculateProjectProgress = (
 }
 
 /**
- * 状态兼容性转换
- * 将旧的状态值转换为新的统一状态值
+ * Status compatibility conversion
+ * Convert old status values to new unified status values
  */
 export const normalizeProjectStatus = (status: string): ProjectStatus => {
   switch (status) {

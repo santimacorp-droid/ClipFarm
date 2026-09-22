@@ -21,13 +21,24 @@ class ProjectStatus(str, Enum):
 class ProjectType(str, Enum):
     """Project type enumeration."""
     DEFAULT = "default"
+    PODCAST = "podcast"
+    PODCAST_HIGHLIGHT = "podcast_highlight"
+    INTERVIEW = "interview"
+    VLOG = "vlog"
+    STORYTELLING = "storytelling"
     KNOWLEDGE = "knowledge"
     BUSINESS = "business"
+    BUSINESS_INSIGHT = "business_insight"
+    TECH_TAKE = "tech_take"
+    AI_MOMENT = "ai_moment"
     OPINION = "opinion"
     EXPERIENCE = "experience"
     SPEECH = "speech"
     CONTENT_REVIEW = "content_review"
     ENTERTAINMENT = "entertainment"
+    FUNNY_MOMENT = "funny_moment"
+    HOT_TAKE = "hot_take"
+    GAMING_HIGHLIGHT = "gaming_highlight"
 
 
 class ProjectCreate(BaseSchema):
@@ -61,6 +72,7 @@ class ProjectResponse(BaseSchema):
     video_path: Optional[str] = Field(description="Video file path for frontend compatibility")
     thumbnail: Optional[str] = Field(description="Project thumbnail (base64 encoded)")
     settings: dict = Field(description="Project settings")
+    processing_config: Optional[dict] = Field(default_factory=dict, description="Processing configuration for frontend compatibility")
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
     completed_at: Optional[datetime] = Field(description="Completion timestamp")

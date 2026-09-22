@@ -1,161 +1,148 @@
-# AutoClip 桌面版发布说明
+# AutoClip Desktop version release notes
 
-## v1.1.0 - 2026年5月
+## v1.1.0 - 2026Year5Month
 
-> 这一版让 macOS 桌面客户端**真正可装、可用、能出片**。v1.0.0 的安装包此前存在打不出产物、
-> 打开黑屏、处理卡死等问题，v1.1.0 把整条链路从头打通并端到端验证。
+> This version makes macOS Desktop client**Truly installable, functional, and capable of producing output**. v1.0.0 The installer previously failed to produce an artifact, 
+> Resolve black screen issues, hanging stalls, etc., v1.1.0 Repository cleanup (removal of historical scripts and documentation). 
 
-### 🚀 桌面客户端可用了
+### 🚀 Desktop client available
 
-- **零依赖安装**：安装包内置便携 Python 运行时和静态 ffmpeg/ffprobe，用户机器**无需预装
-  Python 或 ffmpeg**，双击 DMG 即可使用。
-- **端到端出片**：粘贴 B站/YouTube 链接 → 自动下载 → 字幕 → AI 大纲/时间线/评分/标题/聚类 →
-  ffmpeg 切割 → 生成切片与合集，整条流水线在本地直接跑通（桌面模式不再依赖 Redis）。
+- **Zero dependency installer**: Portable built-in package installer Python Runtime and static ffmpeg/ffprobe, User machine**No need to preinstall
+  Python Or ffmpeg**, double click DMG Ready to use. 
+- **End-to-end delivery**: paste BStation/YouTube Link → automatic download → subtitles → AI Outline/Timeline/rating/Title/clustering →
+  ffmpeg Trim → Video processing takes some time; please be patient Redis). 
 
-### 🐛 关键修复
+### 🐛 key fixes
 
-- **修复启动黑屏**：前端打包的依赖加载顺序问题（antd 早于 React 初始化）导致页面空白，现已修正。
-- **修复项目列表一直「加载中」**：补齐运行时缺失的依赖（`pytz` 等），接口恢复正常。
-- **修复重试时疯狂弹窗**：导入/重试时的提示循环已根治，一次点击对应一次操作。
-- **修复处理一直卡在 0%**：桌面模式下流水线改为本地执行，任务能真正跑起来。
-- 内置 ffmpeg/ffprobe 改为静态自包含版本，解决换机后无法处理视频的问题。
+- **Fixed startup black screen issue**: Check network connection and validity of video link(antd earlier than React Create project, add video link or upload file. 
+- **Fix project列表 always running「Loading...」**: Add missing runtime dependencies(`pytz` ), interface restored normally. 
+- **Fix rapid pop-up during retry**: import/Built-in. 
+- **Fix processing stuck at always 0%**: Initial download of dependencies required on first use; please ensure stable network connection ffmpeg/ffprobe Local pipeline mode changed to local execution; tasks can actually run. 
 
-### ✨ 新功能：本地字幕转写（按需）
+### ✨ Local assembly. Fixed issues with switching devices and video processing**Videos with no subtitles**, can be「Set → Speech transcription」Mile**One-click install Whisper**(Adopt faster-whisper, 
+  Away 200–400MB, does not contain PyTorch), Choose yourself/download model(tiny / base / small / medium / large-v3). 
+- Important: Configure Tongyi Qiankun model first; Keep base install packages lean when not needed. 
 
-- 对于**没有字幕的视频**，可在「设置 → 语音转写」里**一键安装 Whisper**（采用 faster-whisper，
-  约 200–400MB，不含 PyTorch），并自行选择/下载模型（tiny / base / small / medium / large-v3）。
-- 装不装、装哪个模型完全由你决定；不需要时基础安装包保持精简。
+### 🔧 other
 
-### 🔧 其他
+- AI Provider Gemini Migrate to official new version `google-genai` SDK. 
+- CI Retrying prompts now fully resolved; one click equals one operation; Thanks). 
 
-- AI 提供商 Gemini 迁移到官方新版 `google-genai` SDK。
-- CI 桌面构建工作流统一为一条经过验证的流程；仓库清理（移除大量历史脚本与一次性文档）。
+### 📦 Installation instructions(macOS, Apple Silicon)
 
-### 📦 安装说明（macOS, Apple Silicon）
+1. double click DMG, Place/Move `AutoClip Desktop` Drop into「application」. 
+2. **On first launch, right-click to open the app → Choose/Mark「Open」**(ad-hoc Signed, unsigned Apple Notary check, used to bypass Gatekeeper). 
+3. Enter「Set」fill in AI vendor's API Key You can now start using it. 
 
-1. 双击 DMG，将 `AutoClip Desktop` 拖入「应用程序」。
-2. **首次打开请右键点应用 → 选「打开」**（ad-hoc 签名、未做 Apple 公证，用于绕过 Gatekeeper）。
-3. 进入「设置」填入 AI 提供商的 API Key 即可开始使用。
-
-> 当前仅提供 Apple Silicon (M 系列) 版本；Intel / Windows / Linux 包后续提供。
+> Currently only offers Apple Silicon (M Series) version; Intel / Windows / Linux Pack comes with. 
 
 ---
 
-## v1.0.0 - 2024年12月
+## v1.0.0 - 2024Year12Month
 
-### 🎉 首次发布
+### 🎉 First release
 
-AutoClip桌面版是基于AI的智能视频切片工具，支持自动识别精彩片段并生成合集。
+AutoClipThe desktop version is based onAIRegular cleanup of temporary files recommended to save storage space. 
 
-### ✨ 主要功能
+### ✨ Main features
 
-#### 🎬 视频处理
-- **多平台支持**: YouTube、B站视频一键下载
-- **本地文件**: 支持本地视频文件上传
-- **智能切片**: AI自动识别精彩片段
-- **合集生成**: 智能推荐和手动创建视频合集
+#### 🎬 Video processing
+- **Multi-platform support**: YouTube, BOne-click batch download videos
+- **Local file**: Support local video file uploads
+- **intelligent slicing**: AIAutomatically identify精彩片段
+- **collection generation**: Whether or not to install or which model to install is entirely up to you
 
-#### 🤖 AI功能
-- **内容分析**: 基于通义千问的视频内容理解
-- **精彩评分**: 对每个片段进行AI评分
-- **标题生成**: 自动生成吸引人的视频标题
-- **时间点提取**: 智能识别话题时间区间
+#### 🤖 AIfunction
+- **Content analysis**: Initialization causes blank page; now fixed
+- **Rating scores**: Process each fragment forAIrating
+- **Title generation**: Generate engaging video titles automatically
+- **Timestamp extraction**: Intelligent identification of topic time intervals
 
-#### 🖥️ 桌面体验
-- **原生应用**: 基于Tauri的跨平台桌面应用
-- **系统托盘**: 支持最小化到系统托盘
-- **开机自启**: 可设置开机自动启动
-- **实时进度**: WebSocket实时进度推送
+#### 🖥️ Desktop experience
+- **native application**: based onTauriCross-platformDesktopapplication
+- **System tray**: Support minimizing to system tray
+- **Auto-start on boot**: Set startup automatically on开机
+- **Real-time progress**: WebSocketReal-time progress notifications
 
-#### 🎨 用户界面
-- **现代设计**: React + TypeScript + Ant Design
-- **响应式布局**: 适配不同屏幕尺寸
-- **拖拽排序**: 支持视频片段拖拽排序
-- **实时监控**: 详细的任务状态显示
+#### 🎨 User interface
+- **Modern design**: React + TypeScript + Ant Design
+- **Responsive layout**: Adapt to different screen尺寸
+- **Drag-and-drop sorting**: Support drag-and-drop reordering of video clips
+- **Real-time monitoring**: Detailed task状态 display
 
-### 🛠️ 技术特性
+### 🛠️ Technical specifications
 
-- **后端**: FastAPI + Celery + Redis + SQLite
-- **前端**: React 18 + TypeScript + Vite
-- **桌面**: Tauri 2.0 (Rust)
-- **AI**: 通义千问大语言模型
-- **视频**: yt-dlp + FFmpeg
+- **Backend**: FastAPI + Celery + Redis + SQLite
+- **front end**: React 18 + TypeScript + Vite
+- **Desktop**: Tauri 2.0 (Rust)
+- **AI**: Tongyi Big Language Model
+- **video**: yt-dlp + FFmpeg
 
-### 📦 系统要求
+### 📦 System requirements
 
-#### 最低配置
-- **操作系统**: Windows 10+ / macOS 10.13+ / Linux
-- **内存**: 4GB RAM
-- **存储**: 10GB 可用空间
-- **网络**: 稳定的互联网连接
+#### Minimum configuration
+- **Operating system**: Windows 10+ / macOS 10.13+ / Linux
+- **Memory**: 4GB RAM
+- **Store**: 10GB available space
+- **network**: Stable internet connection
 
-#### 推荐配置
-- **内存**: 8GB+ RAM
-- **存储**: 20GB+ 可用空间
-- **处理器**: 多核处理器
+#### recommended configuration
+- **Memory**: 8GB+ RAM
+- **Store**: 20GB+ available space
+- **Processor**: Multi-core processor
 
-### 🚀 快速开始
+### 🚀 Quick start
 
-1. **下载安装**: 从GitHub Releases下载对应平台的安装包
-2. **首次启动**: 运行应用，系统会自动初始化
-3. **配置API**: 在设置中配置通义千问API密钥
-4. **开始使用**: 创建项目，添加视频链接或上传文件
+1. **download and install**: FromGitHub ReleasesDownload installer for the corresponding platform
+2. **First launch**: Run the app - system will auto-initialize
+3. **configurationAPI**: Configure Qwen in settingsAPIKey
+4. **get started**: For desktop builds, unified workflow to a single verified process
 
-### 📋 使用步骤
+### 📋 usage steps
 
-1. **创建项目**: 点击"新建项目"
-2. **添加视频**: 选择YouTube/B站链接或上传本地文件
-3. **AI处理**: 系统自动分析视频内容
-4. **查看结果**: 浏览生成的视频片段
-5. **创建合集**: 选择精彩片段创建合集
-6. **导出下载**: 下载单个片段或完整合集
+1. **create project**: Click "New Project""
+2. **Add video**: SelectYouTube/BPaste website link or upload local file
+3. **AIProcess**: System automatically analyzes video content
+4. **View results**: Browse generated video片段
+5. **Create collection**: Create compilation from精彩片段
+6. **export and download**: Download individual clips or full compilations
 
-### ⚠️ 注意事项
+### ⚠️ New feature: Local speech-to-text transcription (on demand)APIKey required to useAIFeatures
 
-- 需要配置通义千问API密钥才能使用AI功能
-- 首次使用需要下载依赖，请确保网络连接稳定
-- 视频处理需要一定时间，请耐心等待
-- 建议定期清理临时文件以节省存储空间
+### 🔧 Troubleshooting
 
-### 🔧 故障排除
+#### Frequently asked questions
+- **failed to start**: Check system permissions and installed dependencies
+- **Download failed**: Verify the complete pipeline from end to end
+- **AISlow processing**: checkAPIKey configuration and network状况
+- **Storage insufficient**: Intelligent recommendations and manual creation of video assemblies
 
-#### 常见问题
-- **启动失败**: 检查系统权限和依赖安装
-- **下载失败**: 检查网络连接和视频链接有效性
-- **AI处理慢**: 检查API密钥配置和网络状况
-- **存储不足**: 清理临时文件和不需要的项目
+#### Get help [User guide](docs/USER_GUIDE.md)
+- read [Frequently asked questions](docs/FAQ.md)
+- Submit [GitHub Issue](https://github.com/zhouxiaoka/autoclip/issues)
 
-#### 获取帮助
-- 查看 [用户指南](docs/USER_GUIDE.md)
-- 阅读 [常见问题](docs/FAQ.md)
-- 提交 [GitHub Issue](https://github.com/zhouxiaoka/autoclip/issues)
+### 🛣️ future plans
 
-### 🛣️ 未来计划
+- **BUpload station**: Automatically upload slicevideo toBStation
+- **subtitle editor**: Visual subtitle editing and synchronization
+- **Batch processing**: Support batch video processing
+- **Cloud synchronization**: Project dataCloud synchronization
+- **Plugin system**: Support third-party插件 extension
 
-- **B站上传**: 自动上传切片视频到B站
-- **字幕编辑**: 可视化字幕编辑和同步
-- **批量处理**: 支持批量视频处理
-- **云端同步**: 项目数据云端同步
-- **插件系统**: 支持第三方插件扩展
+### 📄 The license is built on [MIT License](LICENSE) Open source license. 
 
-### 📄 许可证
-
-本项目采用 [MIT License](LICENSE) 开源许可证。
-
-### 🙏 致谢
-
-感谢所有开源项目的支持，特别感谢：
-- [Tauri](https://tauri.app/) - 桌面应用框架
-- [FastAPI](https://fastapi.tiangolo.com/) - 后端框架
-- [React](https://reactjs.org/) - 前端框架
-- [通义千问](https://tongyi.aliyun.com/) - AI服务
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - 视频下载工具
+### 🙏 Generation of slices and compilations; entire pipeline runs locally without issue: 
+- [Tauri](https://tauri.app/) - Desktop application framework
+- [FastAPI](https://fastapi.tiangolo.com/) - Backend framework
+- [React](https://reactjs.org/) - front‑end framework
+- [Tongyi Qianwen](https://tongyi.aliyun.com/) - AIservice
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - Video download tool
 
 ---
 
-**下载地址**: [GitHub Releases](https://github.com/zhouxiaoka/autoclip/releases)
+**Download address**: [GitHub Releases](https://github.com/zhouxiaoka/autoclip/releases)
 
-**项目主页**: [GitHub Repository](https://github.com/zhouxiaoka/autoclip)
+**Project homepage**: [GitHub Repository](https://github.com/zhouxiaoka/autoclip)
 
-**问题反馈**: [GitHub Issues](https://github.com/zhouxiaoka/autoclip/issues)
+**issue feedback**: [GitHub Issues](https://github.com/zhouxiaoka/autoclip/issues)
 

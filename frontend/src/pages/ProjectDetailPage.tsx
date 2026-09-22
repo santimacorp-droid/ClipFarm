@@ -8,14 +8,19 @@ import {
   Space, 
   Alert, 
   Spin, 
-  Empty,
-  message,
-  Radio
+  Empty, 
+  message, 
+  Dropdown, 
+  Segmented, 
+  type MenuProps 
 } from 'antd'
 import { 
   ArrowLeftOutlined, 
-  PlayCircleOutlined,
-  PlusOutlined
+  PlayCircleOutlined, 
+  PlusOutlined, 
+  DownloadOutlined, 
+  DownOutlined, 
+  AppstoreOutlined 
 } from '@ant-design/icons'
 import { useProjectStore, Clip, Collection } from '../store/useProjectStore'
 import { projectApi } from '../services/api'
@@ -49,9 +54,62 @@ const ProjectDetailPage: React.FC = () => {
   const [statusLoading, setStatusLoading] = useState(false)
   const [showCreateCollection, setShowCreateCollection] = useState(false)
   const [sortBy, setSortBy] = useState<'time' | 'score'>('score')
+  const [globalPlatform, setGlobalPlatform] = useState<string>('tiktok')
   const [showCollectionDetail, setShowCollectionDetail] = useState(false)
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null)
   const { generateAndDownloadCollectionVideo } = useCollectionVideoDownload()
+  const [exportingZip, setExportingZip] = useState(false)
+
+  const handleExportAllZip = async (platform?: string) => {
+    if (!currentProject?.id) return
+    setExportingZip(true)
+    const platName = platform && platform !== 'all' 
+      ? (platform === 'youtube_shorts' ? 'YouTube Shorts' : platform.charAt(0).toUpperCase() + platform.slice(1))
+      : 'All Platforms Bundle'
+    message.loading({ content: `Packaging ${platName} clips into ZIP archive...`, key: 'zip_export', duration: 0 })
+    try {
+      await projectApi.exportAllClipsZip(currentProject.id, platform)
+      message.success({ content: `Clips ZIP archive (${platName}) downloaded successfully!`, key: 'zip_export' })
+    } catch (e: any) {
+      message.error({ content: `Failed to export ZIP: ${e.message || 'Unknown error'}`, key: 'zip_export' })
+    } finally {
+      setExportingZip(false)
+    }
+  }
+
+  const zipMenuItems: MenuProps['items'] = [
+    {
+      key: 'all',
+      label: (
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0', fontWeight: 600 }}>
+          <AppstoreOutlined />
+          <span>All Platforms Bundle (TikTok, IG, Shorts, FB)</span>
+        </span>
+      ),
+      onClick: () => handleExportAllZip('all')
+    },
+    { type: 'divider' },
+    {
+      key: 'tiktok',
+      label: '📱 All TikTok Clips (ZIP)',
+      onClick: () => handleExportAllZip('tiktok')
+    },
+    {
+      key: 'instagram',
+      label: '📷 All Instagram Reels Clips (ZIP)',
+      onClick: () => handleExportAllZip('instagram')
+    },
+    {
+      key: 'youtube_shorts',
+      label: '▶️ All YouTube Shorts Clips (ZIP)',
+      onClick: () => handleExportAllZip('youtube_shorts')
+    },
+    {
+      key: 'facebook',
+      label: '📘 All Facebook Clips (ZIP)',
+      onClick: () => handleExportAllZip('facebook')
+    },
+  ]
 
   useEffect(() => {
     if (!id) return
@@ -64,7 +122,7 @@ const ProjectDetailPage: React.FC = () => {
     try {
       const project = await projectApi.getProject(id)
       
-      // 如果项目已完成，加载clips和collections
+      // If project is completed, load itclipsAndcollections
       if (project.status === 'completed') {
         try {
           const [clips, collections] = await Promise.all([
@@ -84,11 +142,11 @@ const ProjectDetailPage: React.FC = () => {
           console.log('🎯 Final project with data:', projectWithData)
           setCurrentProject(projectWithData)
           
-          // 同步更新项目列表，避免页面与列表状态漂移
+          // Synchronize project list to prevent page and list state drift
           upsertProject(projectWithData)
         } catch (error) {
           console.error('Failed to load clips/collections:', error)
-          // 即使clips/collections加载失败，也设置项目基本信息
+          // Even whenclips/collectionsFailed to load but still set basic project information
           setCurrentProject(project)
         }
       } else {
@@ -96,7 +154,7 @@ const ProjectDetailPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to load project:', error)
-      message.error('加载项目失败')
+      message.error('Failed to load project')
     }
   }
 
@@ -116,11 +174,11 @@ const ProjectDetailPage: React.FC = () => {
     if (!id) return
     try {
       await projectApi.startProcessing(id)
-      message.success('开始处理')
+      message.success('Processing started')
       loadProcessingStatus()
     } catch (error) {
       console.error('Failed to start processing:', error)
-      message.error('启动处理失败')
+      message.error('Failed to start processing')
     }
   }
 
@@ -136,10 +194,10 @@ const ProjectDetailPage: React.FC = () => {
         created_at: new Date().toISOString()
       })
       setShowCreateCollection(false)
-      message.success('合集创建成功')
+      message.success('Collection created successfully')
     } catch (error) {
       console.error('Failed to create collection:', error)
-      message.error('创建合集失败')
+      message.error('Failed to create collection')
     }
   }
 
@@ -152,10 +210,10 @@ const ProjectDetailPage: React.FC = () => {
     if (!id) return
     try {
       await removeClipFromCollection(id, collectionId, clipId)
-      message.success('切片已从合集中移除')
+      message.success('Clip removed from collection')
     } catch (error) {
       console.error('Failed to remove clip from collection:', error)
-      message.error('移除切片失败')
+      message.error('Failed to remove clip')
     }
   }
 
@@ -165,10 +223,10 @@ const ProjectDetailPage: React.FC = () => {
       await deleteCollection(id, collectionId)
       setShowCollectionDetail(false)
       setSelectedCollection(null)
-      message.success('合集已删除')
+      message.success('Collection deleted')
     } catch (error) {
       console.error('Failed to delete collection:', error)
-      message.error('删除合集失败')
+      message.error('Failed to delete collection')
     }
   }
 
@@ -176,10 +234,10 @@ const ProjectDetailPage: React.FC = () => {
     if (!id) return
     try {
       await reorderCollectionClips(id, collectionId, newClipIds)
-      message.success('合集顺序已更新')
+      message.success('Collection order updated')
     } catch (error) {
       console.error('Failed to reorder collection clips:', error)
-      message.error('更新合集顺序失败')
+      message.error('Failed to reorder clips')
     }
   }
 
@@ -187,10 +245,10 @@ const ProjectDetailPage: React.FC = () => {
     if (!id) return
     try {
       await addClipToCollection(id, collectionId, clipIds)
-      message.success('切片已添加到合集')
+      message.success('Clip added to collection')
     } catch (error) {
       console.error('Failed to add clip to collection:', error)
-      message.error('添加切片失败')
+      message.error('Failed to add clip')
     }
   }
 
@@ -201,7 +259,7 @@ const ProjectDetailPage: React.FC = () => {
     if (sortBy === 'score') {
       return clips.sort((a, b) => b.final_score - a.final_score)
     } else {
-      // 按时间排序 - 将时间字符串转换为秒数进行比较
+      // Sort by time - compare timestamp strings by converting to seconds
       return clips.sort((a, b) => {
         const getTimeInSeconds = (timeStr: string) => {
           const parts = timeStr.split(':')
@@ -230,12 +288,12 @@ const ProjectDetailPage: React.FC = () => {
     return (
       <Content style={{ padding: '24px' }}>
         <Alert
-          message="加载失败"
-          description={error || '项目不存在'}
+          message="Load Failed"
+          description={error || 'Project does not exist'}
           type="error"
           action={
             <Button size="small" onClick={() => navigate('/')}>
-              返回首页
+              Back to Home
             </Button>
           }
         />
@@ -245,7 +303,7 @@ const ProjectDetailPage: React.FC = () => {
 
   return (
     <Content style={{ padding: '24px' }}>
-      {/* 简化的项目头部 */}
+      {/* Simplified project header */}
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <Button 
@@ -254,7 +312,7 @@ const ProjectDetailPage: React.FC = () => {
             onClick={() => navigate('/')}
             style={{ padding: 0, marginBottom: '8px' }}
           >
-            返回项目列表
+            Back to Projects
           </Button>
           <Title level={2} style={{ margin: 0 }}>
             {currentProject.name}
@@ -268,23 +326,23 @@ const ProjectDetailPage: React.FC = () => {
               onClick={handleStartProcessing}
               loading={statusLoading}
             >
-              开始处理
+              Start Processing
             </Button>
           )}
         </Space>
       </div>
 
-      {/* 主要内容 */}
+      {/* Main content */}
       {currentProject.status === 'completed' ? (
         <div>
-          {/* AI合集横向滚动区域 */}
+          {/* AICollection horizontal scroll area */}
           {currentProject.collections && currentProject.collections.length > 0 && (
             <Card style={{ marginBottom: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <div>
-                  <Title level={4} style={{ margin: 0 }}>AI推荐合集</Title>
+                  <Title level={4} style={{ margin: 0 }}>AI Collections</Title>
                   <Text type="secondary">
-                    AI 已为您推荐了 {currentProject.collections.length} 个主题合集
+                    AI recommended {currentProject.collections.length} topic collections
                   </Text>
                 </div>
                 <Button 
@@ -301,7 +359,7 @@ const ProjectDetailPage: React.FC = () => {
                     fontSize: '14px'
                   }}
                 >
-                  创建合集
+                  Create Collection
                 </Button>
               </div>
               
@@ -316,7 +374,7 @@ const ProjectDetailPage: React.FC = () => {
               >
                 {currentProject.collections
                   .sort((a, b) => {
-                    // 按创建时间倒序排列，最新的在前面
+                    // Sort projects descending by creation time with newest first
                     const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
                     const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
                     return timeB - timeA
@@ -347,79 +405,87 @@ const ProjectDetailPage: React.FC = () => {
             </Card>
           )}
           
-          {/* 视频片段区域 */}
+          {/* Video segment area */}
           <Card 
             style={{
               borderRadius: '16px',
-              border: '1px solid #303030',
+              border: '1px solid var(--ac-line)',
               background: 'var(--ac-card)'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
               <div>
-                <Title level={4} style={{ margin: 0, color: '#ffffff', fontWeight: 600 }}>视频片段</Title>
-                <Text type="secondary" style={{ color: 'var(--ac-sub)', fontSize: '14px' }}>
-                  AI 已为您生成了 {currentProject.clips?.length || 0} 个精彩片段
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Title level={4} style={{ margin: 0, color: 'var(--ac-ink)', fontWeight: 600 }}>Video Clips</Title>
+                  <span style={{ 
+                    background: 'rgba(82, 196, 26, 0.12)', 
+                    color: '#52c41a', 
+                    border: '1px solid rgba(82, 196, 26, 0.3)',
+                    padding: '2px 8px', 
+                    borderRadius: '999px', 
+                    fontSize: '11.5px',
+                    fontWeight: 600
+                  }}>
+                    4 Platforms Ready
+                  </span>
+                </div>
+                <Text type="secondary" style={{ color: 'var(--ac-sub)', fontSize: '13.5px', marginTop: '4px', display: 'block' }}>
+                  AI generated {currentProject.clips?.length || 0} highlight clips · 4 platform versions available per clip
                 </Text>
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                {/* 排序控件 - 暗黑主题优化 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Text style={{ fontSize: '13px', color: 'var(--ac-sub)', fontWeight: 500 }}>排序</Text>
-                  <Radio.Group
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                {/* Platform Format Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Text style={{ fontSize: '12.5px', color: 'var(--ac-sub)', fontWeight: 500 }}>Format:</Text>
+                  <Segmented
+                    value={globalPlatform}
+                    onChange={(val) => setGlobalPlatform(String(val))}
+                    options={[
+                      { label: '📱 TikTok', value: 'tiktok' },
+                      { label: '📷 Instagram', value: 'instagram' },
+                      { label: '▶️ Shorts', value: 'youtube_shorts' },
+                      { label: '📘 Facebook', value: 'facebook' },
+                    ]}
+                    size="middle"
+                  />
+                </div>
+
+                {/* Sort control */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Text style={{ fontSize: '12.5px', color: 'var(--ac-sub)', fontWeight: 500 }}>Sort:</Text>
+                  <Segmented
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    size="small"
-                    buttonStyle="solid"
-                    style={{
-                      ['--ant-radio-button-bg' as string]: 'transparent',
-                      ['--ant-radio-button-checked-bg' as string]: '#1890ff',
-                      ['--ant-radio-button-color' as string]: 'var(--ac-sub)',
-                      ['--ant-radio-button-checked-color' as string]: '#ffffff'
-                    }}
-                  >
-                    <Radio.Button 
-                       value="time" 
-                       style={{ 
-                         fontSize: '13px',
-                         height: '32px',
-                         lineHeight: '30px',
-                         padding: '0 16px',
-                         background: sortBy === 'time' ? 'var(--ac-cta-bg)' : 'var(--ac-line)',
-                         border: sortBy === 'time' ? '1px solid #1890ff' : '1px solid var(--ac-line)',
-                         color: sortBy === 'time' ? '#ffffff' : 'var(--ac-sub)',
-                         borderRadius: '6px 0 0 6px',
-                         fontWeight: sortBy === 'time' ? 600 : 400,
-                         boxShadow: sortBy === 'time' ? '0 2px 8px rgba(24, 144, 255, 0.3)' : 'none',
-                         transition: 'all 0.2s ease'
-                       }}
-                     >
-                       时间
-                     </Radio.Button>
-                     <Radio.Button 
-                       value="score" 
-                       style={{ 
-                         fontSize: '13px',
-                         height: '32px',
-                         lineHeight: '30px',
-                         padding: '0 16px',
-                         background: sortBy === 'score' ? 'var(--ac-cta-bg)' : 'var(--ac-line)',
-                         border: sortBy === 'score' ? '1px solid #1890ff' : '1px solid var(--ac-line)',
-                         borderLeft: 'none',
-                         color: sortBy === 'score' ? '#ffffff' : 'var(--ac-sub)',
-                         borderRadius: '0 6px 6px 0',
-                         fontWeight: sortBy === 'score' ? 600 : 400,
-                         boxShadow: sortBy === 'score' ? '0 2px 8px rgba(24, 144, 255, 0.3)' : 'none',
-                         transition: 'all 0.2s ease'
-                       }}
-                     >
-                       评分
-                     </Radio.Button>
-                  </Radio.Group>
+                    onChange={(val) => setSortBy(val as 'time' | 'score')}
+                    options={[
+                      { label: 'Score', value: 'score' },
+                      { label: 'Time', value: 'time' },
+                    ]}
+                    size="middle"
+                  />
                 </div>
                 
                 <Space>
+                  {currentProject.clips && currentProject.clips.length > 0 && (
+                    <Dropdown menu={{ items: zipMenuItems }} trigger={['click']}>
+                      <Button
+                        icon={<DownloadOutlined />}
+                        loading={exportingZip}
+                        style={{
+                          borderRadius: '8px',
+                          background: 'var(--ac-line-2)',
+                          border: '1px solid var(--ac-line)',
+                          color: 'var(--ac-ink)',
+                          fontWeight: 500,
+                          height: '36px',
+                          padding: '0 14px',
+                          fontSize: '13px'
+                        }}
+                      >
+                        Download (ZIP) <DownOutlined style={{ fontSize: '10px' }} />
+                      </Button>
+                    </Dropdown>
+                  )}
                   {(!currentProject.collections || currentProject.collections.length === 0) && (
                     <Button 
                       type="primary" 
@@ -430,12 +496,12 @@ const ProjectDetailPage: React.FC = () => {
                         background: 'var(--ac-accent)',
                         border: 'none',
                         fontWeight: 500,
-                        height: '40px',
-                        padding: '0 20px',
-                        fontSize: '14px'
+                        height: '36px',
+                        padding: '0 18px',
+                        fontSize: '13px'
                       }}
                     >
-                      创建合集
+                      Create Collection
                     </Button>
                   )}
                 </Space>
@@ -458,8 +524,10 @@ const ProjectDetailPage: React.FC = () => {
                     projectId={currentProject.id}
                     videoUrl={projectApi.getClipVideoUrl(currentProject.id, clip.id, clip.title || clip.generated_title)}
                     onDownload={(clipId) => projectApi.downloadVideo(currentProject.id, clipId)}
+                    activePlatformProp={globalPlatform}
+                    onPlatformChange={(plat) => setGlobalPlatform(plat)}
                     onClipUpdate={(clipId: string, updates: Partial<Clip>) => {
-                      // 更新本地状态
+                      // Update local state
                       if (currentProject) {
                         const updatedProject = {
                           ...currentProject,
@@ -483,7 +551,7 @@ const ProjectDetailPage: React.FC = () => {
               }}>
                 <Empty 
                   description={
-                    <Text style={{ color: '#888', fontSize: '14px' }}>暂无视频片段</Text>
+                    <Text style={{ color: '#888', fontSize: '14px' }}>No video clips yet</Text>
                   }
                   image={<PlayCircleOutlined style={{ fontSize: '48px', color: '#555' }} />}
                 />
@@ -493,21 +561,21 @@ const ProjectDetailPage: React.FC = () => {
         </div>
       ) : (
         <div>
-          {/* 任务管理组件 */}
+          {/* Task management component */}
           <ProjectTaskManager 
             projectId={currentProject.id} 
             projectName={currentProject.name}
           />
           
-          {/* 项目状态提示 */}
+          {/* Project status indicator */}
           <Card style={{ marginTop: '16px' }}>
             <Empty 
               image={<PlayCircleOutlined style={{ fontSize: '64px', color: '#d9d9d9' }} />}
               description={
                 <div>
-                  <Text>项目还未完成处理</Text>
+                  <Text>Project processing is not complete yet</Text>
                   <br />
-                  <Text type="secondary">处理完成后可查看视频片段和AI合集</Text>
+                  <Text type="secondary">Clips and AI collections will appear here once finished.</Text>
                 </div>
               }
             />
@@ -515,7 +583,7 @@ const ProjectDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* 创建合集模态框 */}
+      {/* Create collection modal */}
       <CreateCollectionModal
         visible={showCreateCollection}
         clips={currentProject.clips || []}
@@ -523,7 +591,7 @@ const ProjectDetailPage: React.FC = () => {
         onCreate={handleCreateCollection}
       />
       
-      {/* 合集预览模态框 */}
+      {/* Collection preview modal */}
       <CollectionPreviewModal
         visible={showCollectionDetail}
         collection={selectedCollection}

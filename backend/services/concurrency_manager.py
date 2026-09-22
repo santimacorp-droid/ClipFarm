@@ -1,6 +1,6 @@
 """
-并发控制管理器
-处理任务并发和锁控制
+Concurrent control manager
+Handle task concurrency and lock control
 """
 
 import logging
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class LockInfo:
-    """锁信息"""
+    """Lock information"""
     resource_id: str
     task_id: str
     acquired_at: datetime
@@ -27,43 +27,43 @@ class LockInfo:
 
 
 class ConcurrencyManager:
-    """并发控制管理器"""
+    """Concurrent control manager"""
     
     def __init__(self):
         self._locks: Dict[str, LockInfo] = {}
-        self._lock = threading.RLock()  # 用于保护内部状态
+        self._lock = threading.RLock()  # For protecting internal state
     
     def acquire_lock(self, resource_id: str, task_id: str, timeout_seconds: int = 30) -> bool:
         """
-        获取锁
+        Get lock
         
         Args:
-            resource_id: 资源ID
-            task_id: 任务ID
-            timeout_seconds: 超时时间（秒）
+            resource_id: resource ID
+            task_id: task ID
+            timeout_seconds: timeout time (seconds)
             
         Returns:
-            是否成功获取锁
+            Whether lock acquired successfully
         """
         with self._lock:
-            # 检查资源是否已被锁定
+            # Check whether the resource has been locked
             if resource_id in self._locks:
                 existing_lock = self._locks[resource_id]
                 
-                # 检查锁是否已超时
+                # Check whether lock has timed out
                 if datetime.now() - existing_lock.acquired_at > existing_lock.timeout:
-                    logger.warning(f"锁已超时，强制释放: {resource_id}")
+                    logger.warning(f"Lock has expired; forcefully releasing: {resource_id}")
                     self._release_lock_internal(resource_id)
                 else:
-                    # 检查是否为同一任务
+                    # Check if it is the same task
                     if existing_lock.task_id == task_id:
-                        logger.debug(f"任务 {task_id} 已持有锁: {resource_id}")
+                        logger.debug(f"Task {task_id} Already holding lock: {resource_id}")
                         return True
                     else:
-                        logger.warning(f"资源 {resource_id} 已被任务 {existing_lock.task_id} 锁定")
+                        logger.warning(f"Resource {resource_id} Already occupied by a task {existing_lock.task_id} Locked")
                         return False
             
-            # 创建新锁
+            # Create new lock
             lock_info = LockInfo(
                 resource_id=resource_id,
                 task_id=task_id,
@@ -72,50 +72,50 @@ class ConcurrencyManager:
             )
             
             self._locks[resource_id] = lock_info
-            logger.info(f"任务 {task_id} 成功获取锁: {resource_id}")
+            logger.info(f"Task {task_id} SuccessfulGet lock: {resource_id}")
             return True
     
     def release_lock(self, resource_id: str, task_id: str) -> bool:
         """
-        释放锁
+        Release lock
         
         Args:
-            resource_id: 资源ID
-            task_id: 任务ID
+            resource_id: resource ID
+            task_id: task ID
             
         Returns:
-            是否成功释放锁
+            Whether lock released successfully
         """
         with self._lock:
             if resource_id not in self._locks:
-                logger.warning(f"尝试释放不存在的锁: {resource_id}")
+                logger.warning(f"Attempting to release an existing lock: {resource_id}")
                 return False
             
             lock_info = self._locks[resource_id]
             if lock_info.task_id != task_id:
-                logger.warning(f"任务 {task_id} 尝试释放不属于自己的锁: {resource_id}")
+                logger.warning(f"Task {task_id} Attempting to release a lock that does not belong to this process: {resource_id}")
                 return False
             
             return self._release_lock_internal(resource_id)
     
     def _release_lock_internal(self, resource_id: str) -> bool:
-        """内部释放锁方法"""
+        """Internal method for releasing lock"""
         if resource_id in self._locks:
             lock_info = self._locks[resource_id]
             lock_info.is_released = True
             del self._locks[resource_id]
-            logger.info(f"锁已释放: {resource_id}")
+            logger.info(f"Lock released: {resource_id}")
             return True
         return False
     
     def is_locked(self, resource_id: str) -> bool:
-        """检查资源是否被锁定"""
+        """Check whether the resource is locked"""
         with self._lock:
             if resource_id not in self._locks:
                 return False
             
             lock_info = self._locks[resource_id]
-            # 检查是否超时
+            # Check whether timeout occurred
             if datetime.now() - lock_info.acquired_at > lock_info.timeout:
                 self._release_lock_internal(resource_id)
                 return False
@@ -123,7 +123,7 @@ class ConcurrencyManager:
             return True
     
     def get_lock_info(self, resource_id: str) -> Optional[Dict[str, Any]]:
-        """获取锁信息"""
+        """Get lock information"""
         with self._lock:
             if resource_id not in self._locks:
                 return None
@@ -138,7 +138,7 @@ class ConcurrencyManager:
             }
     
     def cleanup_expired_locks(self):
-        """清理过期的锁"""
+        """Clean up expired locks"""
         with self._lock:
             current_time = datetime.now()
             expired_resources = []
@@ -149,10 +149,10 @@ class ConcurrencyManager:
             
             for resource_id in expired_resources:
                 self._release_lock_internal(resource_id)
-                logger.info(f"清理过期锁: {resource_id}")
+                logger.info(f"Cleaning up expired locks: {resource_id}")
     
     def get_all_locks(self) -> Dict[str, Dict[str, Any]]:
-        """获取所有锁信息"""
+        """Get all lock information"""
         with self._lock:
             return {
                 resource_id: self.get_lock_info(resource_id)
@@ -162,17 +162,17 @@ class ConcurrencyManager:
     @contextmanager
     def lock_context(self, resource_id: str, task_id: str, timeout_seconds: int = 30):
         """
-        锁上下文管理器
+        Lock context manager
         
         Usage:
             with concurrency_manager.lock_context("project_123", "task_456"):
-                # 执行需要锁保护的操作
+                # Perform operations that require locking protection
                 pass
         """
         try:
             if not self.acquire_lock(resource_id, task_id, timeout_seconds):
                 raise ConcurrentError(
-                    f"无法获取锁: {resource_id}",
+                    f"Unable toGet lock: {resource_id}",
                     resource=resource_id,
                     details={"task_id": task_id, "timeout": timeout_seconds}
                 )
@@ -182,7 +182,7 @@ class ConcurrencyManager:
 
 
 class TaskScheduler:
-    """任务调度器"""
+    """Task scheduler"""
     
     def __init__(self, concurrency_manager: ConcurrencyManager):
         self.concurrency_manager = concurrency_manager
@@ -190,14 +190,14 @@ class TaskScheduler:
         self._lock = threading.RLock()
     
     def can_start_task(self, project_id: str, task_id: str) -> bool:
-        """检查是否可以启动任务"""
+        """Check if the task can be started"""
         resource_id = f"project_{project_id}"
         
-        # 检查项目是否已被锁定
+        # Check if the project is locked
         if self.concurrency_manager.is_locked(resource_id):
             return False
         
-        # 检查任务是否已在运行
+        # Check if the task is already running
         with self._lock:
             if task_id in self._running_tasks:
                 return False
@@ -205,17 +205,17 @@ class TaskScheduler:
         return True
     
     def start_task(self, project_id: str, task_id: str, task_info: Dict[str, Any]) -> bool:
-        """启动任务"""
+        """Start task"""
         resource_id = f"project_{project_id}"
         
         if not self.can_start_task(project_id, task_id):
             return False
         
-        # 获取锁
+        # Get lock
         if not self.concurrency_manager.acquire_lock(resource_id, task_id):
             return False
         
-        # 记录运行中的任务
+        # Log running tasks
         with self._lock:
             self._running_tasks[task_id] = {
                 "project_id": project_id,
@@ -224,65 +224,65 @@ class TaskScheduler:
                 "task_info": task_info
             }
         
-        logger.info(f"任务已启动: {task_id} (项目: {project_id})")
+        logger.info(f"Task started: {task_id} (Project: {project_id})")
         return True
     
     def finish_task(self, project_id: str, task_id: str):
-        """完成任务"""
+        """Task completed"""
         resource_id = f"project_{project_id}"
         
-        # 释放锁
+        # Release lock
         self.concurrency_manager.release_lock(resource_id, task_id)
         
-        # 移除运行中的任务记录
+        # Remove the record of the running task
         with self._lock:
             if task_id in self._running_tasks:
                 del self._running_tasks[task_id]
         
-        logger.info(f"任务已完成: {task_id} (项目: {project_id})")
+        logger.info(f"Task completed: {task_id} (Project: {project_id})")
     
     def get_running_tasks(self) -> Dict[str, Dict[str, Any]]:
-        """获取运行中的任务"""
+        """Get running tasks"""
         with self._lock:
             return self._running_tasks.copy()
     
     def is_task_running(self, task_id: str) -> bool:
-        """检查任务是否在运行"""
+        """Check whether task is running"""
         with self._lock:
             return task_id in self._running_tasks
 
 
-# 全局并发管理器实例
+# GlobalConcurrencyManager instance
 concurrency_manager = ConcurrencyManager()
 task_scheduler = TaskScheduler(concurrency_manager)
 
 
 def with_concurrency_control(resource_id_func: Callable = None):
     """
-    并发控制装饰器
+    Concurrent control decorator
     
     Args:
-        resource_id_func: 生成资源ID的函数，默认为使用project_id
+        resource_id_func: function for generating resource IDs (default: uses project_id)
         
     Usage:
         @with_concurrency_control()
         def process_project(project_id: str, task_id: str, ...):
-            # 函数体
+            # Function body
             pass
         
         @with_concurrency_control(lambda ctx: f"custom_{ctx.project_id}")
         def custom_process(ctx: ProcessingContext):
-            # 函数体
+            # Function body
             pass
     """
     def decorator(func):
         def wrapper(*args, **kwargs):
-            # 尝试从参数中提取project_id和task_id
+            # Attempt to extract project_id and task_id from parameters
             project_id = None
             task_id = None
             context = None
             
-            # 检查是否有ProcessingContext参数
+            # Check for ProcessingContext parameter
             for arg in args:
                 if hasattr(arg, 'project_id') and hasattr(arg, 'task_id'):
                     context = arg
@@ -290,48 +290,48 @@ def with_concurrency_control(resource_id_func: Callable = None):
                     task_id = context.task_id
                     break
             
-            # 如果没有找到context，尝试从kwargs中获取
+            # If no context is found, attempt to retrieve from kwargs
             if not project_id:
                 project_id = kwargs.get('project_id')
                 task_id = kwargs.get('task_id')
             
-            # 如果还是没有找到，尝试从函数签名中获取第一个参数作为project_id
+            # If still not found, attempt to retrieve the first parameter from the function signature as project_id
             if not project_id and len(args) > 0:
                 project_id = str(args[0])
-                # 生成一个临时的task_id
+                # Generate a temporary task_id
                 task_id = f"temp_task_{project_id}"
             
             if not project_id:
-                raise ValueError("无法确定project_id和task_id")
+                raise ValueError("Unable to determine project_id and task_id")
             
-            # 生成资源ID
+            # Generate resource ID
             if resource_id_func:
                 resource_id = resource_id_func(context or project_id)
             else:
                 resource_id = f"project_{project_id}"
             
-            # 检查是否可以启动任务
+            # Check if the task can be started
             if not task_scheduler.can_start_task(project_id, task_id):
                 raise ConcurrentError(
-                    f"项目 {project_id} 正在被其他任务处理",
+                    f"Project {project_id} Currently being processed by another task",
                     resource=resource_id,
                     details={"project_id": project_id, "task_id": task_id}
                 )
             
-            # 启动任务
+            # Start task
             if not task_scheduler.start_task(project_id, task_id, {"function": func.__name__}):
                 raise ConcurrentError(
-                    f"无法启动任务: {task_id}",
+                    f"Unable toStart task: {task_id}",
                     resource=resource_id,
                     details={"project_id": project_id, "task_id": task_id}
                 )
             
             try:
-                # 执行函数
+                # Execute function
                 result = func(*args, **kwargs)
                 return result
             finally:
-                # 完成任务
+                # Task completed
                 task_scheduler.finish_task(project_id, task_id)
         
         return wrapper

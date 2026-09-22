@@ -1,10 +1,7 @@
 # AutoClip
 
 ## Design System
-做任何视觉/UI 决策前，先读 `DESIGN.md`。所有配色、字体、间距、圆角、状态表达、按钮样式都以它为准。
-未经明确同意不要偏离。代码审查时，发现不符合 `DESIGN.md` 的实现要标出来。
-
-方向一句话：**克制专业 / Calm Premium（参考 Dia Browser）**——安静、留白多、近乎全单色、只用一个克制的蓝做强调。不要玩具撞色、彩色 chip、紫色渐变、霓虹、死黑。
+For any visual/UI Before decisions, read first `DESIGN.md`. All color, font, spacing, corner radius, status expression, and button styles follow this standard. Do not deviate without explicit agreement. Non-compliance will be noted during code review. `DESIGN.md` Implementation must be indicated.: **Restraint professionalism / Calm Premium(Reference Dia Browser)**——Clean, with ample white space, almost monochrome, using only one restrained blue for emphasis. No toyish color clashes or full color. chip, Purple gradient, neon, pure black. 
 
 ## Roadmap
-产品长期规划见 `ROADMAP.md`（账号 / 埋点 / 商业化分阶段）。当前阶段与现状见 `HANDOFF.md`。
+Product long-term roadmap see `ROADMAP.md`(Account / Tracking code / Commercialization phased approach). Current phase and situation see `HANDOFF.md`. 

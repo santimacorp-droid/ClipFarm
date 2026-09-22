@@ -1,6 +1,5 @@
 """
-调试API接口
-用于测试和调试功能
+DebugAPIInterface for testing and debugging functionality
 """
 
 import json
@@ -15,25 +14,25 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 class PublishMessage(BaseModel):
-    """发布消息模型"""
+    """Message publication model"""
     task_id: str
     progress: int
     step: int = 1
     total: int = 6
     phase: str = "test"
-    message: str = "调试消息"
+    message: str = "Debug message"
     status: str = "PROGRESS"
     seq: int = 1
     meta: Dict[str, Any] = {}
 
 @router.post("/debug/publish")
 async def debug_publish_message(message: PublishMessage):
-    """调试接口：发布进度消息到Redis"""
+    """Debug interface: Publish progress message toRedis"""
     try:
-        # 连接Redis
+        # ConnectRedis
         redis_client = redis.from_url(get_redis_url(), decode_responses=True)
         
-        # 构建消息
+        # Build message
         import time
         full_message = {
             "task_id": message.task_id,
@@ -48,13 +47,13 @@ async def debug_publish_message(message: PublishMessage):
             "meta": message.meta
         }
         
-        # 发布到Redis
+        # Published toRedis
         channel = f"progress:{message.task_id}"
         result = await redis_client.publish(channel, json.dumps(full_message))
         
         await redis_client.aclose()
         
-        logger.info(f"调试发布消息: {channel} -> {result} 个订阅者")
+        logger.info(f"Debug published message: {channel} -> {result} subscriptions")
         
         return {
             "success": True,
@@ -64,12 +63,12 @@ async def debug_publish_message(message: PublishMessage):
         }
         
     except Exception as e:
-        logger.error(f"调试发布消息失败: {e}")
-        raise HTTPException(status_code=500, detail=f"发布失败: {str(e)}")
+        logger.error(f"Debug publish message failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Publication failed: {str(e)}")
 
 @router.get("/debug/subscriptions")
 async def debug_get_subscriptions():
-    """调试接口：获取当前订阅状态"""
+    """Debug interface: Get current subscription status"""
     try:
         from ...services.websocket_gateway_service import websocket_gateway_service
         
@@ -82,20 +81,20 @@ async def debug_get_subscriptions():
             }
             
     except Exception as e:
-        logger.error(f"获取订阅状态失败: {e}")
-        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+        logger.error(f"Failed to get subscription status: {e}")
+        raise HTTPException(status_code=500, detail=f"Retrieve failed: {str(e)}")
 
 @router.get("/debug/redis-info")
 async def debug_redis_info():
-    """调试接口：获取Redis连接信息"""
+    """Debug interface: GetRedisConnection information"""
     try:
         redis_url = get_redis_url()
         redis_client = redis.from_url(redis_url, decode_responses=True)
         
-        # 测试连接
+        # Test connection
         await redis_client.ping()
         
-        # 获取信息
+        # Get information
         info = await redis_client.info()
         
         await redis_client.aclose()
@@ -109,6 +108,6 @@ async def debug_redis_info():
         }
         
     except Exception as e:
-        logger.error(f"获取Redis信息失败: {e}")
-        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+        logger.error(f"GetRedisInformation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Retrieve failed: {str(e)}")
 

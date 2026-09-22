@@ -31,7 +31,7 @@ class TaskPriority(Enum):
     URGENT = 4
 
 class UploadTask:
-    """上传任务类"""
+    """Upload Task Class"""
     def __init__(self, task_id: str, video_path: str, title: str, 
                  description: str = "", tags: str = "", 
                  account_id: Optional[int] = None, priority: TaskPriority = TaskPriority.NORMAL):
@@ -71,7 +71,7 @@ class UploadTask:
         }
 
 class UploadQueueService:
-    """上传队列管理服务"""
+    """Upload queue management service"""
     
     def __init__(self, db: Session):
         self.db = db
@@ -79,12 +79,12 @@ class UploadQueueService:
         self.bilibili_upload_service = BilibiliUploadService(db)
         self.task_queue: Dict[str, UploadTask] = {}
         self.processing_tasks: Dict[str, UploadTask] = {}
-        self.max_concurrent_uploads = 3  # 最大并发上传数
+        self.max_concurrent_uploads = 3  # Maximum concurrent uploads limit reached
         
     def add_task(self, video_path: str, title: str, description: str = "", 
                  tags: str = "", account_id: Optional[int] = None, 
                  priority: TaskPriority = TaskPriority.NORMAL) -> str:
-        """添加上传任务"""
+        """Adding upload task"""
         try:
             task_id = str(uuid4())
             task = UploadTask(
@@ -97,63 +97,63 @@ class UploadQueueService:
                 priority=priority
             )
             
-            # 验证视频文件
+            # Validating video file
             import os
             if not os.path.exists(video_path):
-                raise ValueError(f"视频文件不存在: {video_path}")
+                raise ValueError(f"Video file does not exist: {video_path}")
             
-            # 如果没有指定账号，自动选择最佳账号
+            # If no account is specified, automatically select the best account
             if not account_id:
                 best_account = self.bilibili_account_service.select_best_account()
                 if not best_account:
-                    raise ValueError("没有可用的B站账号")
+                    raise ValueError("No available Bilibili accounts")
                 task.account_id = best_account.id
             
             self.task_queue[task_id] = task
             task.status = TaskStatus.QUEUED
             
-            logger.info(f"添加上传任务: {task_id} - {title}")
+            logger.info(f"Adding upload task: {task_id} - {title}")
             
-            # 尝试立即处理任务
+            # Attempt immediate task processing
             asyncio.create_task(self._process_queue())
             
             return task_id
             
         except Exception as e:
-            logger.error(f"添加上传任务失败: {e}")
+            logger.error(f"Failed to add upload task: {e}")
             raise
     
     def add_batch_tasks(self, tasks_data: List[Dict[str, Any]]) -> List[str]:
-        """批量添加上传任务"""
+        """Batch add upload tasks"""
         try:
             task_ids = []
             
-            # 为批量任务分配账号
+            # Account assignment for batch tasks
             accounts = self.bilibili_account_service.rotate_accounts_for_batch_upload(len(tasks_data))
             
             for i, task_data in enumerate(tasks_data):
-                # 分配账号
+                # Assign account
                 if i < len(accounts):
                     task_data['account_id'] = accounts[i].id
                 
                 task_id = self.add_task(**task_data)
                 task_ids.append(task_id)
             
-            logger.info(f"批量添加 {len(task_ids)} 个上传任务")
+            logger.info(f"Batch add {len(task_ids)} upload tasks")
             return task_ids
             
         except Exception as e:
-            logger.error(f"批量添加上传任务失败: {e}")
+            logger.error(f"Batch add upload task failed: {e}")
             raise
     
     async def _process_queue(self):
-        """处理任务队列"""
+        """Processing task queue"""
         try:
-            # 检查是否有空闲的处理槽位
+            # Check if there are idle processing slots
             if len(self.processing_tasks) >= self.max_concurrent_uploads:
                 return
             
-            # 获取待处理的任务（按优先级排序）
+            # Get unprocessed tasks (sorted by priority)
             pending_tasks = [
                 task for task in self.task_queue.values() 
                 if task.status == TaskStatus.QUEUED
@@ -162,31 +162,31 @@ class UploadQueueService:
             if not pending_tasks:
                 return
             
-            # 按优先级和创建时间排序
+            # Sort by priority and creation time
             pending_tasks.sort(key=lambda t: (-t.priority.value, t.created_at))
             
-            # 处理任务
+            # Process task
             available_slots = self.max_concurrent_uploads - len(self.processing_tasks)
             for task in pending_tasks[:available_slots]:
                 await self._start_task(task)
                 
         except Exception as e:
-            logger.error(f"处理任务队列失败: {e}")
+            logger.error(f"Task queue processing failed: {e}")
     
     async def _start_task(self, task: UploadTask):
-        """启动单个任务"""
+        """Starting individual task"""
         try:
             task.status = TaskStatus.PROCESSING
             task.updated_at = datetime.now()
             
-            # 移动到处理队列
+            # Moving to processing queue
             self.processing_tasks[task.task_id] = task
             if task.task_id in self.task_queue:
                 del self.task_queue[task.task_id]
             
-            logger.info(f"开始处理上传任务: {task.task_id}")
+            logger.info(f"Start uploading task: {task.task_id}")
             
-            # 提交到Celery
+            # Submit to Celery
             celery_task = upload_video_task.delay(
                 task.task_id,
                 task.video_path,
@@ -199,30 +199,30 @@ class UploadQueueService:
             task.celery_task_id = celery_task.id
             
         except Exception as e:
-            logger.error(f"启动任务失败: {e}")
+            logger.error(f"Failed to start task: {e}")
             task.status = TaskStatus.FAILED
             task.error_message = str(e)
             self._move_task_to_completed(task)
     
     def _move_task_to_completed(self, task: UploadTask):
-        """将任务移动到完成状态"""
+        """Move task to completed state"""
         task.updated_at = datetime.now()
         
-        # 从处理队列中移除
+        # Removing from processing queue
         if task.task_id in self.processing_tasks:
             del self.processing_tasks[task.task_id]
         
-        # 继续处理队列中的其他任务
+        # Continue processing other tasks in the queue
         asyncio.create_task(self._process_queue())
     
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
-        """获取任务状态"""
+        """Failed to get task status"""
         try:
-            # 先在处理队列中查找
+            # First look in the processing queue
             if task_id in self.processing_tasks:
                 task = self.processing_tasks[task_id]
                 
-                # 检查Celery任务状态
+                # Check Celery task status
                 if task.celery_task_id:
                     celery_task = celery_app.AsyncResult(task.celery_task_id)
                     if celery_task.state == 'SUCCESS':
@@ -241,11 +241,11 @@ class UploadQueueService:
                 
                 return task.to_dict()
             
-            # 在等待队列中查找
+            # Looking up in waiting queue
             if task_id in self.task_queue:
                 return self.task_queue[task_id].to_dict()
             
-            # 在数据库中查找已完成的任务
+            # Look up completed tasks in database
             upload_record = self.db.query(BilibiliUploadRecord).filter(
                 BilibiliUploadRecord.task_id == task_id
             ).first()
@@ -264,41 +264,41 @@ class UploadQueueService:
             return None
             
         except Exception as e:
-            logger.error(f"获取任务状态失败: {e}")
+            logger.error(f"Failed to get task status: {e}")
             return None
     
     def cancel_task(self, task_id: str) -> bool:
-        """取消任务"""
+        """Cancel task"""
         try:
-            # 在等待队列中取消
+            # Cancel in waiting queue
             if task_id in self.task_queue:
                 task = self.task_queue[task_id]
                 task.status = TaskStatus.CANCELLED
                 del self.task_queue[task_id]
-                logger.info(f"取消等待中的任务: {task_id}")
+                logger.info(f"Cancel pending task: {task_id}")
                 return True
             
-            # 在处理队列中取消
+            # Canceling task in queue
             if task_id in self.processing_tasks:
                 task = self.processing_tasks[task_id]
                 
-                # 取消Celery任务
+                # Cancel Celery task
                 if task.celery_task_id:
                     celery_app.control.revoke(task.celery_task_id, terminate=True)
                 
                 task.status = TaskStatus.CANCELLED
                 self._move_task_to_completed(task)
-                logger.info(f"取消处理中的任务: {task_id}")
+                logger.info(f"Cancelling task currently being processed: {task_id}")
                 return True
             
             return False
             
         except Exception as e:
-            logger.error(f"取消任务失败: {e}")
+            logger.error(f"Canceling task failed: {e}")
             return False
     
     def get_queue_status(self) -> Dict[str, Any]:
-        """获取队列状态"""
+        """Failed to get queue status"""
         try:
             queued_count = len([t for t in self.task_queue.values() if t.status == TaskStatus.QUEUED])
             processing_count = len(self.processing_tasks)
@@ -328,24 +328,24 @@ class UploadQueueService:
             }
             
         except Exception as e:
-            logger.error(f"获取队列状态失败: {e}")
+            logger.error(f"Failed to get queue status: {e}")
             return {"error": str(e)}
 
-# Celery任务定义
+# Celery task definition
 @celery_app.task(bind=True)
 def upload_video_task(self, task_id: str, video_path: str, title: str, 
                      description: str, tags: str, account_id: int):
-    """Celery上传任务"""
+    """CeleryUpload task"""
     try:
-        # 更新任务进度
+        # Updating task progress
         self.update_state(state='PROGRESS', meta={'progress': 10})
         
-        # 获取数据库会话
+        # Error occurred while getting database session
         db = next(get_db())
         bilibili_upload_service = BilibiliUploadService(db)
         bilibili_account_service = BilibiliAccountService(db)
         
-        # 准备上传数据
+        # Preparing upload data
         clip_data = {
             'video_path': video_path,
             'title': title,
@@ -353,10 +353,10 @@ def upload_video_task(self, task_id: str, video_path: str, title: str,
             'tags': tags
         }
         
-        # 更新进度
+        # Update progress
         self.update_state(state='PROGRESS', meta={'progress': 30})
         
-        # 执行上传 - 使用线程池避免事件循环冲突
+        # Upload execution - use thread pool to avoid event loop conflict
         import concurrent.futures
         
         def run_async_upload():
@@ -368,11 +368,11 @@ def upload_video_task(self, task_id: str, video_path: str, title: str,
             future = executor.submit(run_async_upload)
             upload_record = future.result()
         
-        # 更新任务ID
+        # Updating task ID
         upload_record.task_id = task_id
         db.commit()
         
-        # 更新账号使用时间
+        # Update account usage time
         bilibili_account_service.update_account_usage(account_id)
         
         if upload_record.status == 'completed':
@@ -383,8 +383,8 @@ def upload_video_task(self, task_id: str, video_path: str, title: str,
                 'upload_record_id': upload_record.id
             }
         else:
-            raise Exception(upload_record.error_message or "上传失败")
+            raise Exception(upload_record.error_message or "Upload failed")
             
     except Exception as e:
-        logger.error(f"Celery上传任务失败: {e}")
+        logger.error(f"CeleryUpload task failed: {e}")
         raise self.retry(exc=e, countdown=60, max_retries=3)

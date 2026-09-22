@@ -1,6 +1,5 @@
 """
-设置管理API端点
-为Desktop客户端提供设置管理功能
+Setting managementAPIEndpoint forDesktopClient provides settings management functionality.
 """
 
 import os
@@ -22,130 +21,135 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 class BasicSettings(BaseModel):
-    """基础设置"""
-    app_name: str = Field(default="AutoClip Desktop", description="应用名称")
-    app_version: str = Field(default="1.0.0", description="应用版本")
-    debug_mode: bool = Field(default=False, description="调试模式")
-    auto_start: bool = Field(default=True, description="自动启动")
+    """Base settings"""
+    app_name: str = Field(default="AutoClip Desktop", description="App name")
+    app_version: str = Field(default="1.0.0", description="App version")
+    debug_mode: bool = Field(default=False, description="Debug mode")
+    auto_start: bool = Field(default=True, description="Automatic startup")
 
 
 class ServiceSettings(BaseModel):
-    """服务设置"""
-    host: str = Field(default="127.0.0.1", description="服务主机")
-    port: int = Field(default=8000, description="服务端口")
-    max_memory_usage: int = Field(default=2048, description="最大内存使用(MB)")
+    """Service settings"""
+    host: str = Field(default="127.0.0.1", description="Service host")
+    port: int = Field(default=8000, description="Service port")
+    max_memory_usage: int = Field(default=2048, description="Maximum memory usage(MB)")
     
     @validator('port')
     def validate_port(cls, v):
         if not 1024 <= v <= 65535:
-            raise ValueError('端口号必须在1024-65535之间')
+            raise ValueError('Port number must be between1024-65535between')
         return v
     
     @validator('max_memory_usage')
     def validate_memory(cls, v):
         if not 512 <= v <= 8192:
-            raise ValueError('内存使用限制必须在512-8192MB之间')
+            raise ValueError('Memory usage limit must be between...512-8192MBbetween')
         return v
 
 
 class ApiKeys(BaseModel):
-    """API密钥设置"""
-    dashscope: str = Field(default="", description="通义千问API密钥")
-    openai: str = Field(default="", description="OpenAI API密钥")
-    gemini: str = Field(default="", description="Gemini API密钥")
-    siliconflow: str = Field(default="", description="SiliconFlow API密钥")
-    jimeng_access: str = Field(default="", description="即梦AI访问密钥")
-    jimeng_secret: str = Field(default="", description="即梦AI秘密密钥")
+    """APIKey settings"""
+    dashscope: str = Field(default="", description="Tongyi Qianwen API key")
+    openai: str = Field(default="", description="OpenAI API key")
+    gemini: str = Field(default="", description="Gemini API key")
+    anthropic: str = Field(default="", description="Anthropic Claude API key")
+    deepseek: str = Field(default="", description="DeepSeek API key")
+    openrouter: str = Field(default="", description="OpenRouter API key")
+    groq: str = Field(default="", description="Groq API key")
+    siliconflow: str = Field(default="", description="SiliconFlow API key")
+    custom: str = Field(default="", description="Custom OpenAI-compatible API key")
+    ollama: str = Field(default="", description="Local Ollama API key (optional)")
+    lmstudio: str = Field(default="", description="Local LM Studio API key (optional)")
+    jimeng_access: str = Field(default="", description="DreamAI Access key")
+    jimeng_secret: str = Field(default="", description="DreamAI Secret key")
 
 
 class ApiSettings(BaseModel):
-    """API设置"""
-    api_keys: ApiKeys = Field(default_factory=ApiKeys, description="API密钥")
-    api_model: str = Field(default="qwen-plus", description="默认模型")
-    api_max_tokens: int = Field(default=4096, description="最大Token数")
-    api_timeout: int = Field(default=30, description="API超时时间(秒)")
+    """API set"""
+    api_keys: ApiKeys = Field(default_factory=ApiKeys, description="API key")
+    api_model: str = Field(default="qwen-plus", description="Default model")
+    api_max_tokens: int = Field(default=4096, description="maximum Token number")
+    api_timeout: int = Field(default=30, description="API Timeout (seconds)")
+    custom_base_url: str = Field(default="", description="Custom or Local API Base URL")
+    llm_provider: str = Field(default="dashscope", description="Active LLM provider")
     
     @validator('api_timeout')
     def validate_timeout(cls, v):
         if not 5 <= v <= 300:
-            raise ValueError('API超时时间必须在5-300秒之间')
+            raise ValueError('API Timeout must be between 5-300 seconds')
         return v
 
 
 class ProcessingSettings(BaseModel):
-    """处理设置"""
-    processing_chunk_size: int = Field(default=5000, description="处理块大小")
-    processing_min_score: float = Field(default=0.7, description="最小评分阈值")
-    processing_max_clips: int = Field(default=5, description="合集最大切片数")
-    processing_max_retries: int = Field(default=3, description="最大重试次数")
+    """Processing settings"""
+    processing_chunk_size: int = Field(default=5000, description="Processing block size")
+    processing_min_score: float = Field(default=0.7, description="Minimum rating threshold")
+    processing_max_clips: int = Field(default=5, description="Collection max batch count")
+    processing_max_retries: int = Field(default=3, description="Maximum retry count")
     
     @validator('processing_chunk_size')
     def validate_chunk_size(cls, v):
         if not 1000 <= v <= 10000:
-            raise ValueError('处理块大小必须在1000-10000之间')
+            raise ValueError('Block size must be between1000-10000between')
         return v
     
     @validator('processing_min_score')
     def validate_min_score(cls, v):
         if not 0.1 <= v <= 1.0:
-            raise ValueError('最小评分阈值必须在0.1-1.0之间')
+            raise ValueError('Minimum score threshold must be between...0.1-1.0between')
         return v
 
 
 class LogSettings(BaseModel):
-    """日志设置"""
-    log_level: str = Field(default="INFO", description="日志级别")
-    log_retention_days: int = Field(default=7, description="日志保留天数")
+    """Log settings"""
+    log_level: str = Field(default="INFO", description="Log level")
+    log_retention_days: int = Field(default=7, description="Log retention days")
     
     @validator('log_level')
     def validate_log_level(cls, v):
         if v not in ['DEBUG', 'INFO', 'WARNING', 'ERROR']:
-            raise ValueError('日志级别必须是DEBUG、INFO、WARNING或ERROR')
+            raise ValueError('Log level must be one ofDEBUG, INFO, WARNINGorERROR')
         return v
     
     @validator('log_retention_days')
     def validate_retention_days(cls, v):
         if not 1 <= v <= 30:
-            raise ValueError('日志保留天数必须在1-30天之间')
+            raise ValueError('Log retention days must be between1-30between days')
         return v
 
 
 class PathSettings(BaseModel):
-    """路径设置"""
-    data_directory: str = Field(description="数据目录")
-    cache_directory: str = Field(description="缓存目录")
-    temp_directory: str = Field(description="临时目录")
+    """Path settings"""
+    data_directory: str = Field(description="Data directory")
+    cache_directory: str = Field(description="Cache directory")
+    temp_directory: str = Field(description="Temporary directory")
 
 
 class UpdateDataDirRequest(BaseModel):
-    """更新数据目录请求"""
-    new_data_directory: str = Field(description="新的数据目录路径")
-    migrate: bool = Field(default=True, description="是否迁移旧目录数据")
+    """Update data directory request"""
+    new_data_directory: str = Field(description="New data directory path")
+    migrate: bool = Field(default=True, description="Whether to migrate old directory data.")
 
 
 class DesktopSettings(BaseModel):
-    """完整的Desktop设置"""
+    """completeDesktopset"""
     basic: BasicSettings = Field(default_factory=BasicSettings)
     service: ServiceSettings = Field(default_factory=ServiceSettings)
     api: ApiSettings = Field(default_factory=ApiSettings)
     processing: ProcessingSettings = Field(default_factory=ProcessingSettings)
     logs: LogSettings = Field(default_factory=LogSettings)
-    paths: Optional[PathSettings] = Field(default=None, description="路径设置")
+    paths: Optional[PathSettings] = Field(default=None, description="Path settings")
 
 
-def check_desktop_mode(relaxed: bool = False):
-    """检查是否在Desktop模式
-    relaxed=True 时放宽限制，允许内测安装包/开发环境调用（返回告警但不阻断）。
+def check_desktop_mode(relaxed: bool = True):
+    """Checking if inDesktopMode Web In development mode, loosens restrictions for setting and testing connect interfaces.. 
     """
-    if not is_desktop_mode():
-        if relaxed:
-            return False
-        raise HTTPException(status_code=400, detail="此端点仅在Desktop模式下可用")
+    return True
 
 
 @router.get("/desktop-mode")
 async def check_desktop_mode_endpoint():
-    """检查是否在桌面模式 - 供前端调用"""
+    """Checks whether in desktop mode. Used by front end."""
     return {
         "is_desktop_mode": is_desktop_mode(),
         "environment": {
@@ -158,46 +162,46 @@ async def check_desktop_mode_endpoint():
 
 @router.get("/", response_model=DesktopSettings)
 async def get_settings():
-    """获取所有设置"""
+    """Getting all settings"""
     check_desktop_mode()
     
     try:
         config = get_desktop_config()
         
-        # 尝试从保存的设置文件中读取
+        # Tries reading from saved settings file.
         settings_file = config.paths.data_dir / "settings.json"
-        print(f"设置文件路径: {settings_file}")
-        print(f"设置文件存在: {settings_file.exists()}")
+        print(f"Setting file path: {settings_file}")
+        print(f"Settings file exists: {settings_file.exists()}")
         
         if settings_file.exists():
             try:
                 with open(settings_file, 'r', encoding='utf-8') as f:
                     saved_settings = json.load(f)
                 
-                print(f"从文件读取的设置: {saved_settings.get('basic', {}).get('app_name', 'unknown')}")
+                print(f"Settings read from file: {saved_settings.get('basic', {}).get('app_name', 'unknown')}")
                 
-                # 验证并返回保存的设置
+                # Validates and returns saved settings.
                 settings = DesktopSettings(**saved_settings)
                 return settings
             except Exception as e:
-                # 如果读取失败，回退到默认配置
-                print(f"读取设置文件失败: {e}")
+                # Falls back to default configuration if read fails.
+                print(f"Failed to read settings file: {e}")
                 pass
         
-        # 构建路径设置
+        # Building path settings
         paths = PathSettings(
             data_directory=str(config.paths.data_dir),
             cache_directory=str(config.paths.cache_dir),
             temp_directory=str(config.paths.temp_dir)
         )
         
-        # 构建完整设置
+        # Building complete settings
         settings = DesktopSettings(
             basic=BasicSettings(
                 app_name=config.app_name,
                 app_version=config.app_version,
                 debug_mode=config.debug_mode,
-                auto_start=True  # 默认值
+                auto_start=True  # default value
             ),
             service=ServiceSettings(
                 host=config.host,
@@ -210,8 +214,8 @@ async def get_settings():
                     openai=config.openai_api_key,
                     gemini=config.gemini_api_key,
                     siliconflow=config.siliconflow_api_key,
-                    jimeng_access="",  # 默认值
-                    jimeng_secret=""   # 默认值
+                    jimeng_access="",  # default value
+                    jimeng_secret=""   # default value
                 ),
                 api_model=config.default_model,
                 api_max_tokens=config.max_tokens,
@@ -233,7 +237,7 @@ async def get_settings():
         return settings
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取设置失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get settings: {str(e)}")
 
 
 @router.post("/paths/data-directory")
@@ -241,7 +245,7 @@ async def update_data_directory(
     new_path: str,
     migrate_data: bool = True
 ):
-    """更新数据目录"""
+    """Updating data directory"""
     check_desktop_mode()
     
     try:
@@ -260,11 +264,11 @@ async def update_data_directory(
             raise HTTPException(status_code=400, detail=result["error"])
             
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"更新数据目录失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Updating data directory failed: {str(e)}")
 
 @router.get("/paths/data-directory")
 async def get_data_directory_info():
-    """获取数据目录信息"""
+    """Getting data directory information"""
     check_desktop_mode()
     
     try:
@@ -273,17 +277,17 @@ async def get_data_directory_info():
         return get_data_dir_info()
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取数据目录信息失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get data directory information.: {str(e)}")
 
 @router.delete("/")
 async def clear_settings(
     config: DesktopConfig = Depends(get_desktop_config)
 ):
-    """清除所有设置"""
+    """Clearing all settings"""
     check_desktop_mode()
     
     try:
-        # 重置配置为默认值
+        # Reset configuration to default values
         config.dashscope_api_key = ""
         config.openai_api_key = ""
         config.gemini_api_key = ""
@@ -291,107 +295,217 @@ async def clear_settings(
         config.jimeng_access_key = ""
         config.jimeng_secret_key = ""
         
-        # 保存配置
+        # Save config
         save_desktop_config(config)
         
-        return {"message": "设置已清除", "success": True}
+        return {"message": "Settings have been cleared", "success": True}
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"清除设置失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear settings: {str(e)}")
 
 class TestApiRequest(BaseModel):
     provider: str
-    api_key: str
+    api_key: Optional[str] = ""
+    model_name: Optional[str] = None
+    base_url: Optional[str] = None
 
 @router.post("/test-api")
 async def test_api_connection(request: TestApiRequest):
-    """测试API连接"""
+    """Test API connectivity"""
     check_desktop_mode()
     
     try:
-        # 首先进行基本的API Key格式验证
-        if not request.api_key or len(request.api_key.strip()) < 10:
-            return {
-                "success": False,
-                "error": "API Key为空或过短，请检查输入",
-                "provider": request.provider
-            }
-        
-        # 根据提供商进行格式验证
-        if request.provider in ["dashscope", "openai"]:
-            if not request.api_key.startswith("sk-"):
+        provider_name = (request.provider or "").lower().strip()
+        api_key = (request.api_key or "").strip()
+        base_url = (request.base_url or "").strip()
+
+        # For cloud providers without custom base_url, validate key format
+        local_or_custom = provider_name in ("ollama", "lmstudio", "custom")
+        if not local_or_custom and not base_url:
+            if not api_key or len(api_key) < 5:
                 return {
                     "success": False,
-                    "error": f"{request.provider} API Key格式可能不正确，通常以'sk-'开头",
+                    "error": "API key is empty or too short. Please check your input.",
+                    "provider": request.provider
+                }
+            if provider_name in ["dashscope", "openai"] and not api_key.startswith("sk-"):
+                return {
+                    "success": False,
+                    "error": f"{request.provider} API key typically starts with 'sk-'. Please verify.",
+                    "provider": request.provider
+                }
+            if provider_name == "anthropic" and not (api_key.startswith("sk-ant-") or api_key.startswith("sk-")):
+                return {
+                    "success": False,
+                    "error": "Anthropic API key typically starts with 'sk-ant-'. Please verify.",
+                    "provider": request.provider
+                }
+            if provider_name == "groq" and not api_key.startswith("gsk_"):
+                return {
+                    "success": False,
+                    "error": "Groq API key typically starts with 'gsk_'. Please verify.",
                     "provider": request.provider
                 }
         
-        # 根据提供商测试API连接
-        if request.provider == "dashscope":
-            from backend.core.llm_providers import DashScopeProvider
-            provider_instance = DashScopeProvider(api_key=request.api_key)
-        elif request.provider == "openai":
-            from backend.core.llm_providers import OpenAIProvider
-            provider_instance = OpenAIProvider(api_key=request.api_key)
-        elif request.provider == "gemini":
-            from backend.core.llm_providers import GeminiProvider
-            provider_instance = GeminiProvider(api_key=request.api_key)
-        elif request.provider == "siliconflow":
-            from backend.core.llm_providers import SiliconFlowProvider
-            provider_instance = SiliconFlowProvider(api_key=request.api_key)
-        else:
-            raise HTTPException(status_code=400, detail="不支持的API提供商")
+        model_name = request.model_name or os.getenv("API_MODEL_NAME")
         
-        # 测试连接
+        if provider_name == "dashscope":
+            from backend.core.llm_providers import DashScopeProvider
+            provider_instance = DashScopeProvider(api_key=api_key, model_name=model_name or "qwen-plus-character")
+        elif provider_name == "openai":
+            from backend.core.llm_providers import OpenAIProvider
+            provider_instance = OpenAIProvider(api_key=api_key, model_name=model_name or "gpt-4o-mini", base_url=base_url or None)
+        elif provider_name == "gemini":
+            from backend.core.llm_providers import GeminiProvider
+            provider_instance = GeminiProvider(api_key=api_key, model_name=model_name or "gemini-1.5-flash")
+        elif provider_name == "anthropic":
+            from backend.core.llm_providers import AnthropicProvider
+            provider_instance = AnthropicProvider(api_key=api_key, model_name=model_name or "claude-3-5-sonnet-20241022", base_url=base_url or None)
+        elif provider_name == "deepseek":
+            from backend.core.llm_providers import DeepSeekProvider
+            provider_instance = DeepSeekProvider(api_key=api_key, model_name=model_name or "deepseek-chat", base_url=base_url or "https://api.deepseek.com/v1")
+        elif provider_name == "openrouter":
+            from backend.core.llm_providers import OpenRouterProvider
+            provider_instance = OpenRouterProvider(api_key=api_key, model_name=model_name or "anthropic/claude-3.5-sonnet", base_url=base_url or "https://openrouter.ai/api/v1")
+        elif provider_name == "groq":
+            from backend.core.llm_providers import GroqProvider
+            provider_instance = GroqProvider(api_key=api_key, model_name=model_name or "llama-3.3-70b-versatile", base_url=base_url or "https://api.groq.com/openai/v1")
+        elif provider_name == "siliconflow":
+            from backend.core.llm_providers import SiliconFlowProvider
+            provider_instance = SiliconFlowProvider(api_key=api_key, model_name=model_name or "Qwen/Qwen2.5-7B-Instruct")
+        elif provider_name == "ollama":
+            from backend.core.llm_providers import OllamaProvider
+            provider_instance = OllamaProvider(api_key=api_key or "ollama", model_name=model_name or "llama3.2", base_url=base_url or "http://localhost:11434/v1")
+        elif provider_name == "lmstudio":
+            from backend.core.llm_providers import LMStudioProvider
+            provider_instance = LMStudioProvider(api_key=api_key or "local", model_name=model_name or "local-model", base_url=base_url or "http://localhost:1234/v1")
+        elif provider_name == "custom":
+            from backend.core.llm_providers import CustomOpenAIProvider
+            if not base_url:
+                return {
+                    "success": False,
+                    "error": "Base URL is required for custom OpenAI-compatible endpoints.",
+                    "provider": request.provider
+                }
+            provider_instance = CustomOpenAIProvider(api_key=api_key or "local", model_name=model_name or "custom-model", base_url=base_url)
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported API provider: {request.provider}")
+        
+        # Test connection
         test_result = provider_instance.test_connection()
         
         if test_result:
+            try:
+                from backend.core.token_tracker import token_tracker
+                token_tracker.record(request.provider, model_name or "test", 12, 8)
+            except Exception as trk_err:
+                logger.warning(f"Could not record test token usage: {trk_err}")
             return {
                 "success": True,
-                "message": "API连接测试成功",
+                "message": f"Successfully connected to {request.provider}!",
                 "provider": request.provider
             }
         else:
-            # 提供更详细的错误信息
-            error_msg = f"API连接测试失败"
-            if request.provider == "dashscope":
-                error_msg += "。请检查API Key是否正确，DashScope API Key通常以'sk-'开头"
-            elif request.provider == "openai":
-                error_msg += "。请检查API Key是否正确，OpenAI API Key通常以'sk-'开头"
-            elif request.provider == "gemini":
-                error_msg += "。请检查API Key是否正确"
-            elif request.provider == "siliconflow":
-                error_msg += "。请检查API Key是否正确"
-            
             return {
                 "success": False,
-                "error": error_msg,
+                "error": f"Failed to connect to {request.provider}. Please verify your Base URL, API key, and model.",
                 "provider": request.provider
             }
             
     except Exception as e:
-        logger.error(f"API连接测试异常: {str(e)}")
+        logger.error(f"API Connection test threw an exception: {str(e)}")
         return {
             "success": False,
-            "error": f"API连接测试失败: {str(e)}",
+            "error": f"API Connection test failed: {str(e)}",
+            "provider": request.provider
+        }
+
+
+class FetchModelsRequest(BaseModel):
+    provider: str
+    api_key: Optional[str] = ""
+    base_url: Optional[str] = None
+
+
+@router.post("/fetch-models")
+async def fetch_models(request: FetchModelsRequest):
+    """Fetch remote models list from local or custom OpenAI-compatible endpoint."""
+    check_desktop_mode()
+    try:
+        provider = (request.provider or "").lower().strip()
+        base_url = (request.base_url or "").strip()
+        api_key = (request.api_key or "").strip()
+
+        # Handle Anthropic directly
+        if provider == "anthropic":
+            return {
+                "success": True,
+                "models": [
+                    "claude-3-5-sonnet-20241022",
+                    "claude-3-5-haiku-20241022",
+                    "claude-3-opus-20240229"
+                ],
+                "count": 3,
+                "provider": request.provider
+            }
+
+        # Resolve known endpoint base URLs
+        if provider == "ollama" and not base_url:
+            base_url = "http://localhost:11434/v1"
+        elif provider == "lmstudio" and not base_url:
+            base_url = "http://localhost:1234/v1"
+        elif provider == "deepseek" and not base_url:
+            base_url = "https://api.deepseek.com/v1"
+        elif provider == "openrouter" and not base_url:
+            base_url = "https://openrouter.ai/api/v1"
+        elif provider == "groq" and not base_url:
+            base_url = "https://api.groq.com/openai/v1"
+        elif provider == "openai" and not base_url:
+            base_url = "https://api.openai.com/v1"
+
+        if not base_url:
+            raise HTTPException(status_code=400, detail="Base URL is required to fetch models")
+
+        import openai
+        client = openai.OpenAI(api_key=api_key or "local", base_url=base_url.rstrip("/"))
+        response = client.models.list()
+        
+        model_names = []
+        for m in getattr(response, "data", []):
+            m_id = getattr(m, "id", None) or str(m)
+            if m_id:
+                model_names.append(m_id)
+        
+        return {
+            "success": True,
+            "models": model_names,
+            "count": len(model_names),
+            "provider": request.provider
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch models from {request.provider}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "models": [],
             "provider": request.provider
         }
 
 @router.put("/", response_model=Dict[str, Any])
 async def update_settings(settings: DesktopSettings):
-    """更新设置"""
+    """Update settings"""
     check_desktop_mode()
     
     try:
         config = get_desktop_config()
         
-        # 更新配置
+        # Updating configuration
         config.debug_mode = settings.basic.debug_mode
         config.host = settings.service.host
         config.port = settings.service.port
         config.max_memory_usage = settings.service.max_memory_usage
         
-        # 更新API设置
+        # updateAPIset
         config.dashscope_api_key = settings.api.api_keys.dashscope
         config.openai_api_key = settings.api.api_keys.openai
         config.gemini_api_key = settings.api.api_keys.gemini
@@ -400,63 +514,85 @@ async def update_settings(settings: DesktopSettings):
         config.max_tokens = settings.api.api_max_tokens
         config.timeout = settings.api.api_timeout
         
-        # 更新处理设置
+        # Updating processing settings
         config.chunk_size = settings.processing.processing_chunk_size
         config.min_score_threshold = settings.processing.processing_min_score
         config.max_clips_per_collection = settings.processing.processing_max_clips
         config.max_retries = settings.processing.processing_max_retries
         
-        # 更新日志设置
+        # Updating log settings
         config.log_level = settings.logs.log_level
         
-        # 保存设置到文件
+        # Saving settings to file
         settings_file = config.paths.data_dir / "settings.json"
         with open(settings_file, 'w', encoding='utf-8') as f:
             json.dump(settings.dict(), f, indent=2, ensure_ascii=False)
         
-        # 重要：保存主配置文件，确保API key等关键配置被持久化
+        # Important: Save main config file to ensure...API keyCritical configurations persisted...
         from backend.core.desktop_config import save_desktop_config
         if not save_desktop_config(config):
-            raise HTTPException(status_code=500, detail="保存主配置文件失败")
+            raise HTTPException(status_code=500, detail="Failed to save main configuration file")
+
+        # Update in-memory LLMManager directly so settings take effect immediately
+        try:
+            from backend.core.llm_manager import get_llm_manager
+            llm_mgr = get_llm_manager()
+            new_llm_settings = {
+                "llm_provider": settings.api.llm_provider or "dashscope",
+                "model_name": settings.api.api_model or "qwen-plus",
+                "dashscope_api_key": settings.api.api_keys.dashscope,
+                "openai_api_key": settings.api.api_keys.openai,
+                "gemini_api_key": settings.api.api_keys.gemini,
+                "siliconflow_api_key": settings.api.api_keys.siliconflow,
+                "custom_api_key": settings.api.api_keys.custom,
+                "ollama_api_key": settings.api.api_keys.ollama,
+                "custom_base_url": settings.api.custom_base_url,
+                "chunk_size": settings.processing.processing_chunk_size,
+                "min_score_threshold": settings.processing.processing_min_score,
+                "max_clips_per_collection": settings.processing.processing_max_clips,
+            }
+            llm_mgr.update_settings(new_llm_settings)
+        except Exception as llm_err:
+            logger.warning(f"Failed to update in-memory LLMManager: {llm_err}")
         
-        return {"message": "设置更新成功", "settings_file": str(settings_file)}
+        return {"message": "Settings updated successfully", "settings_file": str(settings_file)}
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"更新设置失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update settings: {str(e)}")
 
 
 @router.post("/reset")
 async def reset_settings():
-    """重置设置为默认值"""
+    """Reset settings to default values"""
     check_desktop_mode()
     
     try:
         config = get_desktop_config()
         
-        # 删除设置文件
+        # Deleting setting file
         settings_file = config.paths.data_dir / "settings.json"
         if settings_file.exists():
             settings_file.unlink()
         
-        # 重新加载默认配置
+        # Reloading default configuration
         config._settings = None
         config._paths = None
         
-        return {"message": "设置已重置为默认值"}
+        return {"message": "Settings reset to default values."}
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"重置设置失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to reset settings: {str(e)}")
 
 
 @router.post("/paths/data-directory", response_model=Dict[str, Any])
 async def update_data_directory(payload: UpdateDataDirRequest):
-    """更新数据目录（可选迁移数据）。供首次运行向导或设置页调用。"""
+    """Updates data directory (optional data migration). Called by first-run wizard or settings page.. """
     is_desktop = check_desktop_mode(relaxed=True)
     try:
         config = get_desktop_config()
         result = config.set_data_dir(Path(payload.new_data_directory), migrate_from_old=payload.migrate)
 
-        # 同步返回新的路径配置
+        # Synchronization returns new path configuration.
         paths = {
             "data_directory": str(config.paths.data_dir),
             "cache_directory": str(config.paths.cache_dir),
@@ -464,76 +600,76 @@ async def update_data_directory(payload: UpdateDataDirRequest):
             "database_url": config.paths.database_url,
         }
 
-        resp = {"message": "数据目录更新成功", "result": result, "paths": paths}
+        resp = {"message": "Data directory updated successfully", "result": result, "paths": paths}
         if not is_desktop:
-            resp["warning"] = "当前非Desktop模式，但已更新路径配置"
+            resp["warning"] = "current non-DesktopDevelopment mode but updated path config."
         return resp
     except Exception as e:
-        # 返回更详细的错误，帮助定位权限/路径/占用等问题
+        # Returns more detailed error for permission troubleshooting./path/Usage-related issues
         return {
-            "message": "更新数据目录失败，但已跳过（内测模式）",
+            "message": "Failed to update data directory but skipped (internal test mode).)",
             "error": str(e),
-            "hint": "请确认目标目录可写且未被系统限制，必要时选择用户主目录下的路径",
+            "hint": "Confirm that the target directory is writable and not system-limited. Select a user home directory path when necessary.",
         }
 
 
 @router.post("/export")
 async def export_settings():
-    """导出设置"""
+    """Exporting settings"""
     check_desktop_mode()
     
     try:
         config = get_desktop_config()
         settings = await get_settings()
         
-        # 创建导出文件
+        # Creating export file
         export_file = config.paths.data_dir / "autoclip-settings-export.json"
         with open(export_file, 'w', encoding='utf-8') as f:
             json.dump(settings.dict(), f, indent=2, ensure_ascii=False)
         
         return {
-            "message": "设置导出成功",
+            "message": "Successfully exported settings",
             "export_file": str(export_file),
             "download_url": f"/api/v1/settings/download/{export_file.name}"
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"导出设置失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Exporting settings failed: {str(e)}")
 
 
 @router.post("/import")
 async def import_settings(file: UploadFile = File(...)):
-    """导入设置"""
+    """Importing settings"""
     check_desktop_mode()
     
     try:
-        # 读取上传的文件
+        # Reading uploaded file
         content = await file.read()
         settings_data = json.loads(content.decode('utf-8'))
         
-        # 验证设置格式
+        # Validating settings format
         settings = DesktopSettings(**settings_data)
         
-        # 更新设置
+        # Update settings
         result = await update_settings(settings)
         
         return {
-            "message": "设置导入成功",
+            "message": "Settings imported successfully",
             "imported_settings": settings.dict()
         }
         
     except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="设置文件格式错误")
+        raise HTTPException(status_code=400, detail="Settings file format error")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"导入设置失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to import settings: {str(e)}")
 
 
-# 删除重复的test_api_connection函数
+# Removing duplicatetest_api_connectionfunction
 
 
 @router.get("/validation")
 async def validate_settings():
-    """验证当前设置"""
+    """Validating current settings"""
     check_desktop_mode()
     
     try:
@@ -548,12 +684,12 @@ async def validate_settings():
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"设置验证失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Settings validation failed: {str(e)}")
 
 
 @router.get("/backup")
 async def backup_settings():
-    """备份设置"""
+    """Backing up settings"""
     check_desktop_mode()
     
     try:
@@ -561,7 +697,7 @@ async def backup_settings():
         backup_dir = config.paths.data_dir / "backups"
         backup_dir.mkdir(exist_ok=True)
         
-        # 创建备份
+        # Create backup
         import datetime
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_file = backup_dir / f"settings_backup_{timestamp}.json"
@@ -571,18 +707,18 @@ async def backup_settings():
             json.dump(settings.dict(), f, indent=2, ensure_ascii=False)
         
         return {
-            "message": "设置备份成功",
+            "message": "Settings backup successful",
             "backup_file": str(backup_file),
             "backup_time": timestamp
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"备份设置失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to back up settings: {str(e)}")
 
 
 @router.get("/backups")
 async def list_backups():
-    """列出所有备份"""
+    """Listing all backups"""
     check_desktop_mode()
     
     try:
@@ -603,81 +739,224 @@ async def list_backups():
                 "modified_time": stat.st_mtime
             })
         
-        # 按创建时间排序
+        # Sorted by creation time
         backups.sort(key=lambda x: x["created_time"], reverse=True)
         
         return {"backups": backups}
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取备份列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get backup list: {str(e)}")
 
 
 @router.get("/available-models")
 async def get_available_models():
-    """获取可用的模型列表"""
+    """Get available model list with token rates and limits."""
     check_desktop_mode()
     
     try:
-        # 返回按供应商分类的模型列表
+        from backend.core.token_tracker import MODEL_RATES
+        
+        # Categorized models with rates and token limits
         models = {
             "dashscope": [
-                {"name": "qwen-plus", "display_name": "通义千问增强版", "max_tokens": 8192, "description": "适合复杂推理和创作任务"},
-                {"name": "qwen-turbo", "display_name": "通义千问标准版", "max_tokens": 8192, "description": "平衡性能和成本"},
-                {"name": "qwen-max", "display_name": "通义千问旗舰版", "max_tokens": 8192, "description": "最强性能，适合复杂任务"},
-                {"name": "qwen-long", "display_name": "通义千问长文本版", "max_tokens": 100000, "description": "支持超长文本处理"}
+                {
+                    "name": "qwen3.8-max-0902",
+                    "display_name": "Qwen 3.8 Max (Flagship)",
+                    "max_tokens": 8192,
+                    "description": "Flagship Qwen 3.8 Max reasoning model for viral hook generation and scoring",
+                    "input_rate": 0.0028,
+                    "output_rate": 0.0084,
+                    "rate_display": "$2.80 / 1M in · $8.40 / 1M out"
+                },
+                {
+                    "name": "qwen-flash-character",
+                    "display_name": "Qwen Flash (Character)",
+                    "max_tokens": 8192,
+                    "description": "Ultra-fast flash model with dialogue and personality tuning",
+                    "input_rate": 0.0001,
+                    "output_rate": 0.0002,
+                    "rate_display": "$0.10 / 1M in · $0.20 / 1M out"
+                },
+                {
+                    "name": "qwen-plus-character",
+                    "display_name": "Qwen Plus (Character)",
+                    "max_tokens": 8192,
+                    "description": "Optimized for character/dialogue and highlight scoring",
+                    "input_rate": 0.0004,
+                    "output_rate": 0.0012,
+                    "rate_display": "$0.40 / 1M in · $1.20 / 1M out"
+                },
+                {
+                    "name": "qwen-plus",
+                    "display_name": "Qwen Plus",
+                    "max_tokens": 8192,
+                    "description": "Balanced reasoning and outline extraction",
+                    "input_rate": 0.0004,
+                    "output_rate": 0.0012,
+                    "rate_display": "$0.40 / 1M in · $1.20 / 1M out"
+                },
+                {
+                    "name": "qwen-turbo",
+                    "display_name": "Qwen Turbo",
+                    "max_tokens": 8192,
+                    "description": "Fast and economical model",
+                    "input_rate": 0.0001,
+                    "output_rate": 0.0002,
+                    "rate_display": "$0.10 / 1M in · $0.20 / 1M out"
+                },
+                {
+                    "name": "qwen-max",
+                    "display_name": "Qwen Max",
+                    "max_tokens": 8192,
+                    "description": "Flagship high intelligence model",
+                    "input_rate": 0.0028,
+                    "output_rate": 0.0084,
+                    "rate_display": "$2.80 / 1M in · $8.40 / 1M out"
+                },
+                {
+                    "name": "qwen-long",
+                    "display_name": "Qwen Long",
+                    "max_tokens": 100000,
+                    "description": "Large context window for long videos",
+                    "input_rate": 0.00007,
+                    "output_rate": 0.00028,
+                    "rate_display": "$0.07 / 1M in · $0.28 / 1M out"
+                }
             ],
             "openai": [
-                {"name": "gpt-4o", "display_name": "GPT-4 Omni", "max_tokens": 128000, "description": "最新多模态模型"},
-                {"name": "gpt-4o-mini", "display_name": "GPT-4 Omni Mini", "max_tokens": 128000, "description": "轻量级多模态模型"},
-                {"name": "gpt-4-turbo", "display_name": "GPT-4 Turbo", "max_tokens": 128000, "description": "高性能版本"},
-                {"name": "gpt-4", "display_name": "GPT-4", "max_tokens": 8192, "description": "经典版本"},
-                {"name": "gpt-3.5-turbo", "display_name": "GPT-3.5 Turbo", "max_tokens": 16384, "description": "经济实用版本"}
+                {
+                    "name": "gpt-4o",
+                    "display_name": "GPT-4 Omni",
+                    "max_tokens": 128000,
+                    "description": "Flagship multimodal intelligence",
+                    "input_rate": 0.0025,
+                    "output_rate": 0.0100,
+                    "rate_display": "$2.50 / 1M in · $10.00 / 1M out"
+                },
+                {
+                    "name": "gpt-4o-mini",
+                    "display_name": "GPT-4 Omni Mini",
+                    "max_tokens": 128000,
+                    "description": "Fast, cost-efficient small model",
+                    "input_rate": 0.00015,
+                    "output_rate": 0.00060,
+                    "rate_display": "$0.15 / 1M in · $0.60 / 1M out"
+                },
+                {
+                    "name": "gpt-4-turbo",
+                    "display_name": "GPT-4 Turbo",
+                    "max_tokens": 128000,
+                    "description": "High performance 128k context",
+                    "input_rate": 0.0100,
+                    "output_rate": 0.0300,
+                    "rate_display": "$10.00 / 1M in · $30.00 / 1M out"
+                },
+                {
+                    "name": "gpt-3.5-turbo",
+                    "display_name": "GPT-3.5 Turbo",
+                    "max_tokens": 16384,
+                    "description": "Economical standard model",
+                    "input_rate": 0.0005,
+                    "output_rate": 0.0015,
+                    "rate_display": "$0.50 / 1M in · $1.50 / 1M out"
+                }
             ],
             "gemini": [
-                {"name": "gemini-1.5-pro", "display_name": "Gemini 1.5 Pro", "max_tokens": 2000000, "description": "最新专业版"},
-                {"name": "gemini-1.5-flash", "display_name": "Gemini 1.5 Flash", "max_tokens": 1000000, "description": "快速响应版本"},
-                {"name": "gemini-pro", "display_name": "Gemini Pro", "max_tokens": 30720, "description": "经典专业版"}
+                {
+                    "name": "gemini-1.5-flash",
+                    "display_name": "Gemini 1.5 Flash",
+                    "max_tokens": 1000000,
+                    "description": "Ultra fast response with 1M context",
+                    "input_rate": 0.000075,
+                    "output_rate": 0.000300,
+                    "rate_display": "$0.075 / 1M in · $0.30 / 1M out"
+                },
+                {
+                    "name": "gemini-1.5-pro",
+                    "display_name": "Gemini 1.5 Pro",
+                    "max_tokens": 2000000,
+                    "description": "State of the art reasoning with 2M context",
+                    "input_rate": 0.00125,
+                    "output_rate": 0.00500,
+                    "rate_display": "$1.25 / 1M in · $5.00 / 1M out"
+                }
             ],
             "siliconflow": [
-                {"name": "deepseek-chat", "display_name": "DeepSeek Chat", "max_tokens": 32768, "description": "深度求索对话模型"},
-                {"name": "deepseek-coder", "display_name": "DeepSeek Coder", "max_tokens": 16384, "description": "代码生成专用模型"},
-                {"name": "qwen-plus", "display_name": "通义千问增强版", "max_tokens": 8192, "description": "通过硅基流动访问"},
-                {"name": "qwen-turbo", "display_name": "通义千问标准版", "max_tokens": 8192, "description": "通过硅基流动访问"}
+                {
+                    "name": "deepseek-chat",
+                    "display_name": "DeepSeek Chat (V3)",
+                    "max_tokens": 32768,
+                    "description": "Advanced reasoning at ultra low price",
+                    "input_rate": 0.00014,
+                    "output_rate": 0.00028,
+                    "rate_display": "$0.14 / 1M in · $0.28 / 1M out"
+                },
+                {
+                    "name": "deepseek-coder",
+                    "display_name": "DeepSeek Coder",
+                    "max_tokens": 16384,
+                    "description": "Code and structured text generation",
+                    "input_rate": 0.00014,
+                    "output_rate": 0.00028,
+                    "rate_display": "$0.14 / 1M in · $0.28 / 1M out"
+                }
             ],
         }
         
         return {"models": models}
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取模型列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch model list: {str(e)}")
+
+
+@router.get("/token-stats")
+async def get_token_stats():
+    """Get token consumption statistics and model pricing rates."""
+    check_desktop_mode()
+    try:
+        from backend.core.token_tracker import token_tracker
+        return token_tracker.get_stats()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get token stats: {str(e)}")
+
+
+@router.post("/token-stats/reset")
+async def reset_token_stats():
+    """Reset token consumption statistics."""
+    check_desktop_mode()
+    try:
+        from backend.core.token_tracker import token_tracker
+        token_tracker.reset_stats()
+        return {"message": "Token statistics reset successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reset token stats: {str(e)}")
 
 
 @router.get("/current-provider")
 async def get_current_provider():
-    """获取当前提供商信息"""
+    """Get current provider and model information."""
     check_desktop_mode()
     
     try:
         config = get_desktop_config()
         
-        # 根据当前配置返回提供商信息
         provider_info = {
-            "provider": "dashscope",  # 默认提供商
-            "model": config.default_model or "qwen-plus",
+            "provider": getattr(config, "llm_provider", "dashscope"),
+            "model": getattr(config, "default_model", None) or os.getenv("API_MODEL_NAME", "qwen-plus-character"),
             "available": True,
-            "display_name": "通义千问",
-            "description": "阿里云通义千问服务"
+            "display_name": "Alibaba Qwen",
+            "description": "Alibaba Cloud DashScope Service"
         }
         
         return provider_info
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取当前提供商信息失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get provider info: {str(e)}")
 
 
 @router.post("/restore/{backup_filename}")
 async def restore_backup(backup_filename: str):
-    """从备份恢复设置"""
+    """Restoring settings from backup"""
     check_desktop_mode()
     
     try:
@@ -685,18 +964,18 @@ async def restore_backup(backup_filename: str):
         backup_file = config.paths.data_dir / "backups" / backup_filename
         
         if not backup_file.exists():
-            raise HTTPException(status_code=404, detail="备份文件不存在")
+            raise HTTPException(status_code=404, detail="Backup file does not exist")
         
-        # 读取备份文件
+        # Reading backup file
         with open(backup_file, 'r', encoding='utf-8') as f:
             settings_data = json.load(f)
         
-        # 验证并恢复设置
+        # Validate and restore settings
         settings = DesktopSettings(**settings_data)
         result = await update_settings(settings)
         
         return {
-            "message": "设置恢复成功",
+            "message": "Settings restored successfully",
             "restored_from": backup_filename,
             "restored_settings": settings.dict()
         }
@@ -704,35 +983,35 @@ async def restore_backup(backup_filename: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"恢复设置失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to restore settings: {str(e)}")
 
 
 @router.post("/sync-config")
 async def sync_config():
-    """手动同步客户端配置到后端"""
+    """Manual sync of client configuration to backend."""
     check_desktop_mode()
     
     try:
         if config_sync_service.sync_from_client():
             return {
                 "status": "success",
-                "message": "配置同步成功"
+                "message": "Successfully synchronized configuration"
             }
         else:
             return {
                 "status": "error",
-                "message": "配置同步失败"
+                "message": "Configuration synchronization failed"
             }
     except Exception as e:
         return {
             "status": "error",
-            "message": f"配置同步失败: {str(e)}"
+            "message": f"Configuration synchronization failed: {str(e)}"
         }
 
 
 @router.get("/config-status")
 async def get_config_status():
-    """获取配置同步状态"""
+    """Configuration synchronization status"""
     check_desktop_mode()
     
     try:
@@ -752,5 +1031,5 @@ async def get_config_status():
     except Exception as e:
         return {
             "status": "error",
-            "message": f"获取配置状态失败: {str(e)}"
+            "message": f"Failed to get configuration status: {str(e)}"
         }

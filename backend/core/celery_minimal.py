@@ -1,6 +1,6 @@
 """
-最小化Celery应用配置
-避免所有导入问题，只提供基本的任务处理功能
+Minimal Celery application configuration
+Avoid all import issues; provide only basic task processing functionality
 """
 
 import os
@@ -8,111 +8,111 @@ import sys
 from pathlib import Path
 from celery import Celery
 
-# 创建Celery应用
+# Create Celery application
 celery_app = Celery('autoclip')
 
-# 基本配置
+# Basic Configuration
 celery_app.conf.update(
-    # 序列化格式
+    # Serialization format
     task_serializer='json',
     accept_content=['json'],
     result_serializer='json',
     
-    # Redis配置
+    # Redis configuration
     broker_url='redis://localhost:6379/0',
     result_backend='redis://localhost:6379/0',
     
-    # 时区
+    # Timezone
     timezone='Asia/Shanghai',
     enable_utc=True,
     
-    # 任务配置
+    # Task Configuration
     task_always_eager=False,
     task_eager_propagates=True,
     
-    # 工作进程配置
+    # Worker process configuration
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=1000,
     worker_disable_rate_limits=True,
     
-    # 结果配置
+    # Result configuration
     result_expires=3600,
     task_ignore_result=False,
     
-    # 禁用自动发现
+    # Disable automatic discovery
     autodiscover_tasks=False,
 )
 
-# 手动注册任务
+# Manual task registration
 @celery_app.task(bind=True, name='tasks.processing.process_video_pipeline')
 def process_video_pipeline(self, project_id: str, input_video_path: str, input_srt_path: str):
-    """视频处理流水线任务"""
-    print(f"🎬 开始处理项目: {project_id}")
-    print(f"📹 视频路径: {input_video_path}")
-    print(f"📝 字幕路径: {input_srt_path}")
+    """Video processing pipeline task"""
+    print(f"🎬 Start processing project: {project_id}")
+    print(f"📹 Video Path: {input_video_path}")
+    print(f"📝 Subtitle path: {input_srt_path}")
     
-    # 模拟处理过程
+    # Simulate processing
     import time
     steps = [
-        "大纲提取",
-        "时间定位", 
-        "内容评分",
-        "标题生成",
-        "主题聚类",
-        "视频切割"
+        "Outline extraction",
+        "Time location", 
+        "Content rating",
+        "Title Generation",
+        "Theme clustering",
+        "Video Segmentation"
     ]
     
     for i, step in enumerate(steps):
-        progress = (i + 1) * 16  # 每步16%
-        print(f"📊 步骤 {i+1}/6: {step} - {progress}%")
+        progress = (i + 1) * 16  # each step16%
+        print(f"📊 Steps {i+1}/6: {step} - {progress}%")
         
-        # 更新任务状态
+        # Update task status
         self.update_state(
             state='PROGRESS',
             meta={
                 'current': i + 1,
                 'total': 6,
-                'status': f'正在执行: {step}',
+                'status': f'Executing: {step}',
                 'progress': progress
             }
         )
         
-        time.sleep(2)  # 模拟处理时间
+        time.sleep(2)  # Simulate processing time
     
-    print(f"✅ 项目 {project_id} 处理完成")
+    print(f"✅ Project {project_id} Processing complete")
     return {
         "success": True,
         "project_id": project_id,
-        "message": "视频处理完成",
+        "message": "Video processing completed",
         "steps": steps
     }
 
 @celery_app.task(bind=True, name='tasks.processing.process_single_step')
 def process_single_step(self, project_id: str, step: str, config: dict):
-    """单个步骤处理任务"""
-    print(f"🔧 开始处理项目 {project_id} 的步骤: {step}")
+    """Individual processing task"""
+    print(f"🔧 Start processing project {project_id} steps of: {step}")
     
-    # 模拟处理过程
+    # Simulate processing
     import time
     time.sleep(3)
     
-    print(f"✅ 步骤 {step} 处理完成")
+    print(f"✅ Steps {step} Processing complete")
     return {
         "success": True,
         "project_id": project_id,
         "step": step,
-        "message": f"步骤 {step} 处理完成"
+        "message": f"Steps {step} Processing complete"
     }
 
-# 兼容性任务名称
+# Compatibility task name
 @celery_app.task(bind=True, name='backend.tasks.processing.process_video_pipeline')
 def backend_process_video_pipeline(self, project_id: str, input_video_path: str, input_srt_path: str):
-    """后端视频处理流水线任务（兼容性）"""
+    """Backend video processing pipeline task (compatibility))"""
     return process_video_pipeline(self, project_id, input_video_path, input_srt_path)
 
 @celery_app.task(bind=True, name='backend.tasks.processing.process_single_step')
 def backend_process_single_step(self, project_id: str, step: str, config: dict):
-    """后端单个步骤处理任务（兼容性）"""
+    """Backend individual processing task (compatibility))"""
     return process_single_step(self, project_id, step, config)
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 """
-项目API路由
+projectAPIrouting
 """
 
 import logging
@@ -11,7 +11,7 @@ from backend.core.database import get_db
 from backend.services.project_service import ProjectService
 from backend.services.processing_service import ProcessingService
 from backend.services.websocket_notification_service import WebSocketNotificationService
-# 延迟导入，避免过早触发celery_app导入链
+# Lazy import to avoid triggering too earlycelery_appimport chain
 # from backend.tasks.processing import process_video_pipeline
 from backend.core.websocket_manager import manager as websocket_manager
 from backend.schemas.project import (
@@ -46,107 +46,124 @@ async def upload_files(
     srt_file: Optional[UploadFile] = File(None),
     project_name: str = Form(...),
     video_category: Optional[str] = Form(None),
+    caption_style: Optional[str] = Form("hormozi_yellow"),
+    duration_mode: Optional[str] = Form("tiktok_crp"),
+    aspect_ratio: Optional[str] = Form("9:16_blur"),
+    show_hook_banner: Optional[bool] = Form(True),
+    watermark_preset_id: Optional[str] = Form("none"),
+    watermark_text: Optional[str] = Form(None),
+    watermark_text_opacity: Optional[float] = Form(0.50),
+    watermark_text_position: Optional[str] = Form("lower_center"),
     project_service: ProjectService = Depends(get_project_service)
 ):
     """Upload video file and optional subtitle file to create a new project. If no subtitle is provided, Whisper will automatically generate one."""
     try:
-        # 验证视频文件类型
+        # Validate video file type
         if not video_file.filename.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.webm')):
             raise HTTPException(status_code=400, detail="Invalid video file format")
         
-        # 验证字幕文件类型（如果提供）
+        # Validate subtitle file type (if provided))
         if srt_file and not srt_file.filename.lower().endswith('.srt'):
             raise HTTPException(status_code=400, detail="Invalid subtitle file format")
         
-        # 创建项目数据
-        subtitle_info = srt_file.filename if srt_file else "Whisper自动生成"
+        # Create project data
+        subtitle_info = srt_file.filename if srt_file else "Whisper auto-generated"
         project_data = ProjectCreate(
             name=project_name,
             description=f"Video: {video_file.filename}, Subtitle: {subtitle_info}",
-            project_type=ProjectType.KNOWLEDGE,  # 默认类型
+            project_type=ProjectType.KNOWLEDGE,  # Default type
             status=ProjectStatus.PENDING,
             source_url=None,
             source_file=video_file.filename,
             settings={
                 "video_category": video_category or "knowledge",
                 "video_file": video_file.filename,
-                "srt_file": subtitle_info
+                "srt_file": subtitle_info,
+                "caption_style": caption_style or "hormozi_yellow",
+                "duration_mode": duration_mode or "tiktok_crp",
+                "aspect_ratio": aspect_ratio or "9:16_blur",
+                "show_hook_banner": True if show_hook_banner is None else show_hook_banner,
+                "watermark_preset_id": watermark_preset_id or "none",
+                "watermark_text": watermark_text,
+                "watermark_text_opacity": watermark_text_opacity,
+                "watermark_text_position": watermark_text_position or "lower_center"
             }
         )
         
-        # 创建项目
+        # Create project
         project = project_service.create_project(project_data)
         
-        # 保存文件到项目目录
+        # Save file to project directory
         project_id = str(project.id)
         from ...core.path_utils import get_project_raw_directory
         raw_dir = get_project_raw_directory(project_id)
         
-        # 保存视频文件
+        # Save video file
         video_path = raw_dir / "input.mp4"
         with open(video_path, "wb") as f:
             content = await video_file.read()
             f.write(content)
         
-        # 更新项目的视频路径
+        # Update video path for project
         project.video_path = str(video_path)
         project_service.db.commit()
         
-        # 立即生成缩略图（同步处理）
+        # Generate thumbnail immediately (synchronous processing))
         try:
             from ...utils.thumbnail_generator import generate_project_thumbnail
-            logger.info(f"开始为项目 {project_id} 生成缩略图...")
+            logger.info(f"Starting for project {project_id} Generating thumbnail...")
             thumbnail_data = generate_project_thumbnail(project_id, video_path)
             if thumbnail_data:
                 project.thumbnail = thumbnail_data
                 project_service.db.commit()
-                logger.info(f"项目 {project_id} 缩略图生成并保存成功")
+                logger.info(f"project {project_id} Thumbnail generated and saved successfully")
             else:
-                logger.warning(f"项目 {project_id} 缩略图生成失败")
+                logger.warning(f"project {project_id} Thumbnail generation failed")
         except Exception as e:
-            logger.error(f"生成项目缩略图时发生错误: {e}")
-            # 缩略图生成失败不影响主流程，会在异步任务中重试
+            logger.error(f"Error generating project thumbnail: {e}")
+            # Thumbnail generation failure does not impact main flow; will retry in background task
         
-        # 处理字幕文件（如果用户提供了）
+        # Processing subtitle file (if provided))
         srt_path = None
         if srt_file:
-            # 用户提供了字幕文件
+            # Subtitle file provided
             srt_path = raw_dir / "input.srt"
             with open(srt_path, "wb") as f:
                 content = await srt_file.read()
                 f.write(content)
-            logger.info(f"用户提供的字幕文件已保存: {srt_path}")
+            logger.info(f"User-provided subtitle file saved: {srt_path}")
         
-        # 启动异步处理任务
+        # Launch async processing task
         try:
             from ...tasks.import_processing import process_import_task
             
-            # 检查是否已有相同项目正在处理中
+            # Check if identical project is already being processed
             from ...models.task import Task, TaskStatus
-            existing_task = db.query(Task).filter(
+            from sqlalchemy import or_
+            existing_task = project_service.db.query(Task).filter(
                 Task.project_id == project_id,
                 Task.status == TaskStatus.RUNNING,
-                Task.name.like('%导入%')
+                or_(Task.name.ilike('%import%'), Task.name.like('%import%'))
             ).first()
             
             if existing_task:
-                logger.warning(f"项目 {project_id} 已有处理任务在运行，跳过重复启动")
+                logger.warning(f"project {project_id} Processing task already running; skip duplicate start")
             else:
-                # 提交异步任务
+                # Submit asynchronous task
                 celery_task = process_import_task.delay(
                     project_id=project_id,
                     video_path=str(video_path),
                     srt_file_path=str(srt_path) if srt_path else None
                 )
                 
-                logger.info(f"项目 {project_id} 异步处理任务已启动，Celery任务ID: {celery_task.id}")
+                logger.info(f"project {project_id} Asynchronous processing task started, CelerytaskID: {celery_task.id}")
             
         except Exception as e:
-            logger.error(f"启动项目 {project_id} 异步处理失败: {str(e)}")
-            # 即使异步任务启动失败，也要返回项目创建成功
-            # 用户可以通过重试按钮重新启动处理
+            logger.error(f"Launch project {project_id} Asynchronous processing failed: {str(e)}")
+            # Even if async task startup fails, return successful project creation
+            # Users can restart processing via the retry button
         
-        # 返回项目响应
+        # Returning project response
         response_data = {
             "id": str(project.id),
             "name": str(project.name),
@@ -155,12 +172,12 @@ async def upload_files(
             "status": ProjectStatus(project.status.value),
             "source_url": project.project_metadata.get("source_url") if project.project_metadata else None,
             "source_file": str(project.video_path) if project.video_path else None,
-            "video_path": str(video_path),  # 添加video_path字段
+            "video_path": str(video_path),  # addvideo_pathfield
             "settings": {
                 "video_category": video_category or "knowledge",
                 "video_file": video_file.filename,
                 "srt_file": subtitle_info
-            },  # 只包含可序列化的数据
+            },  # Contains only serializable data
             "created_at": project.created_at,
             "updated_at": project.updated_at,
             "completed_at": project.completed_at,
@@ -169,7 +186,7 @@ async def upload_files(
             "total_tasks": 0
         }
         
-        # 缩略图将在异步任务中生成
+        # Thumbnail will be generated in asynchronous task
         response_data["thumbnail"] = None
         
         return ProjectResponse(**response_data)
@@ -177,8 +194,8 @@ async def upload_files(
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("上传文件创建项目失败")
-        raise HTTPException(status_code=500, detail="创建项目失败，请稍后重试")
+        logger.exception("Failed to create project while uploading file")
+        raise HTTPException(status_code=500, detail="Project creation failed. Please try again later")
 
 
 @router.post("/", response_model=ProjectResponse)
@@ -207,8 +224,8 @@ async def create_project(
             total_tasks=0
         )
     except Exception as e:
-        logger.exception("创建项目失败")
-        raise HTTPException(status_code=500, detail="创建项目失败，请稍后重试")
+        logger.exception("Project creation failed")
+        raise HTTPException(status_code=500, detail="Project creation failed. Please try again later")
 
 
 @router.get("/", response_model=ProjectListResponse)
@@ -226,7 +243,7 @@ async def get_projects(
         
         filters = None
         if status or project_type or search:
-            # 转换字符串为枚举值
+            # Converting string to enum value
             status_enum = None
             if status:
                 try:
@@ -249,15 +266,15 @@ async def get_projects(
         
         return project_service.get_projects_paginated(pagination, filters)
     except Exception as e:
-        logger.exception("获取项目列表失败")
-        raise HTTPException(status_code=500, detail="获取项目列表失败，请稍后重试")
+        logger.exception("Failed to get project list")
+        raise HTTPException(status_code=500, detail="Failed to retrieve project list, please try again later")
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(
     project_id: str,
-    include_clips: bool = Query(False, description="是否包含切片数据"),
-    include_collections: bool = Query(False, description="是否包含合集数据"),
+    include_clips: bool = Query(False, description="Whether to include slice data"),
+    include_collections: bool = Query(False, description="Whether to include collection data"),
     project_service: ProjectService = Depends(get_project_service)
 ):
     """Get a project by ID."""
@@ -266,7 +283,7 @@ async def get_project(
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        # 如果需要包含clips和collections数据，则加载它们
+        # If including is requiredclipsAndcollectionsIf data, load them
         clips_data = None
         collections_data = None
         
@@ -275,35 +292,35 @@ async def get_project(
             from ...services.collection_service import CollectionService
             from ...core.database import get_db
             
-            # 获取数据库会话
+            # Get database session
             db = next(get_db())
             
             if include_clips:
                 clip_service = ClipService(db)
                 clips = clip_service.get_multi(filters={"project_id": project_id})
-                # 转换为字典格式
+                # Converted to dictionary format
                 clips_data = [clip.to_dict() if hasattr(clip, 'to_dict') else clip.__dict__ for clip in clips]
             
             if include_collections:
                 collection_service = CollectionService(db)
                 collections = collection_service.get_multi(filters={"project_id": project_id})
-                # 转换为字典格式
+                # Converted to dictionary format
                 collections_data = [collection.to_dict() if hasattr(collection, 'to_dict') else collection.__dict__ for collection in collections]
         
-        # 创建包含clips和collections的响应数据
+        # Create containingclipsAndcollectionsResponse data of
         response_data = project.model_dump() if hasattr(project, 'model_dump') else project.__dict__
         if clips_data is not None:
             response_data['clips'] = clips_data
         if collections_data is not None:
             response_data['collections'] = collections_data
         
-        # 返回更新后的响应
+        # Return updated response
         return ProjectResponse(**response_data)
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("获取项目详情失败: %s", project_id)
-        raise HTTPException(status_code=500, detail="获取项目详情失败，请稍后重试")
+        logger.exception("Failed to get project details: %s", project_id)
+        raise HTTPException(status_code=500, detail="Failed to get project details; please try again later")
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)
@@ -338,8 +355,8 @@ async def update_project(
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("更新项目失败: %s", project_id)
-        raise HTTPException(status_code=500, detail="更新项目失败，请稍后重试")
+        logger.exception("Update project failed: %s", project_id)
+        raise HTTPException(status_code=500, detail="Project update failed. Please try again later")
 
 
 @router.delete("/{project_id}")
@@ -356,15 +373,15 @@ async def delete_project(
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("删除项目失败: %s", project_id)
-        raise HTTPException(status_code=500, detail="删除项目失败，请稍后重试")
+        logger.exception("Failed to delete project: %s", project_id)
+        raise HTTPException(status_code=500, detail="Project deletion failed. Please try again later")
 
 
 @router.post("/sync-all-data")
 async def sync_all_projects_data(
     db: Session = Depends(get_db)
 ):
-    """同步所有项目的数据到数据库"""
+    """Synchronizing all projects' data to database"""
     try:
         from ...services.data_sync_service import DataSyncService
         from ...core.config import get_data_directory
@@ -375,11 +392,11 @@ async def sync_all_projects_data(
         result = sync_service.sync_all_projects_from_filesystem(data_dir)
         
         return {
-            "message": "数据同步完成",
+            "message": "Data synchronization complete",
             "result": result
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"数据同步失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Data synchronization failed: {str(e)}")
 
 
 @router.post("/{project_id}/sync-data")
@@ -387,29 +404,29 @@ async def sync_project_data(
     project_id: str,
     db: Session = Depends(get_db)
 ):
-    """同步指定项目的数据到数据库"""
+    """Synchronize specified project's data to database"""
     try:
         from ...services.data_sync_service import DataSyncService
         from ...core.path_utils import get_project_directory
         
         project_dir = get_project_directory(project_id)
         if not project_dir.exists():
-            raise HTTPException(status_code=404, detail="项目目录不存在")
+            raise HTTPException(status_code=404, detail="Project directory does not exist")
         
         sync_service = DataSyncService(db)
         result = sync_service.sync_project_from_filesystem(project_id, project_dir)
         
         if result.get("success"):
             return {
-                "message": "项目数据同步成功",
+                "message": "Project data synchronized successfully",
                 "result": result
             }
         else:
-            raise HTTPException(status_code=500, detail=f"数据同步失败: {result.get('error')}")
+            raise HTTPException(status_code=500, detail=f"Data synchronization failed: {result.get('error')}")
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"数据同步失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Data synchronization failed: {str(e)}")
 
 
 @router.post("/{project_id}/process")
@@ -421,65 +438,67 @@ async def start_processing(
 ):
     """Start processing a project using Celery task queue."""
     try:
-        # 获取项目信息
+        # Get project information
         project = project_service.get(project_id)
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        # 检查项目状态
+        # Check project status
         if project.status.value not in ["pending", "failed"]:
             raise HTTPException(status_code=400, detail="Project is not in pending or failed status")
         
-        # 获取视频和SRT文件路径
+        # Getting video andSRTFile path
         video_path = project.video_path
         srt_path = None
         
-        # 从processing_config中获取SRT文件路径
+        # Fromprocessing_configRetrieve fromSRTFile path
         if project.processing_config and "subtitle_path" in project.processing_config:
             srt_path = project.processing_config["subtitle_path"]
         
-        # 验证视频文件存在
+        # Validate video file exists
         if not video_path or not Path(video_path).exists():
             raise HTTPException(status_code=400, detail=f"Video file not found: {video_path}")
         
-        # 如果没有SRT文件路径，尝试自动查找
-        if not srt_path:
+        # Validate and resolve SRT file path
+        from backend.utils.subtitle_validator import validate_subtitle_file
+        candidate_srt = None
+        if srt_path:
+            candidate_srt = Path(srt_path)
+        else:
             video_dir = Path(video_path).parent
-            srt_file = video_dir / "input.srt"
-            if srt_file.exists():
-                srt_path = str(srt_file)
-            else:
-                # SRT文件是可选的，如果没有找到，设置为None
-                srt_path = None
-        elif not Path(srt_path).exists():
-            # 如果指定的SRT文件不存在，尝试自动查找
-            video_dir = Path(video_path).parent
-            srt_file = video_dir / "input.srt"
-            if srt_file.exists():
-                srt_path = str(srt_file)
-            else:
-                srt_path = None
+            candidate_srt = video_dir / "input.srt"
+            if not candidate_srt.exists():
+                meta_srt = video_dir.parent / "metadata" / "input.srt"
+                if meta_srt.exists():
+                    candidate_srt = meta_srt
+
+        if candidate_srt and candidate_srt.exists() and validate_subtitle_file(candidate_srt, video_path=video_path):
+            srt_path = str(candidate_srt)
+        else:
+            if candidate_srt and candidate_srt.exists():
+                logger.warning(f"Ignoring invalid/placeholder subtitle file: {candidate_srt}")
+            srt_path = None
         
-        # 更新项目状态为处理中
+        # Update project status to processing
         project_service.update_project_status(project_id, "processing")
         
-        # 发送WebSocket通知：处理开始
+        # sendWebSocketNotification: Processing started
         await websocket_service.send_processing_started(
             project_id=project_id,
-            message="开始视频处理流程"
+            message="Start video processing workflow"
         )
         
-        # 延迟导入，避免过早触发celery_app导入链
+        # Lazy import to avoid triggering too earlycelery_appimport chain
         from backend.tasks.processing import process_video_pipeline
         
-        # 提交Celery任务
+        # SubmitCelerytask
         celery_task = process_video_pipeline.delay(
             project_id=project_id,
             input_video_path=str(video_path),
             input_srt_path=str(srt_path) if srt_path else None
         )
         
-        # 创建处理任务记录
+        # Create processing task record
         task_result = processing_service._create_processing_task(
             project_id=project_id,
             task_type="VIDEO_PROCESSING"
@@ -496,7 +515,7 @@ async def start_processing(
     except HTTPException:
         raise
     except Exception as e:
-        # 发送错误通知
+        # Sending error notification
         try:
             await websocket_service.send_processing_error(
                 project_id=int(project_id),
@@ -505,8 +524,8 @@ async def start_processing(
             )
         except:
             pass
-        logger.exception("启动项目处理失败: %s", project_id)
-        raise HTTPException(status_code=500, detail="启动处理失败，请稍后重试")
+        logger.exception("Failed to start project processing: %s", project_id)
+        raise HTTPException(status_code=500, detail="Failed to start processing, please try again later")
 
 
 @router.post("/{project_id}/retry")
@@ -518,57 +537,61 @@ async def retry_processing(
 ):
     """Retry processing a project from the beginning."""
     try:
-        # 获取项目信息
+        # Get project information
         project = project_service.get(project_id)
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        # 检查项目状态 - 允许失败、完成、处理中和等待中状态重试
+        # Check project status - allow failed, completed, in progress and waiting states to retry
         if project.status.value not in ["failed", "completed", "processing", "pending"]:
             raise HTTPException(status_code=400, detail="Project is not in failed, completed, processing, or pending status")
         
-        # 重置项目状态
+        # Resetting project state
         project_service.update_project_status(project_id, "pending")
         
-        # 发送WebSocket通知 - 已禁用WebSocket通知
+        # sendWebSocketNotification - DisabledWebSocketNotify
         # await websocket_service.send_processing_started(
         #     project_id=int(project_id),
-        #     message="重新开始处理流程"
+        #     message="Restart processing workflow"
         # )
         
-        # 获取文件路径并重新提交任务
+        # Retrieve file path and resubmit task
         from ...core.path_utils import get_project_raw_directory
         raw_dir = get_project_raw_directory(project_id)
-        video_path = raw_dir / "input.mp4"  # 使用标准的input.mp4文件名
-        srt_path = raw_dir / "input.srt"    # 使用标准的input.srt文件名
+        video_path = raw_dir / "input.mp4"  # Use standard input.mp4 file name
+        srt_path = raw_dir / "input.srt"    # Use standard input.srt file name
+        if not srt_path.exists():
+            meta_srt = raw_dir.parent / "metadata" / "input.srt"
+            if meta_srt.exists():
+                srt_path = meta_srt
         
-        # 检查视频文件是否存在，如果不存在则尝试重新下载
+        # Check if video file exists, attempt re-download if not found
         if not video_path.exists():
-            logger.warning(f"视频文件不存在: {video_path}，尝试重新下载")
+            logger.warning(f"Video file not found: {video_path}, Attempting redownload")
             
-            # 检查项目元数据中是否有源URL
+            # Check for source in project metadataURL
             if hasattr(project, 'project_metadata') and project.project_metadata:
                 source_url = project.project_metadata.get('source_url')
                 if source_url:
-                    logger.info(f"发现源URL: {source_url}，开始重新下载")
+                    logger.info(f"source foundURL: {source_url}, Starting re-download")
                     
-                    # 根据URL类型选择下载方式
+                    # byURLSelect download method by type
                     if 'bilibili.com' in source_url:
-                        # B站视频重新下载
+                        # BRe-download site video
                         from .bilibili import process_download_task, BilibiliDownloadRequest, BilibiliDownloadTask, download_tasks
                         import uuid
                         
-                        # 创建下载请求
+                        # Create download request
                         download_request = BilibiliDownloadRequest(
                             url=source_url,
                             project_name=project.name,
                             video_category=project.project_metadata.get('category', 'general')
                         )
                         
-                        # 生成新的任务ID
+                        # Generating new taskID
                         download_task_id = str(uuid.uuid4())
                         
-                        # 创建任务记录
+                        # Creating task record
                         task = BilibiliDownloadTask(
                             id=download_task_id,
                             url=source_url,
@@ -581,10 +604,10 @@ async def retry_processing(
                             updated_at=str(uuid.uuid1().time)
                         )
                         
-                        # 存储任务
+                        # Store task
                         download_tasks[download_task_id] = task
                         
-                        # 异步启动下载任务
+                        # Asynchronously start download task
                         from .async_task_manager import task_manager
                         await task_manager.create_safe_task(
                             f"bilibili_redownload_{download_task_id}",
@@ -595,27 +618,42 @@ async def retry_processing(
                         )
                         
                         return {
-                            "message": "视频文件不存在，已开始重新下载B站视频",
+                            "message": "Video file not found; started re-downloadBSite video",
                             "project_id": project_id,
                             "download_task_id": download_task_id,
                             "source_url": source_url
                         }
                     elif 'youtube.com' in source_url or 'youtu.be' in source_url:
-                        # YouTube视频重新下载
+                        # YouTubeVideo re-download
                         from .youtube import process_youtube_download_task, YouTubeDownloadRequest
                         import uuid
                         
-                        # 创建下载请求
+                        # Create download request
                         download_request = YouTubeDownloadRequest(
                             url=source_url,
                             project_name=project.name,
                             video_category=project.project_metadata.get('category', 'general')
                         )
                         
-                        # 生成新的任务ID
+                        # Generating new taskID
                         download_task_id = str(uuid.uuid4())
                         
-                        # 异步启动下载任务
+                        # Import task model and storage dictionary
+                        from .youtube import YouTubeDownloadTask, download_tasks
+                        task = YouTubeDownloadTask(
+                            id=download_task_id,
+                            url=source_url,
+                            project_name=project.name,
+                            video_category=project.project_metadata.get('category', 'general') if hasattr(project, 'project_metadata') and project.project_metadata else 'general',
+                            status="pending",
+                            progress=0.0,
+                            project_id=project_id,
+                            created_at=str(uuid.uuid1().time),
+                            updated_at=str(uuid.uuid1().time)
+                        )
+                        download_tasks[download_task_id] = task
+
+                        # Asynchronously start download task
                         from .async_task_manager import task_manager
                         await task_manager.create_safe_task(
                             f"youtube_redownload_{download_task_id}",
@@ -626,39 +664,39 @@ async def retry_processing(
                         )
                         
                         return {
-                            "message": "视频文件不存在，已开始重新下载YouTube视频",
+                            "message": "Video file not found; started re-downloadYouTubevideo",
                             "project_id": project_id,
                             "download_task_id": download_task_id,
                             "source_url": source_url
                         }
                     else:
-                        raise HTTPException(status_code=400, detail=f"不支持的视频源: {source_url}")
+                        raise HTTPException(status_code=400, detail=f"Unsupported video source: {source_url}")
                 else:
-                    raise HTTPException(status_code=400, detail=f"视频文件不存在且没有源URL: {video_path}")
+                    raise HTTPException(status_code=400, detail=f"Video file does not exist and has no sourceURL: {video_path}")
             else:
-                raise HTTPException(status_code=400, detail=f"视频文件不存在且没有项目元数据: {video_path}")
+                raise HTTPException(status_code=400, detail=f"Video file not found and no project metadata exists: {video_path}")
         
-        # 字幕文件是可选的
+        # Subtitle file is optional
         srt_path_str = str(srt_path) if srt_path.exists() else None
         
-        # 延迟导入，避免过早触发celery_app导入链
+        # Lazy import to avoid triggering too earlycelery_appimport chain
         from backend.tasks.processing import process_video_pipeline
         
-        # 提交Celery任务 - 使用字符串类型的project_id
+        # SubmitCeleryTask - Using string typeproject_id
         celery_task = process_video_pipeline.delay(
             project_id=project_id,
             input_video_path=str(video_path),
             input_srt_path=srt_path_str
         )
         
-        # 创建新的处理任务记录
+        # Create new processing task record
         from ...models.task import TaskType
         task_result = processing_service._create_processing_task(
             project_id=project_id,
             task_type=TaskType.VIDEO_PROCESSING
         )
         
-        # 更新任务的Celery任务ID
+        # Updating task'sCelerytaskID
         task_result.celery_task_id = celery_task.id
         processing_service.db.commit()
         
@@ -673,7 +711,7 @@ async def retry_processing(
     except HTTPException:
         raise
     except Exception as e:
-        # 发送错误通知 - 已禁用WebSocket通知
+        # Sending error notification - DisabledWebSocketNotify
         # try:
         #     await websocket_service.send_processing_error(
         #         project_id=int(project_id),
@@ -682,8 +720,8 @@ async def retry_processing(
         #     )
         # except:
         #     pass
-        logger.exception("重试项目处理失败: %s", project_id)
-        raise HTTPException(status_code=500, detail="重试处理失败，请稍后重试")
+        logger.exception("Retry failed project processing: %s", project_id)
+        raise HTTPException(status_code=500, detail="Retrying failed processing, please try again later")
 
 
 @router.post("/{project_id}/resume")
@@ -695,16 +733,16 @@ async def resume_processing(
 ):
     """Resume processing from a specific step."""
     try:
-        # 获取项目信息
+        # Get project information
         project = project_service.get(project_id)
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        # 检查项目状态
+        # Check project status
         if project.status.value not in ["failed", "processing", "pending"]:
             raise HTTPException(status_code=400, detail="Project is not in failed, processing, or pending status")
         
-        # 获取SRT文件路径（如果需要）
+        # getSRTFile path (if applicable))
         srt_path = None
         if start_step == "step1_outline":
             if project.processing_config and "srt_file" in project.processing_config:
@@ -715,7 +753,7 @@ async def resume_processing(
             if not srt_path or not srt_path.exists():
                 raise HTTPException(status_code=400, detail=f"SRT file not found: {srt_path}")
         
-        # 调用处理服务恢复执行
+        # Resume execution by calling handler service
         result = processing_service.resume_processing(project_id, start_step, srt_path)
         
         return {
@@ -725,8 +763,8 @@ async def resume_processing(
             "result": result
         }
     except Exception as e:
-        logger.exception("恢复项目处理失败: %s", project_id)
-        raise HTTPException(status_code=500, detail="恢复处理失败，请稍后重试")
+        logger.exception("Failed to resume project processing: %s", project_id)
+        raise HTTPException(status_code=500, detail="Recovery failed. Please try again later")
 
 
 @router.get("/{project_id}/status")
@@ -737,12 +775,12 @@ async def get_processing_status(
 ):
     """Get processing status of a project."""
     try:
-        # 获取项目信息
+        # Get project information
         project = project_service.get(project_id)
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        # 获取最新的任务
+        # Get latest task
         tasks = project.tasks if hasattr(project, 'tasks') else []
         latest_task = None
         if tasks:
@@ -753,18 +791,20 @@ async def get_processing_status(
                 "status": "pending",
                 "current_step": 0,
                 "total_steps": 6,
-                "step_name": "等待开始",
+                "step_name": "Wait to start",
                 "progress": 0,
                 "error_message": None
             }
         
-        # 获取处理状态
+        # Get processing status
         status = processing_service.get_processing_status(project_id, str(latest_task.id))
         
         return status
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.exception("获取处理状态失败: %s", project_id)
-        raise HTTPException(status_code=500, detail="获取处理状态失败，请稍后重试")
+        logger.exception("Failed to get processing status: %s", project_id)
+        raise HTTPException(status_code=500, detail="Failed to retrieve processing status, please try again later")
 
 
 @router.get("/{project_id}/logs")
@@ -775,38 +815,38 @@ async def get_project_logs(
 ):
     """Get project logs."""
     try:
-        # 模拟日志数据，实际应该从日志服务获取
+        # Simulate log data, actual should be fetched from log service
         return {
             "logs": [
                 {
                     "timestamp": "2025-08-01T13:30:00.000Z",
                     "module": "processing",
                     "level": "INFO",
-                    "message": "开始处理项目"
+                    "message": "Start processing project"
                 },
                 {
                     "timestamp": "2025-08-01T13:30:05.000Z",
                     "module": "processing",
                     "level": "INFO",
-                    "message": "Step 1: 提取大纲完成"
+                    "message": "Step 1: Outline extraction complete"
                 },
                 {
                     "timestamp": "2025-08-01T13:30:10.000Z",
                     "module": "processing",
                     "level": "INFO",
-                    "message": "Step 2: 时间定位完成"
+                    "message": "Step 2: Time synchronization complete"
                 },
                 {
                     "timestamp": "2025-08-01T13:30:15.000Z",
                     "module": "processing",
                     "level": "INFO",
-                    "message": "Step 3: 内容评分进行中..."
+                    "message": "Step 3: Content rating in progress..."
                 }
             ]
         }
     except Exception as e:
-        logger.exception("获取项目日志失败: %s", project_id)
-        raise HTTPException(status_code=500, detail="获取项目日志失败，请稍后重试")
+        logger.exception("Failed to get project logs: %s", project_id)
+        raise HTTPException(status_code=500, detail="Failed to retrieve project logs, please try again later")
 
 
 @router.get("/{project_id}/import-status")
@@ -814,29 +854,29 @@ async def get_import_status(
     project_id: str,
     project_service: ProjectService = Depends(get_project_service)
 ):
-    """获取项目导入状态"""
+    """Getting import status of project"""
     try:
-        # 获取项目信息
+        # Get project information
         project = project_service.get(project_id)
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        # 检查是否有正在进行的导入任务
+        # Checking for an ongoing import task
         from backend.celery_app import celery_app
         
-        # 这里可以添加更复杂的任务状态检查逻辑
-        # 目前简单返回项目状态
+        # Here you can add more complex task state check logic
+        # Returns current project status
         return {
             "project_id": project_id,
             "status": project.status.value,
-            "message": "导入状态正常"
+            "message": "Import status normal"
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"获取导入状态失败: {e}")
-        raise HTTPException(status_code=500, detail=f"获取导入状态失败: {str(e)}")
+        logger.error(f"Failed to get import status: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get import status: {str(e)}")
 
 
 @router.post("/{project_id}/generate-thumbnail")
@@ -844,47 +884,47 @@ async def generate_project_thumbnail(
     project_id: str,
     project_service: ProjectService = Depends(get_project_service)
 ):
-    """为项目生成缩略图"""
+    """Generating thumbnail for project"""
     try:
-        # 获取项目信息
+        # Get project information
         project = project_service.get(project_id)
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        # 检查是否有视频文件
+        # Check for video file
         if not project.video_path:
             raise HTTPException(status_code=400, detail="Project has no video file")
         
-        # 检查视频文件是否存在
+        # Check if video file exists
         video_path = Path(project.video_path)
         if not video_path.exists():
             raise HTTPException(status_code=400, detail="Video file not found")
         
-        # 生成缩略图
+        # Generating thumbnail
         from ...utils.thumbnail_generator import generate_project_thumbnail
         thumbnail_data = generate_project_thumbnail(project_id, video_path)
         
         if thumbnail_data:
-            # 保存缩略图到数据库
+            # Save thumbnail to database
             project.thumbnail = thumbnail_data
             project_service.db.commit()
             
             return {
                 "success": True,
                 "thumbnail": thumbnail_data,
-                "message": "缩略图生成并保存成功"
+                "message": "Thumbnail generated and saved successfully"
             }
         else:
-            raise HTTPException(status_code=500, detail="缩略图生成失败")
+            raise HTTPException(status_code=500, detail="Thumbnail generation failed")
             
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"生成项目缩略图失败: {e}")
-        raise HTTPException(status_code=500, detail=f"生成缩略图失败: {str(e)}")
+        logger.error(f"Failed to generate project thumbnail: {e}")
+        raise HTTPException(status_code=500, detail=f"Thumbnail generation failed: {str(e)}")
 
 
-@router.get("/{project_id}/files/{filename}")
+@router.api_route("/{project_id}/files/{filename}", methods=["GET", "HEAD"])
 async def get_project_file(
     project_id: str,
     filename: str,
@@ -896,49 +936,53 @@ async def get_project_file(
         import json
         from fastapi.responses import FileResponse
         
-        # 构建文件路径 - 使用正确的项目目录路径
+        # Build file path - use correct project directory path
         from ...core.path_utils import get_project_directory
         project_root = get_project_directory(project_id)
         
-        # 尝试多个可能的路径
+        filename_base = Path(filename).name
+        # Trying multiple possible paths
         possible_paths = [
-            project_root / "raw" / filename,  # 原始文件
-            project_root / "metadata" / filename,  # 元数据文件
-            project_root / filename,  # 直接在项目根目录
+            project_root / "raw" / filename,  # Original file
+            project_root / "raw" / filename_base,
+            project_root / "metadata" / filename,  # Metadata file
+            project_root / "metadata" / filename_base,
+            project_root / filename,  # Directly in project root directory
+            project_root / filename_base,
         ]
         
         file_path = None
         for path in possible_paths:
-            if path.exists():
+            if path.exists() and path.is_file():
                 file_path = path
                 break
         
         if not file_path:
             raise HTTPException(status_code=404, detail="File not found")
         
-        # 根据文件类型返回不同响应
+        # Return different response based on file type
         if filename.endswith('.json'):
-            # JSON文件返回数据
+            # JSONFile returned data
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             return data
         else:
-            # 其他文件（如视频）返回文件流
+            # Other files (such as videos) return file stream
             media_type = "video/mp4" if filename.endswith('.mp4') else "application/octet-stream"
             return FileResponse(
                 path=str(file_path),
                 filename=filename,
                 media_type=media_type,
                 headers={
-                    "Accept-Ranges": "bytes",  # 支持范围请求，便于视频播放
-                    "Cache-Control": "public, max-age=3600"  # 缓存1小时
+                    "Accept-Ranges": "bytes",  # Support range requests for video playback
+                    "Cache-Control": "public, max-age=3600"  # cache1Hours
                 }
             )
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("获取项目文件失败: %s/%s", project_id, filename)
-        raise HTTPException(status_code=500, detail="获取项目文件失败，请稍后重试")
+        logger.exception("Failed to get project file: %s/%s", project_id, filename)
+        raise HTTPException(status_code=500, detail="Failed to retrieve project file, please try again later")
 
 
 @router.get("/{project_id}/clips/{clip_id}")
@@ -952,20 +996,20 @@ async def get_project_clip(
         from pathlib import Path
         import os
         
-        # 构建视频文件路径 - 使用正确的项目目录路径
+        # Build video file path - use correct project directory path
         from ...core.path_utils import get_project_directory
         project_dir = get_project_directory(project_id)
         clips_dir = project_dir / "output" / "clips"
         
-        # 确保路径存在
+        # Ensuring path exists
         if not clips_dir.exists():
             raise HTTPException(status_code=404, detail=f"Clips directory not found: {clips_dir}")
         
-        # 查找对应的视频文件
-        # 首先尝试通过clip_id查找
+        # Find corresponding video file
+        # First trying throughclip_idFind
         video_files = list(clips_dir.glob(f"{clip_id}_*.mp4"))
         
-        # 如果没找到，尝试查找所有mp4文件，然后通过数据库匹配
+        # If not found, attempt to find allmp4File, then match through database
         if not video_files:
             from ...models.clip import Clip
             clip = project_service.db.query(Clip).filter(Clip.id == clip_id).first()
@@ -980,45 +1024,49 @@ async def get_project_clip(
         else:
             video_file = video_files[0]
         
-        # 检查文件是否存在
+        # Check if file exists
         if not video_file.exists():
             raise HTTPException(status_code=404, detail="Clip video file not found")
         
-        # 返回文件流
+        # Returning file stream
         from fastapi.responses import FileResponse
         return FileResponse(
             path=str(video_file),
             media_type="video/mp4",
-            filename=video_file.name
+            filename=video_file.name,
+            headers={
+                "Cache-Control": "no-cache, must-revalidate",
+                "Pragma": "no-cache"
+            }
         )
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("获取项目切片失败: %s/%s", project_id, clip_id)
-        raise HTTPException(status_code=500, detail="获取切片文件失败，请稍后重试")
+        logger.exception("Getting slice retrieval failed: %s/%s", project_id, clip_id)
+        raise HTTPException(status_code=500, detail="Failed to retrieve slice file, please try again later")
 
 
 @router.post("/sync-all")
 async def sync_all_projects_from_filesystem(
     db: Session = Depends(get_db)
 ):
-    """从文件系统同步所有项目数据到数据库"""
+    """Synchronize all project data from file system to database"""
     try:
         from backend.services.data_sync_service import DataSyncService
         from backend.core.config import get_data_directory
         
-        # 获取数据目录
+        # Getting data directory
         data_dir = get_data_directory()
         
-        # 创建数据同步服务
+        # Create data synchronization service
         sync_service = DataSyncService(db)
         
-        # 同步所有项目
+        # Synchronizing all projects
         result = sync_service.sync_all_projects_from_filesystem(data_dir)
         
         return {
             "success": result.get("success", False),
-            "message": "数据同步完成",
+            "message": "Data synchronization complete",
             "synced_projects": result.get("synced_projects", []),
             "failed_projects": result.get("failed_projects", []),
             "total_synced": len(result.get("synced_projects", [])),
@@ -1026,8 +1074,8 @@ async def sync_all_projects_from_filesystem(
         }
         
     except Exception as e:
-        logger.error(f"同步所有项目数据失败: {e}")
-        raise HTTPException(status_code=500, detail=f"同步失败: {str(e)}")
+        logger.error(f"Failed to synchronize all project data: {e}")
+        raise HTTPException(status_code=500, detail=f"Synchronization failed: {str(e)}")
 
 
 @router.patch("/{project_id}/collections/{collection_id}/reorder")
@@ -1037,27 +1085,27 @@ async def reorder_collection_clips(
     clip_ids: List[str],
     db: Session = Depends(get_db)
 ):
-    """重新排序合集中的切片"""
+    """Reorder slices in collection"""
     try:
         from backend.services.collection_service import CollectionService
         
-        # 创建合集服务
+        # Create collection service
         collection_service = CollectionService(db)
         
-        # 获取合集
+        # Get collection
         collection = collection_service.get(collection_id)
         if not collection:
             raise HTTPException(status_code=404, detail="Collection not found")
         
-        # 验证合集属于指定项目
+        # Verify collection belongs to specified project
         if str(collection.project_id) != project_id:
             raise HTTPException(status_code=400, detail="Collection does not belong to the specified project")
         
-        # 更新collection_metadata中的clip_ids
+        # Updatecollection_metadatainclip_ids
         metadata = getattr(collection, 'collection_metadata', {}) or {}
         metadata['clip_ids'] = clip_ids
         
-        # 直接更新数据库中的collection_metadata字段
+        # Directly update databasecollection_metadatafield
         from sqlalchemy import update
         from backend.models.collection import Collection
         
@@ -1075,8 +1123,8 @@ async def reorder_collection_clips(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"重新排序合集 {collection_id} 切片失败: {e}")
-        raise HTTPException(status_code=500, detail=f"重新排序失败: {str(e)}")
+        logger.error(f"Reordering collection {collection_id} Slice failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Reordering failed: {str(e)}")
 
 
 @router.post("/sync/{project_id}")
@@ -1084,22 +1132,22 @@ async def sync_project_from_filesystem(
     project_id: str,
     db: Session = Depends(get_db)
 ):
-    """从文件系统同步指定项目数据到数据库"""
+    """Synchronize specified project data from file system to database"""
     try:
         from backend.services.data_sync_service import DataSyncService
         from backend.core.config import get_data_directory
         
-        # 获取数据目录
+        # Getting data directory
         data_dir = get_data_directory()
         project_dir = data_dir / "projects" / project_id
         
         if not project_dir.exists():
-            raise HTTPException(status_code=404, detail=f"项目目录不存在: {project_id}")
+            raise HTTPException(status_code=404, detail=f"Project directory does not exist: {project_id}")
         
-        # 创建数据同步服务
+        # Create data synchronization service
         sync_service = DataSyncService(db)
         
-        # 同步项目数据
+        # Synchronizing project data
         result = sync_service.sync_project_from_filesystem(project_id, project_dir)
         
         return {
@@ -1107,14 +1155,14 @@ async def sync_project_from_filesystem(
             "project_id": project_id,
             "clips_synced": result.get("clips_synced", 0),
             "collections_synced": result.get("collections_synced", 0),
-            "message": f"项目 {project_id} 同步完成"
+            "message": f"project {project_id} Synchronization complete"
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"同步项目 {project_id} 数据失败: {e}")
-        raise HTTPException(status_code=500, detail=f"同步失败: {str(e)}")
+        logger.error(f"Synchronize project {project_id} Data failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Synchronization failed: {str(e)}")
 
 
 @router.post("/{project_id}/collections/{collection_id}/generate")
@@ -1124,7 +1172,7 @@ async def generate_collection_video(
     db: Session = Depends(get_db),
     project_service: ProjectService = Depends(get_project_service)
 ):
-    """生成合集视频"""
+    """Generating collection video"""
     try:
         from ...models.collection import Collection
         from ...models.clip import Clip
@@ -1133,41 +1181,41 @@ async def generate_collection_video(
         from pathlib import Path
         import json
         
-        # 验证项目是否存在
+        # Validate if project exists
         project = project_service.get(project_id)
         if not project:
-            raise HTTPException(status_code=404, detail="项目不存在")
+            raise HTTPException(status_code=404, detail="Project does not exist")
         
-        # 获取合集记录
+        # Getting collection record
         collection = db.query(Collection).filter(Collection.id == collection_id).first()
         if not collection:
-            raise HTTPException(status_code=404, detail="合集不存在")
+            raise HTTPException(status_code=404, detail="Collection does not exist")
         
-        # 验证合集属于该项目
+        # Verify collection belongs to this project
         if str(collection.project_id) != project_id:
-            raise HTTPException(status_code=400, detail="合集不属于指定项目")
+            raise HTTPException(status_code=400, detail="Collection does not belong to specified project")
         
-        # 获取合集的切片ID列表
+        # Get slices from collectionIDlist
         metadata = getattr(collection, 'collection_metadata', {}) or {}
         clip_ids = metadata.get('clip_ids', [])
         
         if not clip_ids:
-            raise HTTPException(status_code=400, detail="合集没有包含任何切片")
+            raise HTTPException(status_code=400, detail="Collection contains no slices")
         
-        # 获取切片信息，并按照clip_ids的顺序排列
+        # Get slice info, then byclip_idsOrdered by sequence
         clips_dict = {clip.id: clip for clip in db.query(Clip).filter(Clip.id.in_(clip_ids)).all()}
         if len(clips_dict) != len(clip_ids):
-            raise HTTPException(status_code=400, detail="部分切片不存在")
+            raise HTTPException(status_code=400, detail="Some slices do not exist")
         
-        # 按照用户调整的顺序获取clips
+        # Get ordered by user adjustmentsclips
         ordered_clips = [clips_dict[clip_id] for clip_id in clip_ids if clip_id in clips_dict]
         
-        # 获取项目目录
+        # Getting project directory
         project_dir = get_project_directory(project_id)
         collections_dir = project_dir / "output" / "collections"
         collections_dir.mkdir(parents=True, exist_ok=True)
         
-        # 准备切片视频文件路径，按照用户调整的顺序
+        # Prepare sliced video file paths, in user-adjusted order
         clips_dir = project_dir / "output" / "clips"
         clip_video_paths = []
         
@@ -1175,7 +1223,7 @@ async def generate_collection_video(
             if clip.video_path and Path(clip.video_path).exists():
                 clip_video_paths.append(Path(clip.video_path))
             else:
-                # 尝试在clips目录中查找
+                # try inclipsSearching in directory
                 possible_paths = [
                     clips_dir / f"{clip.id}_*.mp4",
                     clips_dir / f"clip_{clip.id}.mp4",
@@ -1185,7 +1233,7 @@ async def generate_collection_video(
                 found = False
                 for pattern in possible_paths:
                     if pattern.name.endswith('*'):
-                        # 处理通配符
+                        # Processing wildcard
                         matches = list(clips_dir.glob(pattern.name))
                         if matches:
                             clip_video_paths.append(matches[0])
@@ -1198,17 +1246,17 @@ async def generate_collection_video(
                             break
                 
                 if not found:
-                    raise HTTPException(status_code=404, detail=f"切片视频文件不存在: {clip.id}")
+                    raise HTTPException(status_code=404, detail=f"Slice video file does not exist: {clip.id}")
         
-        # 生成合集视频文件名 - 使用合集标题作为文件名
+        # Build collection video file name - use collection title as file name
         collection_name = collection.name or f"collection_{collection_id}"
-        # 使用VideoProcessor的sanitize_filename方法清理文件名
+        # usingVideoProcessorOf / 'ssanitize_filenameClean method for file name
         from ...utils.video_processor import VideoProcessor
         safe_name = VideoProcessor.sanitize_filename(collection_name)
         output_filename = f"{safe_name}.mp4"
         output_path = collections_dir / output_filename
         
-        # 使用VideoProcessor创建合集
+        # usingVideoProcessorCreate collection
         video_processor = VideoProcessor(
             clips_dir=str(clips_dir),
             collections_dir=str(collections_dir)
@@ -1216,31 +1264,31 @@ async def generate_collection_video(
         success = video_processor.create_collection(clip_video_paths, output_path)
         
         if not success:
-            raise HTTPException(status_code=500, detail="合集视频生成失败")
+            raise HTTPException(status_code=500, detail="Collection video generation failed")
         
-        # 生成合集封面
+        # Generate collection cover
         thumbnail_path = None
         try:
             thumbnail_filename = f"{collection_id}_{safe_name}_thumbnail.jpg"
             thumbnail_path = collections_dir / thumbnail_filename
             
-            # 从视频中提取封面（第5秒的帧）
+            # Extract cover from video (frame5frame seconds)
             thumbnail_success = video_processor.extract_thumbnail(output_path, thumbnail_path, time_offset=5)
             if thumbnail_success:
                 collection.thumbnail_path = str(thumbnail_path)
-                logger.info(f"合集封面生成成功: {thumbnail_path}")
+                logger.info(f"Collection cover generation successful: {thumbnail_path}")
             else:
-                logger.warning(f"合集封面生成失败: {collection_id}")
+                logger.warning(f"Failed to generate collection cover: {collection_id}")
         except Exception as e:
-            logger.error(f"生成合集封面时出错: {e}")
+            logger.error(f"Error generating collection thumbnail: {e}")
         
-        # 更新合集的export_path
+        # Update collection ofexport_path
         collection.export_path = str(output_path)
         db.commit()
         
         return {
             "success": True,
-            "message": "合集视频生成成功",
+            "message": "Collection video generation successful",
             "collection_id": collection_id,
             "output_path": str(output_path),
             "filename": output_filename
@@ -1249,50 +1297,42 @@ async def generate_collection_video(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"生成合集视频失败: {e}")
-        raise HTTPException(status_code=500, detail=f"生成合集视频失败: {str(e)}")
+        logger.error(f"Failed to create collection video: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create collection video: {str(e)}")
 
 
-@router.get("/{project_id}/download")
+@router.api_route("/{project_id}/download", methods=["GET", "HEAD"])
 async def download_project_file(
     project_id: str,
-    clip_id: Optional[str] = Query(None, description="下载指定切片"),
-    collection_id: Optional[str] = Query(None, description="下载指定合集"),
+    clip_id: Optional[str] = Query(None, description="Download specified slice"),
+    collection_id: Optional[str] = Query(None, description="Downloading specified collection"),
     db: Session = Depends(get_db),
     project_service: ProjectService = Depends(get_project_service)
 ):
-    """下载项目文件（切片或合集）"""
+    """Downloading project file (slice or bundle))"""
     try:
         from fastapi.responses import FileResponse
         from pathlib import Path
+        import urllib.parse
+        from ...utils.video_processor import VideoProcessor
+        from ...core.path_utils import find_clip_video_file, find_collection_video_file
         
-        # 验证项目是否存在
+        # Validate if project exists
         project = project_service.get(project_id)
         if not project:
-            raise HTTPException(status_code=404, detail="项目不存在")
+            raise HTTPException(status_code=404, detail="Project does not exist")
         
         if collection_id:
-            # 下载合集视频
-            from ...models.collection import Collection
-            collection = db.query(Collection).filter(Collection.id == collection_id).first()
-            if not collection:
-                raise HTTPException(status_code=404, detail="合集不存在")
+            # Downloading collection video
+            file_path, collection = find_collection_video_file(project_id, collection_id, db=db)
+            if not file_path or not file_path.exists():
+                raise HTTPException(status_code=404, detail="Collection video file does not exist")
             
-            if not collection.export_path:
-                raise HTTPException(status_code=404, detail="合集视频文件不存在")
-            
-            file_path = Path(collection.export_path)
-            if not file_path.exists():
-                raise HTTPException(status_code=404, detail="合集视频文件不存在")
-            
-            # 生成下载文件名
-            collection_name = collection.name or f"collection_{collection_id}"
-            from ...utils.video_processor import VideoProcessor
+            # Generate download file name
+            collection_name = (collection.name if collection else None) or file_path.stem or f"collection_{collection_id}"
             safe_name = VideoProcessor.sanitize_filename(collection_name)
             filename = f"{safe_name}.mp4"
             
-            # 对文件名进行URL编码
-            import urllib.parse
             encoded_filename = urllib.parse.quote(filename.encode('utf-8'))
             
             return FileResponse(
@@ -1305,27 +1345,16 @@ async def download_project_file(
             )
         
         elif clip_id:
-            # 下载切片视频
-            from ...models.clip import Clip
-            clip = db.query(Clip).filter(Clip.id == clip_id).first()
-            if not clip:
-                raise HTTPException(status_code=404, detail="切片不存在")
+            # Downloading clip video
+            file_path, clip = find_clip_video_file(project_id, clip_id, db=db)
+            if not file_path or not file_path.exists():
+                raise HTTPException(status_code=404, detail="Slice video file does not exist")
             
-            if not clip.video_path:
-                raise HTTPException(status_code=404, detail="切片视频文件不存在")
-            
-            file_path = Path(clip.video_path)
-            if not file_path.exists():
-                raise HTTPException(status_code=404, detail="切片视频文件不存在")
-            
-            # 生成下载文件名
-            clip_title = clip.title or f"clip_{clip_id}"
-            from ...utils.video_processor import VideoProcessor
+            # Generate download file name
+            clip_title = (clip.title if clip else None) or getattr(clip, 'generated_title', None) or file_path.stem or f"clip_{clip_id}"
             safe_name = VideoProcessor.sanitize_filename(clip_title)
             filename = f"{safe_name}.mp4"
             
-            # 对文件名进行URL编码
-            import urllib.parse
             encoded_filename = urllib.parse.quote(filename.encode('utf-8'))
             
             return FileResponse(
@@ -1338,13 +1367,132 @@ async def download_project_file(
             )
         
         else:
-            raise HTTPException(status_code=400, detail="必须指定clip_id或collection_id")
+            raise HTTPException(status_code=400, detail="Must specify clip_id or collection_id")
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"下载文件失败: {e}")
-        raise HTTPException(status_code=500, detail=f"下载文件失败: {str(e)}")
+        logger.error(f"Failed to download file: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to download file: {str(e)}")
+
+
+@router.api_route("/{project_id}/export-zip", methods=["GET", "HEAD"])
+async def export_project_clips_zip(
+    project_id: str,
+    platform: Optional[str] = Query(None, description="Filter clips by platform (tiktok, instagram, youtube_shorts, facebook, all)"),
+    db: Session = Depends(get_db),
+    project_service: ProjectService = Depends(get_project_service)
+):
+    """Package all clips and subtitles of a project into a downloadable ZIP archive."""
+    try:
+        import zipfile
+        import io
+        import json
+        import os
+        from fastapi.responses import StreamingResponse
+        from pathlib import Path
+        import urllib.parse
+        from ...models.clip import Clip
+        from ...utils.video_processor import VideoProcessor
+        from ...core.path_utils import get_project_directory, find_clip_video_file
+
+        project = project_service.get(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        clips = db.query(Clip).filter(Clip.project_id == project_id).all()
+        if not clips:
+            raise HTTPException(status_code=404, detail="No clips found for this project")
+
+        req_platform = str(platform).lower().strip() if platform else None
+        if req_platform in ("youtube", "shorts", "yt"):
+            req_platform = "youtube_shorts"
+        elif req_platform in ("ig", "reels"):
+            req_platform = "instagram"
+        elif req_platform in ("fb",):
+            req_platform = "facebook"
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_STORED) as zip_file:
+            for idx, clip in enumerate(clips, 1):
+                title = clip.title or clip.generated_title or f"clip_{idx}"
+                safe_title = VideoProcessor.sanitize_filename(f"{idx:02d}_{title}")
+                
+                meta = getattr(clip, 'clip_metadata', {}) or {}
+                if isinstance(meta, str):
+                    try:
+                        meta = json.loads(meta)
+                    except Exception:
+                        meta = {}
+                cta_plats = meta.get("cta_platforms") or meta.get("platform_videos") or {}
+
+                # If specific platform requested:
+                if req_platform and req_platform in ("tiktok", "instagram", "youtube_shorts", "facebook"):
+                    target_file = None
+                    if isinstance(cta_plats, dict) and req_platform in cta_plats:
+                        p = Path(cta_plats[req_platform])
+                        if p.exists() and p.stat().st_size > 0:
+                            target_file = p
+                    if not target_file:
+                        file_path, _ = find_clip_video_file(project_id, clip.id, clip_obj=clip, db=db)
+                        if file_path and file_path.exists():
+                            target_file = file_path
+
+                    if target_file and target_file.exists():
+                        zip_file.write(target_file, arcname=f"clips/{safe_title}_{req_platform}.mp4")
+                        clip_srt = target_file.with_suffix(".srt")
+                        if not clip_srt.exists():
+                            orig_path, _ = find_clip_video_file(project_id, clip.id, clip_obj=clip, db=db)
+                            if orig_path:
+                                clip_srt = orig_path.with_suffix(".srt")
+                        if clip_srt and clip_srt.exists():
+                            zip_file.write(clip_srt, arcname=f"subtitles/{safe_title}.srt")
+
+                # If "all" or multi-platform files exist:
+                elif isinstance(cta_plats, dict) and any(os.path.exists(p) for p in cta_plats.values()):
+                    for plat_name, plat_path in cta_plats.items():
+                        pp = Path(plat_path)
+                        if pp.exists() and pp.stat().st_size > 0:
+                            zip_file.write(pp, arcname=f"clips/{plat_name}/{safe_title}_{plat_name}.mp4")
+                    orig_path, _ = find_clip_video_file(project_id, clip.id, clip_obj=clip, db=db)
+                    if orig_path and orig_path.with_suffix(".srt").exists():
+                        zip_file.write(orig_path.with_suffix(".srt"), arcname=f"subtitles/{safe_title}.srt")
+
+                # Fallback to single video path
+                else:
+                    file_path, _ = find_clip_video_file(project_id, clip.id, clip_obj=clip, db=db)
+                    if file_path and file_path.exists():
+                        zip_file.write(file_path, arcname=f"clips/{safe_title}.mp4")
+                        clip_srt = file_path.with_suffix(".srt")
+                        if clip_srt.exists():
+                            zip_file.write(clip_srt, arcname=f"subtitles/{safe_title}.srt")
+
+            # Add source subtitle file if available
+            proj_dir = get_project_directory(project_id)
+            srt_path = proj_dir / "raw" / "input.srt"
+            if srt_path.exists():
+                safe_pname = VideoProcessor.sanitize_filename(project.name)
+                zip_file.write(srt_path, arcname=f"{safe_pname}_full_subtitles.srt")
+
+        zip_buffer.seek(0)
+        safe_proj_name = VideoProcessor.sanitize_filename(project.name)
+        plat_suffix = f"_{req_platform}" if req_platform and req_platform != "all" else "_all_platforms"
+        archive_name = f"{safe_proj_name}{plat_suffix}_clips.zip"
+        encoded_name = urllib.parse.quote(archive_name.encode('utf-8'))
+
+        return StreamingResponse(
+            zip_buffer,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}",
+                "Content-Type": "application/zip"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to export clips zip: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create ZIP package: {str(e)}")
 
 
 @router.get("/{project_id}/collections/{collection_id}/thumbnail")
@@ -1354,44 +1502,44 @@ async def get_collection_thumbnail(
     db: Session = Depends(get_db),
     project_service: ProjectService = Depends(get_project_service)
 ):
-    """获取合集封面图片"""
+    """Getting collection cover image"""
     try:
         from fastapi.responses import FileResponse
         from pathlib import Path
         
-        # 验证项目是否存在
+        # Validate if project exists
         project = project_service.get(project_id)
         if not project:
-            raise HTTPException(status_code=404, detail="项目不存在")
+            raise HTTPException(status_code=404, detail="Project does not exist")
         
-        # 获取合集记录
+        # Getting collection record
         from ...models.collection import Collection
         collection = db.query(Collection).filter(Collection.id == collection_id).first()
         if not collection:
-            raise HTTPException(status_code=404, detail="合集不存在")
+            raise HTTPException(status_code=404, detail="Collection does not exist")
         
-        # 验证合集属于该项目
+        # Verify collection belongs to this project
         if str(collection.project_id) != project_id:
-            raise HTTPException(status_code=400, detail="合集不属于指定项目")
+            raise HTTPException(status_code=400, detail="Collection does not belong to specified project")
         
-        # 检查是否有封面
+        # Check for cover image
         if not collection.thumbnail_path:
-            raise HTTPException(status_code=404, detail="合集封面不存在")
+            raise HTTPException(status_code=404, detail="Collection cover does not exist")
         
         thumbnail_path = Path(collection.thumbnail_path)
         if not thumbnail_path.exists():
-            raise HTTPException(status_code=404, detail="合集封面文件不存在")
+            raise HTTPException(status_code=404, detail="Collection cover file does not exist")
         
         return FileResponse(
             path=str(thumbnail_path),
             media_type="image/jpeg",
             headers={
-                "Cache-Control": "public, max-age=3600"  # 缓存1小时
+                "Cache-Control": "public, max-age=3600"  # cache1Hours
             }
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"获取合集封面失败: {e}")
-        raise HTTPException(status_code=500, detail=f"获取合集封面失败: {str(e)}")
+        logger.error(f"Failed to get collection cover: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get collection cover: {str(e)}")

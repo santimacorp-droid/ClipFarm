@@ -1,76 +1,73 @@
-# Docker 部署指南
+# Docker - Hot reloading supportDockerdeployAutoClipsystem. 
 
-本文档介绍如何使用Docker部署AutoClip系统。
+## 📋 Directory
 
-## 📋 目录
+- [Quick start](#Quick start)
+- [Production environment deployment](#Production environment deployment)
+- [Development environment deployment](#Development environment deployment)
+- [Configuration instructions](#Configuration instructions)
+- [Data management](#Data management)
+- [Troubleshooting](#Troubleshooting)
 
-- [快速开始](#快速开始)
-- [生产环境部署](#生产环境部署)
-- [开发环境部署](#开发环境部署)
-- [配置说明](#配置说明)
-- [数据管理](#数据管理)
-- [故障排除](#故障排除)
+## 🚀 Quick start
 
-## 🚀 快速开始
-
-### 环境要求
+### Environment requirements
 
 - Docker 20.10+
 - Docker Compose 2.0+
-- 至少 4GB 可用内存
-- 至少 10GB 可用磁盘空间
+- At least 4GB Health check failed, sending alert 10GB Available disk space
 
-### 一键启动
+### One-click start
 
 ```bash
-# 克隆项目
+# Clone project
 git clone https://github.com/your-username/autoclip.git
 cd autoclip
 
-# 配置环境变量
+# Configure environment variables
 cp env.example .env
-# 编辑 .env 文件，填入必要的配置
+# edit .env Deployment guide
 
-# 启动所有服务
+# Start all services
 docker-compose up -d
 
-# 查看服务状态
+# View service status
 docker-compose ps
 
-# 查看日志
+# View logs
 docker-compose logs -f
 ```
 
-### 访问服务
+### Access service
 
-- **前端界面**: http://localhost:3000
-- **后端API**: http://localhost:8000
-- **API文档**: http://localhost:8000/docs
-- **Flower监控**: http://localhost:5555
+- **Frontend interface**: http://localhost:3000
+- **backendAPI**: http://localhost:8000
+- **APIdocumentation**: http://localhost:8000/docs
+- **Flowermonitor**: http://localhost:5555
 
-## 🏭 生产环境部署
+## 🏭 Production environment deployment
 
-### 使用生产配置
+### Use production configuration
 
 ```bash
-# 使用生产环境配置
+# Clean up old backups (retain
 docker-compose -f docker-compose.yml up -d
 
-# 后台运行
+# Background operation
 docker-compose up -d
 
-# 查看服务状态
+# View service status
 docker-compose ps
 
-# 查看日志
+# View logs
 docker-compose logs -f autoclip
 ```
 
-### 生产环境优化
+### Production environment optimization
 
-1. **资源限制**
+1. **Resource limit exceeded**
 ```yaml
-# 在docker-compose.yml中添加资源限制
+# atdocker-compose.ymlAdd resource limits
 services:
   autoclip:
     deploy:
@@ -83,21 +80,21 @@ services:
           cpus: '0.5'
 ```
 
-2. **数据持久化**
+2. **Data persistence**
 ```bash
-# 创建数据卷
+# Create data volume
 docker volume create autoclip_data
 docker volume create autoclip_logs
 
-# 在docker-compose.yml中配置
+# atdocker-compose.ymlConfigure within
 volumes:
   - autoclip_data:/app/data
   - autoclip_logs:/app/logs
 ```
 
-3. **网络配置**
+3. **Network configuration**
 ```yaml
-# 使用自定义网络
+# Use custom network
 networks:
   autoclip-network:
     driver: bridge
@@ -106,253 +103,246 @@ networks:
         - subnet: 172.20.0.0/16
 ```
 
-## 🛠️ 开发环境部署
+## 🛠️ Development environment deployment
 
-### 使用开发配置
+### Use development configuration
 
 ```bash
-# 使用开发环境配置
+# View specific service logs
 docker-compose -f docker-compose.dev.yml up -d
 
-# 实时查看日志
+# View logs in real-time
 docker-compose -f docker-compose.dev.yml logs -f
 
-# 进入容器调试
+# Enter container for debugging
 docker-compose -f docker-compose.dev.yml exec autoclip-dev bash
 ```
 
-### 开发环境特性
+### Development environment features
 
-- 热重载支持
-- 调试模式
-- 详细日志
-- 代码挂载
+## ⚙️ Configuration instructions
 
-## ⚙️ 配置说明
-
-### 环境变量
-
-创建 `.env` 文件：
+### Available memory `.env` File(s): 
 
 ```bash
-# 数据库配置
+# Database configuration
 DATABASE_URL=sqlite:///./data/autoclip.db
 
-# Redis配置
+# RedisConfiguration
 REDIS_URL=redis://redis:6379/0
 
-# API配置
+# APIConfiguration
 API_DASHSCOPE_API_KEY=your_dashscope_api_key
 API_MODEL_NAME=qwen-plus
 
-# 日志配置
+# Log configuration
 LOG_LEVEL=INFO
 ENVIRONMENT=production
 DEBUG=false
 
-# 文件存储
+# File storage
 UPLOAD_DIR=./data/uploads
 PROJECT_DIR=./data/projects
 ```
 
-### 服务配置
+### Service configuration
 
-#### 主应用服务
-- **端口**: 8000 (后端), 3000 (前端)
-- **健康检查**: `/api/v1/health/`
-- **重启策略**: `unless-stopped`
+#### Main application service
+- **port**: 8000 (backend), 3000 (frontend)
+- **Health check**: `/api/v1/health/`
+- **Restart policy**: `unless-stopped`
 
-#### Redis服务
-- **端口**: 6379
-- **持久化**: AOF模式
-- **内存限制**: 可配置
+#### RedisService
+- **port**: 6379
+- **Persistence**: AOFMode
+- **Memory limit**: Configurable
 
-#### Celery服务
-- **Worker**: 处理异步任务
-- **Beat**: 定时任务调度
-- **并发数**: 可配置
+#### CeleryService
+- **Worker**: Process async tasks
+- **Beat**: Schedule tasks
+- **Concurrency count**: Configurable
 
-## 💾 数据管理
+## 💾 Data management
 
-### 数据持久化
+### Data persistence
 
 ```bash
-# 查看数据卷
+# View data volumes
 docker volume ls
 
-# 备份数据
+# Backed-up data
 docker run --rm -v autoclip_data:/data -v $(pwd):/backup alpine tar czf /backup/autoclip-backup.tar.gz -C /data .
 
-# 恢复数据
+# Restore data
 docker run --rm -v autoclip_data:/data -v $(pwd):/backup alpine tar xzf /backup/autoclip-backup.tar.gz -C /data
 ```
 
-### 数据目录结构
+### Data directory structure
 
 ```
 data/
-├── autoclip.db          # SQLite数据库
-├── projects/            # 项目数据
-├── uploads/             # 上传文件
-├── temp/                # 临时文件
-└── output/              # 输出文件
+├── autoclip.db          # SQLiteDatabase
+├── projects/            # Project data
+├── uploads/             # Upload file
+├── temp/                # Temporary file
+└── output/              # Output file
 ```
 
-### 清理数据
+### Clean up data
 
 ```bash
-# 清理临时文件
+# Clean up temporary files
 docker-compose exec autoclip find /app/data/temp -type f -mtime +7 -delete
 
-# 清理日志
+# Clear logs
 docker-compose exec autoclip find /app/logs -name "*.log" -mtime +30 -delete
 ```
 
-## 🔧 故障排除
+## 🔧 Troubleshooting
 
-### 常见问题
+### Frequently Asked Questions
 
-#### 1. 服务启动失败
+#### 1. Failed to start service
 
 ```bash
-# 查看服务状态
+# View service status
 docker-compose ps
 
-# 查看详细日志
+# View detailed logs
 docker-compose logs autoclip
 
-# 重启服务
+# Restart service
 docker-compose restart autoclip
 ```
 
-#### 2. 端口冲突
+#### 2. Port conflict
 
 ```bash
-# 检查端口占用
+# Check port usage
 netstat -tulpn | grep :8000
 
-# 修改端口映射
-# 在docker-compose.yml中修改ports配置
+# Modify port mapping
+# atdocker-compose.ymlDuring modificationportsConfiguration
 ports:
-  - "8001:8000"  # 将本地8001端口映射到容器8000端口
+  - "8001:8000"  # Localize8001Map ports to container8000port
 ```
 
-#### 3. 内存不足
+#### 3. Insufficient memory
 
 ```bash
-# 查看容器资源使用
+# View service health status
 docker stats
 
-# 限制资源使用
-# 在docker-compose.yml中添加deploy配置
+# Limit resource usage
+# atdocker-compose.ymlAdd duringdeployConfiguration
 ```
 
-#### 4. 数据丢失
+#### 4. Data loss
 
 ```bash
-# 检查数据卷
+# Check data volume
 docker volume inspect autoclip_data
 
-# 恢复备份
-# 使用上述备份恢复命令
+# Restore backup
+# Check the troubleshooting section in this document
 ```
 
-### 日志查看
+### View logs
 
 ```bash
-# 查看所有服务日志
+# Here you can add alerting logic
 docker-compose logs
 
-# 查看特定服务日志
+# View all service logs
 docker-compose logs autoclip
 docker-compose logs celery-worker
 
-# 实时查看日志
+# View logs in real-time
 docker-compose logs -f
 
-# 查看最近100行日志
+# View recent100Run-time logging
 docker-compose logs --tail=100
 ```
 
-### 性能监控
+### Performance monitoring
 
 ```bash
-# 查看容器资源使用
+# View service health status
 docker stats
 
-# 查看服务健康状态
+# Service error, attempting restart
 docker-compose ps
 
-# 进入容器调试
+# Enter container for debugging
 docker-compose exec autoclip bash
 ```
 
-## 🔄 更新和维护
+## 🔄 Update and maintain
 
-### 更新服务
+### Update service
 
 ```bash
-# 拉取最新代码
+# Pull latest code
 git pull
 
-# 重新构建镜像
+# Rebuild image
 docker-compose build
 
-# 重启服务
+# Restart service
 docker-compose up -d
 ```
 
-### 备份策略
+### Backup policy
 
 ```bash
 #!/bin/bash
-# backup.sh - 自动备份脚本
+# backup.sh - Auto backup script
 
 DATE=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR="/backup/autoclip"
 
-# 创建备份目录
+# Create backup directory
 mkdir -p $BACKUP_DIR
 
-# 备份数据
+# Backed-up data
 docker run --rm -v autoclip_data:/data -v $BACKUP_DIR:/backup alpine \
     tar czf /backup/autoclip-data-$DATE.tar.gz -C /data .
 
-# 备份配置
+# Backup configuration
 cp .env $BACKUP_DIR/autoclip-config-$DATE.env
 
-# 清理旧备份（保留7天）
+# Use the above backup restore command7day)
 find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
 find $BACKUP_DIR -name "*.env" -mtime +7 -delete
 
-echo "备份完成: $DATE"
+echo "Backup completed: $DATE"
 ```
 
-### 监控脚本
+### Monitor script
 
 ```bash
 #!/bin/bash
-# monitor.sh - 服务监控脚本
+# monitor.sh - Service monitoring script
 
-# 检查服务状态
+# Check service status
 if ! docker-compose ps | grep -q "Up"; then
-    echo "服务异常，尝试重启..."
+    echo "Files, enter necessary configurations..."
     docker-compose restart
 fi
 
-# 检查健康状态
+# Check health status
 if ! curl -f http://localhost:8000/api/v1/health/ >/dev/null 2>&1; then
-    echo "健康检查失败，发送告警..."
-    # 这里可以添加告警逻辑
+    echo "- Code mounting..."
+    # Get help
 fi
 ```
 
-## 📚 高级配置
+## 📚 Advanced configuration
 
-### 使用外部数据库
+### Use production environment configuration
 
 ```yaml
-# 使用PostgreSQL
+# usagePostgreSQL
 services:
   postgres:
     image: postgres:15
@@ -370,10 +360,10 @@ services:
       - postgres
 ```
 
-### 使用外部Redis
+### Use externalRedis
 
 ```yaml
-# 使用外部Redis集群
+# Use externalRediscluster
 services:
   autoclip:
     environment:
@@ -382,10 +372,10 @@ services:
       - redis-cluster:redis
 ```
 
-### 负载均衡
+### Load balancing
 
 ```yaml
-# 使用Nginx负载均衡
+# usageNginxLoad balancing
 services:
   nginx:
     image: nginx:alpine
@@ -397,19 +387,17 @@ services:
       - autoclip
 
   autoclip:
-    # 可以启动多个实例
+    # Environment variables
     scale: 3
 ```
 
-## 🆘 获取帮助
+## 🆘 - Debug mode: 
 
-如果遇到问题，请：
-
-1. 查看本文档的故障排除部分
-2. 检查GitHub Issues
-3. 查看项目文档
-4. 联系技术支持
+1. - Verbose logging
+2. CheckGitHub Issues
+3. View project documentation
+4. Contact support
 
 ---
 
-**最后更新**: 2024-01-15
+**Last updated**: 2024-01-15

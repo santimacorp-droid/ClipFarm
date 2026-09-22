@@ -3,66 +3,78 @@ import { projectApi } from '../services/api'
 import { Project, useProjectStore } from '../store/useProjectStore'
 
 interface UseProjectPollingOptions {
-  interval?: number // 轮询间隔，默认10秒
+  interval?: number // Polling interval, default10Seconds
   onProjectsUpdate?: (projects: Project[]) => void
-  enabled?: boolean // 是否启用轮询
+  enabled?: boolean // Whether to enable polling
 }
 
 export const useProjectPolling = ({
-  interval = 30000, // 默认30秒，减少频繁请求
+  interval = 30000, // Default30seconds, reduce frequent requests
   onProjectsUpdate,
   enabled = true
 }: UseProjectPollingOptions = {}) => {
   const [isPolling, setIsPolling] = useState(false)
-  const intervalRef = useRef<number | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now())
 
-    const startPolling = () => {
-    if (!enabled || intervalRef.current) return
+  const startPolling = (overrideInterval?: number) => {
+    if (!enabled) return
+    // Clear any existing timer before (re)starting
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
 
     setIsPolling(true)
-    
+
     const poll = async () => {
       try {
-        // 实时获取isDragging状态
+        // Skip poll while user is dragging
         const currentIsDragging = useProjectStore.getState().isDragging
-        
-        // 如果正在拖拽，跳过这次轮询
         if (currentIsDragging) {
           console.log('Skipping poll: dragging in progress')
           return
         }
-        
+
         console.log('Polling projects...')
         const projects = await projectApi.getProjects()
-        console.log('Polled projects:', projects)
-        
-        // 确保projects是数组类型
+
         const safeProjects = Array.isArray(projects) ? projects : []
-        const hasProcessingProjects = safeProjects.some(p => p.status === 'processing')
-        
+        console.log(`Polled: ${safeProjects.length} projects`)
+
+        // Consider a project "active" if it is processing OR pending (which
+        // includes the downloading state before the video file lands on disk).
+        const hasActiveProjects = safeProjects.some(p =>
+          p.status === 'processing' ||
+          p.status === 'pending'
+        )
+
         if (onProjectsUpdate) {
-          console.log('Calling onProjectsUpdate with:', safeProjects)
           onProjectsUpdate(safeProjects)
         }
-        
+
         setLastUpdateTime(Date.now())
-        
-        // 智能轮询：如果没有正在处理的项目，增加轮询间隔
-        if (!hasProcessingProjects) {
-          // 如果没有活跃项目，可以进一步减少轮询频率
-          console.log('无活跃项目，将减少轮询频率')
+
+        // Adaptive polling: fast while something is happening, stay stopped when idle.
+        if (hasActiveProjects) {
+          const targetInterval = 3000
+          const currentInterval = overrideInterval ?? interval
+          if (targetInterval !== currentInterval) {
+            startPolling(targetInterval)
+          } else if (!intervalRef.current) {
+            intervalRef.current = setInterval(poll, targetInterval)
+          }
+        } else {
+          stopPolling() // ensure it stays stopped, don't restart
+          console.log('No active projects, stopped project polling')
         }
       } catch (error) {
         console.error('Polling error:', error)
       }
     }
 
-    // 立即执行一次
+    // Fire immediately. Interval is only scheduled if hasActiveProjects is true
     poll()
-    
-    // 设置定时器
-    intervalRef.current = setInterval(poll, interval)
   }
 
   const stopPolling = () => {
@@ -76,7 +88,7 @@ export const useProjectPolling = ({
   const refreshNow = async () => {
     try {
       const projects = await projectApi.getProjects()
-      // 确保projects是数组类型
+      // EnsureprojectsIs array type
       const safeProjects = Array.isArray(projects) ? projects : []
       if (onProjectsUpdate) {
         onProjectsUpdate(safeProjects)

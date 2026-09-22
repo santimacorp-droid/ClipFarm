@@ -56,7 +56,9 @@ class ClipResponse(BaseSchema):
     status: ClipStatus = Field(description="Clip status")
     video_path: Optional[str] = Field(description="Video file path")
     tags: Optional[List[str]] = Field(description="Clip tags")
-    clip_metadata: Optional[dict] = Field(description="Additional metadata")
+    clip_metadata: Optional[dict] = Field(default=None, description="Additional metadata")
+    platform_advisory: Optional[dict] = Field(default=None, description="Platform duration advisory")
+    social_copy: Optional[dict] = Field(default=None, description="Generated social post caption & hashtags")
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
     

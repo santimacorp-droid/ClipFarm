@@ -52,6 +52,10 @@ export interface ProcessAffiliateResult {
   cta_platform: string
   cta_handle: string
   cta_style: string
+  cta_position?: string
+  cta_watermark?: boolean
+  watermark_preset_id?: string
+  brand_watermark_applied?: boolean
   video_width: number
   video_height: number
   video_duration: number
@@ -80,6 +84,7 @@ export const affiliateApi = {
     cta_style?: string
     cta_position?: string
     watermark?: boolean
+    watermark_preset_id?: string
     language?: string
     engine?: string
   }): Promise<ProcessAffiliateResult> => {

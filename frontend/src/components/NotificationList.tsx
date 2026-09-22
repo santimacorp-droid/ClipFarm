@@ -5,7 +5,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 
-// 配置dayjs插件
+// ConfigurationdayjsPlugin
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -61,17 +61,17 @@ const getNotificationColor = (level: Notification['level']) => {
 };
 
 const formatTime = (timestamp: string) => {
-  // 正确处理时区转换，确保显示本地时间
+  // Correctly handle time zone conversion to ensure accurate local time display
   const now = dayjs().tz('Asia/Shanghai');
   const notificationTime = dayjs(timestamp).tz('Asia/Shanghai');
   const diff = now.diff(notificationTime, 'millisecond');
   
-  if (diff < 60000) { // 1分钟内
-    return '刚刚';
-  } else if (diff < 3600000) { // 1小时内
-    return `${Math.floor(diff / 60000)}分钟前`;
-  } else if (diff < 86400000) { // 24小时内
-    return `${Math.floor(diff / 3600000)}小时前`;
+  if (diff < 60000) { // 1Within minutes
+    return 'Just now';
+  } else if (diff < 3600000) { // 1Within an hour
+    return `${Math.floor(diff / 60000)}Minutes ago`;
+  } else if (diff < 86400000) { // 24Within an hour
+    return `${Math.floor(diff / 3600000)}Hours ago`;
   } else {
     return notificationTime.format('MM-DD HH:mm');
   }
@@ -105,7 +105,7 @@ export const NotificationList: React.FC<NotificationListProps> = ({
           onClick={() => onMarkAsRead(notification.id)}
           disabled={notification.read}
         >
-          标记已读
+          Mark as read
         </Button>,
         <Button
           key="remove"
@@ -115,7 +115,7 @@ export const NotificationList: React.FC<NotificationListProps> = ({
           icon={<DeleteOutlined />}
           onClick={() => onRemove(notification.id)}
         >
-          删除
+          Delete
         </Button>
       ]}
     >
@@ -150,7 +150,7 @@ export const NotificationList: React.FC<NotificationListProps> = ({
     <Card
       title={
         <Space>
-          <span>通知</span>
+          <span>Notification</span>
           {unreadCount > 0 && (
             <Badge count={unreadCount} size="small" />
           )}
@@ -160,11 +160,11 @@ export const NotificationList: React.FC<NotificationListProps> = ({
         <Space>
           {unreadCount > 0 && (
             <Button size="small" onClick={onMarkAllAsRead}>
-              全部已读
+              Mark all as read
             </Button>
           )}
           <Button size="small" danger onClick={onClearAll}>
-            清空
+            Clear
           </Button>
         </Space>
       }
@@ -175,7 +175,7 @@ export const NotificationList: React.FC<NotificationListProps> = ({
       <div style={{ maxHeight, overflowY: 'auto' }}>
         {notifications.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 20, color: '#999' }}>
-            暂无通知
+            No notifications
           </div>
         ) : (
           <List

@@ -1,6 +1,6 @@
 """
-数据模型包
-包含所有数据库模型定义
+Data models package
+Contains all database model definitions
 """
 from .base import Base, TimestampMixin
 from .project import Project
@@ -8,6 +8,7 @@ from .clip import Clip
 from .collection import Collection
 from .task import Task, TaskStatus, TaskType
 from .bilibili import BilibiliAccount, UploadRecord
+from .campaign import Campaign, CampaignClip
 
 __all__ = [
     "Base",
@@ -19,5 +20,7 @@ __all__ = [
     "TaskStatus",
     "TaskType",
     "BilibiliAccount",
-    "UploadRecord"
+    "UploadRecord",
+    "Campaign",
+    "CampaignClip"
 ]

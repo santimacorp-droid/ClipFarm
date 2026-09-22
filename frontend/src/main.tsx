@@ -1,37 +1,34 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
-import { ConfigProvider } from 'antd'
-import { theme as antdTheme } from 'antd'
-import zhCN from 'antd/locale/zh_CN'
+import { ConfigProvider, App as AntdApp, theme as antdTheme } from 'antd'
+import enUS from 'antd/locale/en_US'
 import dayjs from 'dayjs'
-import 'dayjs/locale/zh-cn'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import timezone from 'dayjs/plugin/timezone'
 import utc from 'dayjs/plugin/utc'
 import App from './App.tsx'
 import ErrorBoundary from './components/ErrorBoundary'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
-import { initAnalytics } from './analytics/posthog'
-import { trackLaunch } from './analytics/lifecycle'
+import { initAnalytics } from './appEvents/client'
+import { trackLaunch } from './appEvents/lifecycle'
 import './index.css'
 
-// 初始化产品分析 / 埋点（无 key 时自动 no-op，不发任何网络请求）
+// Global property registration / Update event key Language settings no-op, Initialization of product analytics)
 initAnalytics()
-// 注册全局属性 + 上报启动/安装/更新事件
+// No tracking (no-op) + Plugin configuration/installation/Report startup completed automatically
 void trackLaunch()
 
-// 配置dayjs插件
+// Configure dayjs
 dayjs.extend(relativeTime)
 dayjs.extend(timezone)
 dayjs.extend(utc)
 
-// 设置dayjs中文和时区
-dayjs.locale('zh-cn')
-dayjs.tz.setDefault('Asia/Shanghai')
+// Set dayjs language
+dayjs.locale('en')
 
 function Root() {
-  // 统一在根节点接入错误边界，避免运行时异常导致白屏
+  // Root-level error boundaries only; no network requests
   return (
     <ErrorBoundary showDetails={import.meta.env.DEV}>
       <App />
@@ -45,7 +42,7 @@ function ThemedApp() {
 
   return (
     <ConfigProvider
-      locale={zhCN}
+      locale={enUS}
       theme={{
       algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
       token: {
@@ -68,11 +65,13 @@ function ThemedApp() {
       },
     }}
     >
-    <React.StrictMode>
-      <HashRouter>
-        <Root />
-      </HashRouter>
-    </React.StrictMode>
+    <AntdApp>
+      <React.StrictMode>
+        <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Root />
+        </HashRouter>
+      </React.StrictMode>
+    </AntdApp>
     </ConfigProvider>
   )
 }

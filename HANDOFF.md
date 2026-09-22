@@ -1,111 +1,102 @@
-# AutoClip — 项目状态 / 进度 / 计划
+# AutoClip — Project status / Progress / Schedule
 
-> 更新：2026-05-30 · 分支 `main`（领先 origin 若干 commit，未 push）
+> Update: 2026-05-30 · Branch `main`(Leading origin Several commit, Unstarted push)
 
-AutoClip 是一款 AI 视频切片工具：输入 B站/YouTube 链接或本地视频，自动识别精彩片段、
-生成切片与合集。本文是项目的当前状态与路线图的单一事实来源。
+AutoClip It's a AI Video slice tool: Input BStation/YouTube Links or local videos, automatically recognize highlight clips,. 
 
 ---
 
-## 一、架构与交付形态
+## I. Architecture & Delivery Form
 
-| 层 | 技术 | 目录 |
+| layer | Technology | Directory |
 |----|------|------|
-| 后端 | FastAPI + Celery（桌面模式用本地队列）+ SQLite | `backend/` |
-| 前端 | React + TypeScript + Ant Design + Vite | `frontend/` |
-| 桌面壳 | Tauri 2 + Rust | `src-tauri/` |
-| LLM | OpenAI / Gemini(google-genai) / 通义千问(dashscope) / 硅基流动 | `backend/core/llm_providers.py` |
+| Backend | FastAPI + Celery(Desktop mode uses local queue)+ SQLite | `backend/` |
+| Frontend | React + TypeScript + Ant Design + Vite | `frontend/` |
+| Desktop shell | Tauri 2 + Rust | `src-tauri/` |
+| LLM | OpenAI / Gemini(google-genai) / Tongyi Qianwen(dashscope) / Silicon flow | `backend/core/llm_providers.py` |
 
-三种交付形态：**Docker 部署**、**本地脚本启动**（`start_autoclip.sh`）、**桌面客户端**（macOS DMG）。
-近期工作集中在桌面客户端。
-
----
-
-## 二、当前进度（已完成且验证）
-
-桌面客户端打包链路从"打不出能用的包"做到了**端到端可装可用**：
-
-1. **统一打包路线** —— 砍掉历史上互相打架的 PyInstaller / prepare_resources 两条死路线，
-   只保留 python-build-standalone（PBS）：便携 Python + 后端源码 + 静态 ffmpeg/ffprobe 全部打进
-   `.app`，用户机器零依赖。脚本：`scripts/build_macos_arm.sh`。
-
-2. **修好一连串发版阻断 bug**（都已实测验证）：
-   - **ffmpeg 不可用**：原来打包的是 homebrew 动态版（57 个 `/opt/homebrew` 依赖），换成静态
-     arm64 ffmpeg+ffprobe（零非系统依赖），并让 Rust 启动器通过 `AUTOCLIP_FFMPEG_PATH`/
-     `AUTOCLIP_FFPROBE_PATH` 指向内置二进制。
-   - **黑屏**：Vite 把 React/antd 拆成两个 vendor chunk，antd 先于 React 初始化 → `createContext`
-     报错、React 不挂载。去掉手动分包后正常渲染。
-   - **项目列表一直转圈**：`/api/v1/projects/` 因缺 `pytz` 报 500。补齐 `pytz` 及 LLM SDK
-     (`openai`/`google-genai`/`dashscope`) 到 `requirements.txt`。
-   - **依赖漂移护栏**：构建期 AST 扫描后端所有 import，缺任何一个直接 fail，杜绝"开发能跑、打包就 500"。
-
-3. **CI 统一** —— 7 个从未成功的桌面构建工作流 → 1 个 `desktop-build.yml`（跑 PBS 脚本，
-   `v*` tag 自动挂 Release）。保留 `ci.yml`（测试）、`i18n-sync.yml`（文档）、
-   `nightly-desktop-smoke.yml`（后端冒烟）。
-
-4. **仓库清理** —— 删掉约 30 个废弃脚本、嵌套鬼目录、94M 旧 PyInstaller 备份等；
-   `scripts/` 只剩 4 个活脚本；重写 `scripts/README.md` 与 `BUILD_GUIDE.md`。
-
-5. **Gemini SDK 迁移** —— 从已停更的 `google-generativeai` 迁到统一的 `google-genai`。
-
-**产物**：`src-tauri/target/release/bundle/macos/AutoClip Desktop_1.0.0_aarch64.dmg`（~260M）。
+Three delivery forms: **Docker Deployment**, **Local script launcher**(`start_autoclip.sh`), **Desktop client**(macOS DMG). 
+Recent efforts focused on the desktop client. 
 
 ---
 
-## 三、遗漏 / 未验证（按优先级）
+## II. Current Progress (Completed & Verified)**End-to-end installable and usable**: 
 
-> 已闭环（不再是遗漏）：**完整切片流程**已在打包后的 app 里端到端跑通（粘 B站 链接 → 下载 →
-> 字幕 → DashScope 分析 → 评分 → 标题 → 切割 → 出 5 个切片，79s 完成）；**无字幕视频**现在可
-> 在「设置 → 语音转写」按需安装 faster-whisper 自动转写（实测安装 214MB、转写出 SRT）。
+1. **Unified packaging route** —— Cut off historically conflicting PyInstaller / prepare_resources Removed two dead build routes, python-build-standalone(PBS): Portable Python + Backend source code + Static ffmpeg/ffprobe Flush all
+   `.app`, User machine zero dependencies. Script: `scripts/build_macos_arm.sh`. 
 
-### 中
-- **签名/公证**：目前 ad-hoc 签名，未做 Apple Developer ID 签名 + 公证，用户首次必须右键打开。
-- **仅 arm64**：没有 Intel mac / Windows / Linux 包。
-- **依赖未锁版本**：`requirements.txt` 多数包没固定版本，跨时间/跨机器构建有漂移风险。
-- **构建慢**：每次构建都重装全部 pip 依赖（PBS python 被 `rm -rf` 重建）。可缓存已装好的运行时。
-- **Gemini 迁移未对真实 API 验证**：代码与新版 google-genai SDK 接口已对齐并能 import，但没有
-  Gemini key 实际调用过（DashScope 路径已实跑验证）。
+2. **Fix a series of deployment blocking bugs bug**(All tested and verified): 
+   - **ffmpeg Not available**: Previously packaged was homebrew Dynamic version(57 one `/opt/homebrew` Dependencies), switch to static
+     arm64 ffmpeg+ffprobe(Zero non-system dependencies), and make Rust Launcher passes through `AUTOCLIP_FFMPEG_PATH`/
+     `AUTOCLIP_FFPROBE_PATH` Pointing to built-in binary. 
+   - **Black screen**: Vite Place/Put/Turn React/antd Split into two vendor chunk, antd Prior to React Initialized → `createContext`
+     Error/Error encountered, React Frontend fix: eliminated manual bundling, ensuring normal rendering. 
+   - **Project list keeps spinning**: `/api/v1/projects/` Because of lack `pytz` Report 500. Fill in/Pad/Complete `pytz` Both…and/Together with/Also LLM SDK
+     (`openai`/`google-genai`/`dashscope`) Reached/Arrived at `requirements.txt`. 
+   - **Dependency drift guardrail**: Build time AST Scan backend import, Missing any one directly fail, Eliminate the "development works, packaging fails" cycle 500". 
 
-### 低
-- **前端单 bundle ~1.5MB**：去掉分包后是一个大 chunk，桌面端无所谓，若以后也跑 Web 可考虑按路由懒加载。
-- **单步重试 `submit_single_step_task`** 仍走 Redis send_task（桌面没改），目前没有入口用到；
-  整条流水线的 `.delay()` 已由 DesktopAwareTask 接管本地执行。
+3. **CI Standardize** —— 7 Seventeen never-succeeded legacy desktop builds → 1 one `desktop-build.yml`(Ran PBS Script, 
+   `v*` tag Auto attached Release). Retain/Keep `ci.yml`(Test/Test mode), `i18n-sync.yml`(Documentation), 
+   `nightly-desktop-smoke.yml`(Backend smoke test). 
 
----
+4. **Repository cleanup** —— Remove about 30 Three obsolete scripts, one nested temporary directory,, 94M Old PyInstaller Backup and so on; 
+   `scripts/` Only/Just left/Spare 4 One active script; Rewrite `scripts/README.md` And/With `BUILD_GUIDE.md`. 
 
-## 四、未来计划（路线图）
+5. **Gemini SDK Migrate** —— From discontinued `google-generativeai` Migrated to unified `google-genai`. 
 
-1. **正式签名与公证**：申请 Apple Developer ID，签名 + notarize，消除"右键打开"。
-2. **多平台打包**：把 `build_macos_arm.sh` 的 runner / PBS URL / ffmpeg URL / tauri target 参数化，
-   扩到 Intel mac、Windows、Linux（PBS 与静态 ffmpeg 都有对应平台版本；faster-whisper 本就跨平台）。
-3. **依赖锁定**：固定 `requirements.txt` 版本（或引入 lock 文件），保证可复现构建。
-4. **构建提速**：缓存 PBS python + 已装依赖，避免每次重装。
-5. **自动 UI 冒烟**：在 CI 里加一步，验证打包后的前端能挂载（而不仅是后端接口通）。
-6. 产品向：B站上传、字幕编辑、批量处理、云端同步（见 RELEASE_CHECKLIST.md 后续计划）。
+**Product**: `src-tauri/target/release/bundle/macos/AutoClip Desktop_1.0.0_aarch64.dmg`(~260M). 
 
 ---
 
-## 五、关键文件
+## Three, missed / Not yet verified (by priority))
 
-- 打包脚本：`scripts/build_macos_arm.sh`（说明见 `scripts/README.md`、`BUILD_GUIDE.md`）
-- 后端启动器（Rust）：`src-tauri/src/backend_manager.rs`
-- 桌面后端入口：`backend/desktop_main.py`
-- ffmpeg 路径解析：`backend/utils/ffmpeg_utils.py`
-- LLM 提供商：`backend/core/llm_providers.py`
-- 桌面流水线本地执行：`backend/core/celery_app.py`（DesktopAwareTask）、`backend/utils/task_submission_utils.py`
-- Whisper 运行时（按需安装）：`backend/services/whisper_runtime.py`、`whisper_model_manager.py`、
-  前端 `frontend/src/components/SpeechRecognitionConfig.tsx`
-- 前端 API 配置：`frontend/src/utils/apiConfig.ts`
-- CI：`.github/workflows/desktop-build.yml`
+> Already closed (no longer missed): **Complete slicing workflow**On packaged app End-to-end run-through (sticky) BSite link → Download →
+> Subtitles → DashScope Analysis → Score → Title → Trim → Out/Export 5 One slice, 79s Completed); **Video without subtitles**Now available
+> in「Set → Speech transcription」On-demand install faster-whisper Automatic transcription (actual installation test results show 214MB, Converted out SRT). 
 
-## 六、安装（给用户）
+### Between/Middle
+- **Signature/Notarize**: Currently ad-hoc Signature, not done Apple Developer ID Signature + Mandatory first-time user right-click confirmation. 
+- **Only/Limit to arm64**: None/Non-existent Intel mac / Windows / Linux Within/Contained by. 
+- **Dependency with unsaved version**: `requirements.txt` Most packages lack fixed version numbers, making time-based dependency matching difficult/Cross-machine builds risk divergence. 
+- **Slow build**: Each build re-installs all pip Dependency(PBS python Failed/Break `rm -rf` Updated Dockerfile (recreating from scratch). Can cache already-installed runtime. 
+- **Gemini Migrated not aligned with real API Verify**: Code and new version google-genai SDK Interface aligned and functional import, But doesn't have
+  Gemini key Actually called more than(DashScope Path verified through actual run). 
 
-1. 双击 DMG → 拖 `AutoClip Desktop` 到 Applications
-2. **首次右键应用 → 打开**（ad-hoc 签名，绕过 Gatekeeper）
-3. 进设置页填 LLM API key 即可使用
+### low
+- **Frontend single bundle ~1.5MB**: After removing splits, it's a large chunk, Desktop side doesn't matter here; if future backend runs, Web May consider lazy loading by route. 
+- **Single-step retry `submit_single_step_task`** Still routed through Redis send_task(Main desktop script (no modifications needed for worker),; 
+  Entire pipeline of `.delay()` Already by DesktopAwareTask Take over local execution. 
 
-命令行排查后端：
+---
+
+## IV. Future Plan (Roadmap))
+
+1. **Official signature and notarization**: Request/Apply Apple Developer ID, Signature + notarize, Remove "right-click open". 
+2. **Multiplatform packaging**: Place/Put/Turn `build_macos_arm.sh` of runner / PBS URL / ffmpeg URL / tauri target Parametric, Intel mac, Windows, Linux(PBS And static ffmpeg Each has a corresponding platform version; faster-whisper Cross-platform by nature). 
+3. **Dependency lock**: Fixed `requirements.txt` Version (or imported lock Cleaned build artifacts (including package-lock files) to ensure reproducible builds. 
+4. **Build acceleration**: Cache PBS python + Installed dependencies to avoid reinstallation on every run. 
+5. **Automatic UI Smoke test**: in CI Added an intermediate step to verify that the packaged frontend can mount). 
+6. Product towards: BBackend features: deployment, subtitle editing, batch processing, cloud sync (see separate doc) RELEASE_CHECKLIST.md Next plan). 
+
+---
+
+## V. Key Files: `scripts/build_macos_arm.sh`(See description `scripts/README.md`, `BUILD_GUIDE.md`)
+- Backend launcher(Rust): `src-tauri/src/backend_manager.rs`
+- Desktop backend entry: `backend/desktop_main.py`
+- ffmpeg Path resolution: `backend/utils/ffmpeg_utils.py`
+- LLM Supplier: `backend/core/llm_providers.py`
+- Desktop pipeline local execution: `backend/core/celery_app.py`(DesktopAwareTask), `backend/utils/task_submission_utils.py`
+- Whisper Runtime (on-demand install): `backend/services/whisper_runtime.py`, `whisper_model_manager.py`, 
+  Frontend `frontend/src/components/SpeechRecognitionConfig.tsx`
+- Frontend API Configuration: `frontend/src/utils/apiConfig.ts`
+- CI: `.github/workflows/desktop-build.yml`
+
+## VI. Installation (for users)
+
+1. Double click DMG → Drag `AutoClip Desktop` Reached/Arrived at Applications
+2. **First right-click application → Open**(ad-hoc Signature, bypassed Gatekeeper)
+3. Enter settings page and fill in LLM API key Command-line diagnostics for backend: 
 ```bash
 '/Applications/AutoClip Desktop.app/Contents/MacOS/autoclip-desktop'
-# 应看到 Backend started on port: XXXXX / Application startup complete
+# Should see Backend started on port: XXXXX / Application startup complete
 ```

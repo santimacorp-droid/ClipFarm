@@ -1,6 +1,6 @@
 """
-合集Repository
-提供合集相关的数据访问操作
+CollectionRepository
+Provide collection-related data access operations
 """
 
 from typing import List, Optional, Dict, Any
@@ -11,83 +11,83 @@ from .base import BaseRepository
 from ..models.collection import Collection, CollectionStatus
 
 class CollectionRepository(BaseRepository[Collection]):
-    """合集Repository类"""
+    """Compilation Repository class"""
     
     def __init__(self, db: Session):
         super().__init__(Collection, db)
     
     def get_by_project(self, project_id: str) -> List[Collection]:
         """
-        获取项目的所有合集
+        Get all compilations for a project
         
         Args:
-            project_id: 项目ID
+            project_id: ProjectID
             
         Returns:
-            合集列表
+            Collection list
         """
         return self.find_by(project_id=project_id)
     
     def get_by_status(self, status: CollectionStatus) -> List[Collection]:
         """
-        根据状态获取合集列表
+        Get compilation list by status
         
         Args:
-            status: 合集状态
+            status: Collection status
             
         Returns:
-            合集列表
+            Collection list
         """
         return self.find_by(status=status)
     
     def get_by_project_and_status(self, project_id: str, status: CollectionStatus) -> List[Collection]:
         """
-        根据项目和状态获取合集列表
+        Get compilation list by project and status
         
         Args:
-            project_id: 项目ID
-            status: 合集状态
+            project_id: ProjectID
+            status: Collection status
             
         Returns:
-            合集列表
+            Collection list
         """
         return self.find_by(project_id=project_id, status=status)
     
     def get_by_theme(self, project_id: str, theme: str) -> List[Collection]:
         """
-        根据主题获取合集列表
+        Get compilation list by theme
         
         Args:
-            project_id: 项目ID
-            theme: 主题
+            project_id: ProjectID
+            theme: Topic
             
         Returns:
-            合集列表
+            Collection list
         """
         return self.find_by(project_id=project_id, theme=theme)
     
     def get_completed_collections(self, project_id: str) -> List[Collection]:
         """
-        获取已完成的合集
+        Get completed compilations
         
         Args:
-            project_id: 项目ID
+            project_id: ProjectID
             
         Returns:
-            已完成的合集列表
+            Completed compilation list
         """
         return self.find_by(project_id=project_id, status=CollectionStatus.COMPLETED)
     
     def search_collections(self, project_id: str, keyword: str) -> List[Collection]:
         """
-        搜索合集
+        Search collections
         
         Args:
-            project_id: 项目ID
-            keyword: 搜索关键词
+            project_id: ProjectID
+            keyword: Search keyword
             
         Returns:
-            匹配的合集列表
+            Matching compilation list
         """
         return self.db.query(self.model).filter(
             self.model.project_id == project_id,
@@ -98,14 +98,14 @@ class CollectionRepository(BaseRepository[Collection]):
     
     def get_collections_by_clips_count(self, project_id: str, min_clips: int = 1) -> List[Collection]:
         """
-        根据切片数量获取合集
+        Get compilations by number of slices
         
         Args:
-            project_id: 项目ID
-            min_clips: 最少切片数量
+            project_id: ProjectID
+            min_clips: Minimum number of slices
             
         Returns:
-            合集列表
+            Collection list
         """
         return self.db.query(self.model).filter(
             self.model.project_id == project_id,
@@ -113,22 +113,22 @@ class CollectionRepository(BaseRepository[Collection]):
         ).order_by(desc(self.model.clips_count)).all()
     
     def create_collection(self, collection_data: Dict[str, Any]) -> Collection:
-        """创建合集记录（分离存储模式）"""
+        """Create compilation record (separation storage mode))"""
         from ..services.storage_service import StorageService
         import uuid
         
-        # 生成合集ID（如果没有提供）
+        # Generate compilation ID (if not provided)
         if "id" not in collection_data:
             collection_data["id"] = str(uuid.uuid4())
         
-        # 1. 保存合集文件到文件系统
+        # Save compilation file to file system
         storage_service = StorageService(collection_data["project_id"])
         export_path = storage_service.save_collection_file(collection_data, collection_data["id"])
         
-        # 2. 保存完整数据到文件系统
+        # Save complete data to file system
         metadata_path = storage_service.save_metadata(collection_data, f"collection_{collection_data['id']}")
         
-        # 3. 保存元数据到数据库（只存储路径引用）
+        # Save metadata to database (stores only path references)
         collection = Collection(
             id=collection_data["id"],
             project_id=collection_data["project_id"],
@@ -138,9 +138,9 @@ class CollectionRepository(BaseRepository[Collection]):
             tags=collection_data.get("tags"),
             total_duration=collection_data.get("total_duration"),
             clips_count=collection_data.get("clips_count", 0),
-            export_path=export_path,  # 只存储路径
+            export_path=export_path,  # Only store path
             collection_metadata={
-                'metadata_file': metadata_path,  # 完整数据文件路径
+                'metadata_file': metadata_path,  # Full data file path
                 'clip_ids': collection_data.get('clip_ids', []),
                 'collection_type': collection_data.get('collection_type', 'ai_recommended'),
                 'collection_id': collection_data["id"],
@@ -153,19 +153,19 @@ class CollectionRepository(BaseRepository[Collection]):
         return collection
     
     def get_collection_file(self, collection_id: str) -> Optional[Path]:
-        """获取合集文件路径"""
+        """Get compilation file path"""
         collection = self.get_by_id(collection_id)
         if collection and collection.export_path:
             return Path(collection.export_path)
         return None
     
     def get_collection_content(self, collection_id: str) -> Optional[Dict[str, Any]]:
-        """获取合集完整内容"""
+        """Get full compilation content"""
         collection = self.get_by_id(collection_id)
         if not collection:
             return None
         
-        # 从文件系统获取完整数据
+        # Retrieve full data from file system
         if collection.collection_metadata and 'metadata_file' in collection.collection_metadata:
             from ..services.storage_service import StorageService
             storage_service = StorageService(collection.project_id)
@@ -175,15 +175,15 @@ class CollectionRepository(BaseRepository[Collection]):
     
     def get_collections_by_duration_range(self, project_id: str, min_duration: int, max_duration: int) -> List[Collection]:
         """
-        根据时长范围获取合集
+        Get compilations within duration range
         
         Args:
-            project_id: 项目ID
-            min_duration: 最小时长（秒）
-            max_duration: 最大时长（秒）
+            project_id: ProjectID
+            min_duration: Minimum duration (seconds))
+            max_duration: Maximum duration (seconds))
             
         Returns:
-            合集列表
+            Collection list
         """
         return self.db.query(self.model).filter(
             self.model.project_id == project_id,
@@ -193,13 +193,13 @@ class CollectionRepository(BaseRepository[Collection]):
     
     def get_collections_statistics(self, project_id: str) -> dict:
         """
-        获取合集统计信息
+        Get compilation statistical information
         
         Args:
-            project_id: 项目ID
+            project_id: ProjectID
             
         Returns:
-            统计信息字典
+            Statistics dictionary
         """
         total_collections = self.db.query(self.model).filter(
             self.model.project_id == project_id
@@ -228,52 +228,52 @@ class CollectionRepository(BaseRepository[Collection]):
     
     def update_collection_status(self, collection_id: str, status: CollectionStatus) -> Optional[Collection]:
         """
-        更新合集状态
+        Update collection status
         
         Args:
-            collection_id: 合集ID
-            status: 新状态
+            collection_id: CollectionID
+            status: New status
             
         Returns:
-            更新后的合集实例或None
+            Updated compilation instance orNone
         """
         return self.update(collection_id, status=status)
     
     def update_collection_clips_count(self, collection_id: str, clips_count: int) -> Optional[Collection]:
         """
-        更新合集切片数量
+        Update compilation slice count
         
         Args:
-            collection_id: 合集ID
-            clips_count: 切片数量
+            collection_id: CollectionID
+            clips_count: Number of slices
             
         Returns:
-            更新后的合集实例或None
+            Updated compilation instance orNone
         """
         return self.update(collection_id, clips_count=clips_count)
     
     def update_collection_duration(self, collection_id: str, total_duration: int) -> Optional[Collection]:
         """
-        更新合集总时长
+        Update collection total duration
         
         Args:
-            collection_id: 合集ID
-            total_duration: 总时长（秒）
+            collection_id: CollectionID
+            total_duration: Total duration (seconds))
             
         Returns:
-            更新后的合集实例或None
+            Updated compilation instance orNone
         """
         return self.update(collection_id, total_duration=total_duration)
     
     def get_collections_with_clips(self, project_id: str) -> List[Collection]:
         """
-        获取包含切片的合集详情
+        Get compilation details including slice
         
         Args:
-            project_id: 项目ID
+            project_id: ProjectID
             
         Returns:
-            合集列表
+            Collection list
         """
         return self.db.query(self.model).filter(
             self.model.project_id == project_id
@@ -281,15 +281,15 @@ class CollectionRepository(BaseRepository[Collection]):
     
     def get_collection_by_theme_and_size(self, project_id: str, theme: str, target_size: int = 5) -> Optional[Collection]:
         """
-        根据主题和目标大小获取合集
+        Get compilation by theme and target size
         
         Args:
-            project_id: 项目ID
-            theme: 主题
-            target_size: 目标大小
+            project_id: ProjectID
+            theme: Topic
+            target_size: Target size
             
         Returns:
-            合集实例或None
+            Collection instance orNone
         """
         return self.db.query(self.model).filter(
             self.model.project_id == project_id,

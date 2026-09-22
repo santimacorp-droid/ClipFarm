@@ -1,6 +1,6 @@
 """
-自动化流水线启动服务
-当新项目创建后自动启动视频处理流水线
+Automation pipeline startup service
+Automatically start video processing pipeline after new project creation
 """
 
 import logging
@@ -13,112 +13,112 @@ from backend.core.database import SessionLocal
 from backend.models.project import Project, ProjectStatus
 from backend.models.task import Task, TaskStatus
 from backend.services.progress_update_service import progress_update_service
-# from backend.services.pipeline_adapter import PipelineAdapter  # 临时注释，文件不存在
+# from backend.services.pipeline_adapter import PipelineAdapter  # Temporary comment, file does not exist
 from backend.utils.task_submission_utils import submit_video_pipeline_task
 
 logger = logging.getLogger(__name__)
 
 class AutoPipelineService:
-    """自动化流水线启动服务"""
+    """Automation pipeline startup service"""
     
     def __init__(self):
         self.processing_projects = set()
     
     async def auto_start_pipeline(self, project_id: str) -> Dict[str, Any]:
         """
-        自动启动项目流水线处理
+        Automatically start project pipeline processing
         
         Args:
-            project_id: 项目ID
+            project_id: ProjectID
             
         Returns:
-            启动结果
+            Start result
         """
         try:
-            logger.info(f"自动启动项目流水线: {project_id}")
+            logger.info(f"Auto starting project pipeline: {project_id}")
             
-            # 检查项目是否已经在处理中
+            # Check if the project is already being processed
             if project_id in self.processing_projects:
-                logger.warning(f"项目 {project_id} 已在处理中，跳过")
-                return {"status": "skipped", "message": "项目已在处理中"}
+                logger.warning(f"Project {project_id} Already in processing, skipping")
+                return {"status": "skipped", "message": "Project already in processing"}
             
-            # 标记项目为处理中
+            # Marking project as in processing
             self.processing_projects.add(project_id)
             
-            # 获取项目信息
+            # Get project information
             db = SessionLocal()
             try:
                 project = db.query(Project).filter(Project.id == project_id).first()
                 if not project:
-                    raise ValueError(f"项目 {project_id} 不存在")
+                    raise ValueError(f"Project {project_id} Does not exist")
                 
-                # 检查项目状态
+                # Check project status
                 if project.status != ProjectStatus.PENDING:
-                    logger.info(f"项目 {project_id} 状态为 {project.status}，跳过自动启动")
-                    return {"status": "skipped", "message": f"项目状态为 {project.status}"}
+                    logger.info(f"Project {project_id} Status is {project.status}, Skipping auto start")
+                    return {"status": "skipped", "message": f"Project status is {project.status}"}
                 
-                # 检查项目文件
+                # Checking project file
                 if not project.video_path:
-                    raise ValueError(f"项目 {project_id} 没有视频文件")
+                    raise ValueError(f"Project {project_id} No video files found")
                 
-                # 查找字幕文件
+                # Find subtitle file
                 srt_file = self._find_srt_file(project_id)
                 if not srt_file:
-                    logger.warning(f"项目 {project_id} 没有找到字幕文件，将尝试自动生成")
+                    logger.warning(f"Project {project_id} Subtitle file not found, attempt to auto-generate")
                 
-                # 检查是否已有正在运行的任务
+                # Check if there is already a running task
                 existing_task = db.query(Task).filter(
                     Task.project_id == project_id,
-                    Task.name == "自动视频处理流水线",
+                    Task.name == "Automatic video processing pipeline",
                     Task.status.in_([TaskStatus.PENDING, TaskStatus.RUNNING])
                 ).first()
                 
                 if existing_task:
-                    # 使用现有任务
+                    # Using existing task
                     task = existing_task
-                    logger.info(f"使用现有任务: {task.id}")
+                    logger.info(f"Using existing task: {task.id}")
                 else:
-                    # 创建新任务记录
+                    # Creating new task record
                     task = self._create_processing_task(db, project_id)
                     if not task:
-                        raise ValueError("创建任务记录失败")
+                        raise ValueError("Failed to create task record")
                 
-                # 更新项目状态
+                # Update project status
                 project.status = ProjectStatus.PROCESSING
                 project.updated_at = datetime.utcnow()
                 db.commit()
                 
-                logger.info(f"项目 {project_id} 状态已更新为处理中")
+                logger.info(f"Project {project_id} Status updated to in progress")
                 
-                # 启动进度监控
+                # Starting progress monitoring
                 await progress_update_service.start_progress_monitoring(task.id)
                 
-                # 提交Celery任务
-                logger.info(f"准备提交Celery任务: {project_id}")
+                # Submit Celery task
+                logger.info(f"Preparing to submit Celery task: {project_id}")
                 
-                # 查找项目文件路径
+                # Finding project file path
                 from ..core.config import get_data_directory
                 data_dir = get_data_directory()
                 project_dir = Path(data_dir) / "projects" / project_id
                 input_video_path = str(project_dir / "raw" / "input.mp4")
                 input_srt_path = str(project_dir / "raw" / "input.srt")
                 
-                # 检查文件是否存在
+                # Checking if file exists
                 if not Path(input_video_path).exists():
-                    raise ValueError(f"视频文件不存在: {input_video_path}")
+                    raise ValueError(f"Video file does not exist: {input_video_path}")
                 
-                logger.info(f"视频文件: {input_video_path}")
-                logger.info(f"字幕文件: {input_srt_path if Path(input_srt_path).exists() else '不存在'}")
+                logger.info(f"Video file: {input_video_path}")
+                logger.info(f"Subtitle file: {input_srt_path if Path(input_srt_path).exists() else 'Does not exist'}")
                 
-                # 提交Celery任务
+                # Submit Celery task
                 task_result = submit_video_pipeline_task(project_id, input_video_path, input_srt_path)
-                logger.info(f"Celery任务提交结果: {task_result}")
+                logger.info(f"CeleryTask submission result: {task_result}")
                 
                 if task_result.get('success'):
                     celery_task_id = task_result['task_id']
-                    logger.info(f"Celery任务已提交: {celery_task_id}")
+                    logger.info(f"CeleryTask submitted: {celery_task_id}")
                     
-                    # 更新任务记录
+                    # Update task record
                     task.celery_task_id = celery_task_id
                     task.status = TaskStatus.RUNNING
                     task.started_at = datetime.utcnow()
@@ -126,14 +126,14 @@ class AutoPipelineService:
                     
                     result = {
                         "status": "started",
-                        "message": "流水线处理已启动",
+                        "message": "Pipeline processing started",
                         "project_id": project_id,
                         "task_id": task.id,
                         "celery_task_id": celery_task_id
                     }
                 else:
-                    error_msg = task_result.get('error', '未知错误')
-                    raise ValueError(f"提交Celery任务失败: {error_msg}")
+                    error_msg = task_result.get('error', 'Unknown error')
+                    raise ValueError(f"Celery task submission failed: {error_msg}")
                 
                 return result
                 
@@ -141,27 +141,27 @@ class AutoPipelineService:
                 db.close()
                 
         except Exception as e:
-            logger.error(f"自动启动流水线失败: {e}")
-            # 移除处理中标记
+            logger.error(f"Automatic pipeline startup failed: {e}")
+            # Removing processing marker
             self.processing_projects.discard(project_id)
             
-            # 更新项目状态为失败
+            # Updating project status to failed
             await self._mark_project_failed(project_id, str(e))
             
-            return {"status": "failed", "message": f"启动失败: {str(e)}"}
+            return {"status": "failed", "message": f"Start failed: {str(e)}"}
     
     def _find_srt_file(self, project_id: str) -> Optional[str]:
-        """查找项目的字幕文件"""
+        """Looking for subtitles file of project"""
         try:
             from ..core.path_utils import get_project_directory
             project_dir = get_project_directory(project_id)
             
-            # 查找可能的字幕文件
+            # Looking for possible subtitle files
             srt_files = list(project_dir.glob("**/*.srt"))
             if srt_files:
                 return str(srt_files[0])
             
-            # 查找原始目录
+            # Find original directory
             raw_dir = project_dir / "raw"
             if raw_dir.exists():
                 srt_files = list(raw_dir.glob("*.srt"))
@@ -171,19 +171,19 @@ class AutoPipelineService:
             return None
             
         except Exception as e:
-            logger.warning(f"查找字幕文件失败: {e}")
+            logger.warning(f"Failed to find subtitles file: {e}")
             return None
     
     def _create_processing_task(self, db: Session, project_id: str) -> Optional[Task]:
-        """创建处理任务记录"""
+        """Creating task record"""
         try:
             task = Task(
                 project_id=project_id,
-                name="自动视频处理流水线",
+                name="Automatic video processing pipeline",
                 task_type="video_processing",
                 status=TaskStatus.PENDING,
                 progress=0.0,
-                current_step="初始化",
+                current_step="Initialize",
                 priority=0,
                 metadata={
                     "auto_started": True,
@@ -195,16 +195,16 @@ class AutoPipelineService:
             db.commit()
             db.refresh(task)
             
-            logger.info(f"创建处理任务: {task.id}")
+            logger.info(f"Creating processing task: {task.id}")
             return task
             
         except Exception as e:
-            logger.error(f"创建任务记录失败: {e}")
+            logger.error(f"Failed to create task record: {e}")
             db.rollback()
             return None
     
     async def _mark_project_failed(self, project_id: str, error_message: str):
-        """标记项目为失败状态"""
+        """Mark project as failed state"""
         try:
             db = SessionLocal()
             try:
@@ -213,84 +213,84 @@ class AutoPipelineService:
                     project.status = ProjectStatus.FAILED
                     project.updated_at = datetime.utcnow()
                     db.commit()
-                    logger.info(f"项目 {project_id} 已标记为失败")
+                    logger.info(f"Project {project_id} Marked as failed")
                     
-                    # 从处理中项目集合中移除
+                    # Remove from processing project set
                     self.processing_projects.discard(project_id)
-                    logger.info(f"项目 {project_id} 已从处理中集合移除")
+                    logger.info(f"Project {project_id} Removed from processing collection")
             finally:
                 db.close()
         except Exception as e:
-            logger.error(f"标记项目失败状态时出错: {e}")
+            logger.error(f"An error occurred while marking project failed state: {e}")
     
     async def check_and_restart_failed_pipelines(self):
-        """检查并重启失败的流水线"""
+        """Check and restart failed pipelines"""
         try:
             db = SessionLocal()
             try:
-                # 查找失败的项目
+                # Finding failed projects
                 failed_projects = db.query(Project).filter(
                     Project.status == ProjectStatus.FAILED
                 ).all()
                 
                 for project in failed_projects:
-                    logger.info(f"检查失败项目: {project.id}")
+                    logger.info(f"Check failed project: {project.id}")
                     
-                    # 检查是否有未完成的任务
+                    # Check for unfinished tasks
                     incomplete_tasks = db.query(Task).filter(
                         Task.project_id == project.id,
                         Task.status.in_([TaskStatus.PENDING, TaskStatus.RUNNING])
                     ).all()
                     
                     if not incomplete_tasks:
-                        logger.info(f"项目 {project.id} 没有未完成任务，尝试重启")
+                        logger.info(f"Project {project.id} No unfinished tasks, attempt to restart")
                         await self.auto_start_pipeline(project.id)
                     else:
-                        logger.info(f"项目 {project.id} 仍有未完成任务，跳过重启")
+                        logger.info(f"Project {project.id} There are still unfinished tasks, skip restart")
                         
             finally:
                 db.close()
                 
         except Exception as e:
-            logger.error(f"检查失败流水线时出错: {e}")
+            logger.error(f"An error occurred when checking failed pipelines: {e}")
     
     async def auto_start_all_pending_pipelines(self):
-        """自动启动所有等待中的流水线"""
+        """Automatically start all pending pipelines"""
         try:
             db = SessionLocal()
             try:
-                # 查找所有等待中的项目
+                # Find all pending projects
                 pending_projects = db.query(Project).filter(
                     Project.status == ProjectStatus.PENDING
                 ).all()
                 
-                logger.info(f"找到 {len(pending_projects)} 个等待中的项目")
+                logger.info(f"Found {len(pending_projects)} pending items")
                 
                 for project in pending_projects:
                     try:
-                        logger.info(f"自动启动项目流水线: {project.id}")
+                        logger.info(f"Auto starting project pipeline: {project.id}")
                         result = await self.auto_start_pipeline(project.id)
-                        logger.info(f"项目 {project.id} 启动结果: {result}")
+                        logger.info(f"Project {project.id} Start result: {result}")
                         
-                        # 避免同时启动太多项目
+                        # Avoid starting too many projects simultaneously
                         await asyncio.sleep(1)
                         
                     except Exception as e:
-                        logger.error(f"自动启动项目 {project.id} 失败: {e}")
+                        logger.error(f"Auto start project {project.id} Failed: {e}")
                         continue
                         
             finally:
                 db.close()
                 
         except Exception as e:
-            logger.error(f"自动启动所有等待中流水线时出错: {e}")
+            logger.error(f"Error occurred while automatically starting all pending pipelines: {e}")
     
     def get_processing_status(self) -> Dict[str, Any]:
-        """获取处理状态"""
+        """Getting processing status"""
         return {
             "processing_projects": list(self.processing_projects),
             "total_processing": len(self.processing_projects)
         }
 
-# 全局实例
+# Global instance
 auto_pipeline_service = AutoPipelineService()

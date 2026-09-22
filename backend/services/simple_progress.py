@@ -1,6 +1,6 @@
 """
-简化的进度服务 - 固定阶段 + 固定权重
-基于你提出的"做笨做稳"方案
+Simplified progress service - fixed stage + Fixed weight
+Based on your "do simple and steady" proposal
 """
 
 import time
@@ -11,25 +11,25 @@ import sqlite3
 import threading
 import os
 try:
-    import redis  # 可选依赖
+    import redis  # Optional dependency
 except Exception:
     redis = None
 
 logger = logging.getLogger(__name__)
 
-# 固定阶段定义 - 根据你的项目实际调整
+# Fixed stage definition - adjust according to your project specifics
 STAGES: List[Tuple[str, int]] = [
-    ("INGEST", 10),        # 下载/就绪
-    ("SUBTITLE", 15),      # 字幕/对齐
-    ("ANALYZE", 20),       # 语义分析/大纲
-    ("HIGHLIGHT", 25),     # 片段定位/打分
-    ("EXPORT", 20),        # 导出/封装
-    ("DONE", 10),          # 校验/归档
+    ("INGEST", 10),        # Download/Prerequisites
+    ("SUBTITLE", 15),      # Captions/Subtitles/Alignment
+    ("ANALYZE", 20),       # Semantic analysis/Outline
+    ("HIGHLIGHT", 25),     # Fragment positioning/Scoring
+    ("EXPORT", 20),        # Export/Encapsulation
+    ("DONE", 10),          # Validation/Archive
 ]
 
-# 阶段权重映射
+# Stage weight mapping
 WEIGHTS = {name: w for name, w in STAGES}
-# 阶段顺序
+# Phase sequence
 ORDER = [name for name, _ in STAGES]
 
 class ProgressStore:
@@ -150,7 +150,7 @@ class SqliteProgressStore(ProgressStore):
         return results
 
 
-# 选择存储：Desktop模式强制SQLite；Server模式优先Redis，失败则自动降级到SQLite
+# Storage selection: Desktop mode enforces SQLite; Server mode prefers Redis, with automatic downgrade to SQLite if failed
 store: ProgressStore
 try:
     from backend.core.desktop_config import is_desktop_mode, get_desktop_paths
@@ -158,20 +158,20 @@ try:
         paths = get_desktop_paths()
         db_file = os.path.join(str(paths.data_dir), "progress.db")
         store = SqliteProgressStore(db_file)
-        logger.info(f"桌面模式使用SQLite进度存储: {db_file}")
+        logger.info(f"SQLite progress storage used in desktop mode: {db_file}")
     else:
         if redis is None:
-            raise RuntimeError("redis 未安装")
-        # 从环境变量获取Redis URL，默认为本地地址
+            raise RuntimeError("redis Not installed")
+        # Retrieve Redis URL from environment variables, defaulting to local address
         redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
         r_client = redis.Redis.from_url(redis_url, decode_responses=True)
         r_client.ping()
         store = RedisProgressStore(r_client)
-        logger.info("Server模式使用Redis进度存储")
+        logger.info("ServerRedis progress storage used in mode")
 except Exception as e:
-    # 自动降级到SQLite
+    # Automatic fallback to SQLite
     try:
-        # 优先使用桌面数据目录；若不可用则落到项目根 data 目录
+        # Prefer desktop data directory; fallback to project root data directory if unavailable
         db_file = None
         try:
             from backend.core.desktop_config import get_desktop_paths
@@ -180,54 +180,54 @@ except Exception as e:
             from pathlib import Path
             db_file = str((Path(__file__).parent.parent.parent / 'data' / 'progress.db').resolve())
         store = SqliteProgressStore(db_file)
-        logger.warning(f"Redis不可用或未安装，自动降级到SQLite进度存储: {db_file}，原因: {e}")
+        logger.warning(f"RedisFalls back to SQLite progress storage if Redis is unavailable or not installed: {db_file}, Reason: {e}")
     except Exception as e2:
-        logger.error(f"初始化进度存储失败: {e2}")
+        logger.error(f"Failed to initialize progress store: {e2}")
         store = None
 
 
 def compute_percent(stage: str, subpercent: Optional[float] = None) -> int:
     """
-    计算阶段对应的百分比
+    Calculates corresponding percentage for stage
     
     Args:
-        stage: 当前阶段名称
-        subpercent: 子进度百分比 (0-100)，可选
+        stage: Current stage name
+        subpercent: Sub-progress percentage (0-100), optional
         
     Returns:
-        总进度百分比 (0-100)
+        Overall progress percentage (0-100)
     """
-    # 累加之前阶段权重
+    # Accumulate previous phase weight
     done = 0
     for s in ORDER:
         if s == stage:
             break
         done += WEIGHTS[s]
     
-    # 当前阶段
+    # Current stage
     cur = WEIGHTS.get(stage, 0)
     
     if subpercent is None:
-        # 阶段切换时，显示到当前阶段开始
+        # Upon stage switching, displays from the current stage start
         return min(100, done + cur) if stage == "DONE" else min(99, done)
     else:
-        # 带子进度，按权重线性换算
+        # With sub-progress, linearly converted by weight
         subpercent = max(0, min(100, subpercent))
         return min(99, done + int(cur * subpercent / 100))
 
 
 def emit_progress(project_id: str, stage: str, message: str = "", subpercent: Optional[float] = None):
     """
-    发送进度事件
+    Send progress event
     
     Args:
-        project_id: 项目ID
-        stage: 当前阶段
-        message: 进度消息
-        subpercent: 子进度百分比，可选
+        project_id: ProjectID
+        stage: Current stage
+        message: Progress message
+        subpercent: Sub-progress percentage, optional
     """
     if not store:
-        logger.warning("进度存储未初始化，跳过进度发送")
+        logger.warning("Progress store not initialized, skips progress sending")
         return
         
     percent = compute_percent(stage, subpercent)
@@ -241,20 +241,20 @@ def emit_progress(project_id: str, stage: str, message: str = "", subpercent: Op
     
     try:
         store.save(project_id, stage, percent, message, payload["ts"])
-        logger.info(f"进度事件已发送: {project_id} - {stage} ({percent}%) - {message}")
+        logger.info(f"Progress event sent: {project_id} - {stage} ({percent}%) - {message}")
     except Exception as e:
-        logger.error(f"发送进度事件失败: {e}")
+        logger.error(f"Sending progress event failed: {e}")
 
 
 def get_progress_snapshot(project_id: str) -> Optional[Dict[str, Any]]:
     """
-    获取项目进度快照
+    Gets project progress snapshot
     
     Args:
-        project_id: 项目ID
+        project_id: ProjectID
         
     Returns:
-        进度快照数据，如果不存在返回None
+        Progress snapshot data, returns nothing if it doesn't existNone
     """
     if not store:
         return None
@@ -262,55 +262,55 @@ def get_progress_snapshot(project_id: str) -> Optional[Dict[str, Any]]:
     try:
         return store.get(project_id)
     except Exception as e:
-        logger.error(f"获取进度快照失败: {e}")
+        logger.error(f"Failed to retrieve progress snapshot: {e}")
         return None
 
 
 def get_multiple_progress_snapshots(project_ids: List[str]) -> List[Dict[str, Any]]:
     """
-    批量获取多个项目的进度快照
+    Batch retrieves multiple project progress snapshots
     
     Args:
-        project_ids: 项目ID列表
+        project_ids: List of project IDs
         
     Returns:
-        进度快照列表
+        Progress snapshot list
     """
     if not store:
         return []
     try:
         return store.get_many(project_ids)
     except Exception as e:
-        logger.error(f"批量获取进度快照失败: {e}")
+        logger.error(f"Batch retrieving progress snapshots failed: {e}")
         return []
 
 
 def clear_progress(project_id: str):
     """
-    清除项目进度数据
+    Clear project progress data
     
     Args:
-        project_id: 项目ID
+        project_id: ProjectID
     """
     if not store:
         return
     try:
         store.delete(project_id)
-        logger.info(f"已清除项目进度数据: {project_id}")
+        logger.info(f"Cleared project progress data: {project_id}")
     except Exception as e:
-        logger.error(f"清除进度数据失败: {e}")
+        logger.error(f"Failed to clear progress data: {e}")
 
 
-# 阶段名称映射（用于显示）
+# Stage name mapping (for display)
 STAGE_NAMES = {
-    "INGEST": "素材准备",
-    "SUBTITLE": "字幕处理", 
-    "ANALYZE": "内容分析",
-    "HIGHLIGHT": "片段定位",
-    "EXPORT": "视频导出",
-    "DONE": "处理完成"
+    "INGEST": "Material preparation",
+    "SUBTITLE": "Subtitle processing", 
+    "ANALYZE": "Content analysis",
+    "HIGHLIGHT": "Fragment positioning",
+    "EXPORT": "Video export",
+    "DONE": "Processing complete"
 }
 
 def get_stage_display_name(stage: str) -> str:
-    """获取阶段的显示名称"""
+    """Gets display name of stage"""
     return STAGE_NAMES.get(stage, stage)

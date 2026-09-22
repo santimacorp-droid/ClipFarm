@@ -1,6 +1,6 @@
 """
-任务进度更新服务
-提供实时进度更新功能
+Task progress update service
+Provide real-time progress update feature
 """
 
 import asyncio
@@ -15,7 +15,7 @@ from ..core.websocket_manager import manager as websocket_manager
 logger = logging.getLogger(__name__)
 
 class ProgressUpdateService:
-    """任务进度更新服务"""
+    """Task progress update service"""
     
     def __init__(self):
         self.active_tasks: Dict[str, Dict[str, Any]] = {}
@@ -27,9 +27,9 @@ class ProgressUpdateService:
         current_step: str = None,
         step_details: str = None
     ):
-        """更新任务进度"""
+        """Update task progress"""
         try:
-            # 更新数据库中的任务进度
+            # Update task progress in database
             db = SessionLocal()
             try:
                 task = db.query(Task).filter(Task.id == task_id).first()
@@ -40,7 +40,7 @@ class ProgressUpdateService:
                     task.updated_at = datetime.utcnow()
                     db.commit()
                     
-                    # 记录到活动任务中
+                    # Log to active tasks
                     self.active_tasks[task_id] = {
                         'progress': progress,
                         'current_step': current_step,
@@ -48,22 +48,22 @@ class ProgressUpdateService:
                         'updated_at': datetime.utcnow()
                     }
                     
-                    logger.info(f"任务 {task_id} 进度更新: {progress}% - {current_step}")
+                    logger.info(f"Task {task_id} Progress updated: {progress}% - {current_step}")
                     
-                    # 通过WebSocket发送进度更新
+                    # Send progress update via WebSocket
                     await self.broadcast_progress_update(task)
                 else:
-                    logger.warning(f"任务 {task_id} 不存在")
+                    logger.warning(f"Task {task_id} Does not exist")
             finally:
                 db.close()
                 
         except Exception as e:
-            logger.error(f"更新任务进度失败: {e}")
+            logger.error(f"Failed to update task progress: {e}")
     
     async def broadcast_progress_update(self, task: Task):
-        """广播进度更新到前端"""
+        """Broadcast progress update to frontend"""
         try:
-            # 构建进度更新消息
+            # Build progress update message
             progress_message = {
                 'type': 'task_progress_update',
                 'task_id': task.id,
@@ -74,47 +74,47 @@ class ProgressUpdateService:
                 'updated_at': task.updated_at.isoformat() if task.updated_at else None
             }
             
-            # 发送到所有连接的客户端
+            # Send to all connected clients
             await websocket_manager.broadcast(progress_message)
-            logger.debug(f"进度更新已广播: {progress_message}")
+            logger.debug(f"Progress update broadcasted: {progress_message}")
             
         except Exception as e:
-            logger.error(f"广播进度更新失败: {e}")
+            logger.error(f"Broadcast progress update failed: {e}")
     
     async def start_progress_monitoring(self, task_id: str):
-        """开始监控任务进度"""
+        """Start monitoring task progress"""
         try:
             db = SessionLocal()
             try:
                 task = db.query(Task).filter(Task.id == task_id).first()
                 if task:
-                    # 标记任务为运行中
+                    # Mark task as running
                     task.status = TaskStatus.RUNNING
                     task.started_at = datetime.utcnow()
                     db.commit()
                     
-                    # 添加到活动任务列表
+                    # Add to active tasks list
                     self.active_tasks[task_id] = {
                         'progress': 0.0,
-                        'current_step': '初始化',
-                        'step_details': '开始处理任务',
+                        'current_step': 'Initialized',
+                        'step_details': 'Start processing task',
                         'started_at': datetime.utcnow(),
                         'updated_at': datetime.utcnow()
                     }
                     
-                    logger.info(f"开始监控任务进度: {task_id}")
+                    logger.info(f"Start monitoring task progress: {task_id}")
                     
-                    # 发送任务开始通知
+                    # Send task start notification
                     await self.broadcast_progress_update(task)
                     
             finally:
                 db.close()
                 
         except Exception as e:
-            logger.error(f"开始进度监控失败: {e}")
+            logger.error(f"Starting progress monitoring failed: {e}")
     
     async def complete_task(self, task_id: str, result: Dict[str, Any] = None, error: str = None):
-        """完成任务"""
+        """Task completed"""
         try:
             db = SessionLocal()
             try:
@@ -126,34 +126,34 @@ class ProgressUpdateService:
                     else:
                         task.status = TaskStatus.COMPLETED
                         task.progress = 100.0
-                        task.current_step = '完成'
+                        task.current_step = 'Done'
                     
                     task.completed_at = datetime.utcnow()
                     task.updated_at = datetime.utcnow()
                     db.commit()
                     
-                    # 从活动任务列表中移除
+                    # Remove from active tasks list
                     if task_id in self.active_tasks:
                         del self.active_tasks[task_id]
                     
-                    logger.info(f"任务完成: {task_id}, 状态: {task.status}")
+                    logger.info(f"Task completed: {task_id}, Status: {task.status}")
                     
-                    # 发送任务完成通知
+                    # Send task completion notification
                     await self.broadcast_progress_update(task)
                     
             finally:
                 db.close()
                 
         except Exception as e:
-            logger.error(f"完成任务失败: {e}")
+            logger.error(f"Completing task failed: {e}")
     
     def get_task_progress(self, task_id: str) -> Optional[Dict[str, Any]]:
-        """获取任务进度"""
+        """Get task progress"""
         return self.active_tasks.get(task_id)
     
     def get_all_active_tasks(self) -> Dict[str, Dict[str, Any]]:
-        """获取所有活动任务"""
+        """Get all active tasks"""
         return self.active_tasks.copy()
 
-# 全局实例
+# Global instance
 progress_update_service = ProgressUpdateService()

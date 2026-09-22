@@ -1,10 +1,10 @@
 /**
- * 投稿相关API服务
+ * Submission-relatedAPIService
  */
 
 import api from './api'
 
-// 类型定义
+// Type definition
 export interface BilibiliAccount {
   id: string
   username: string
@@ -56,48 +56,48 @@ export interface UploadStatus {
   created_at: string
 }
 
-// B站分区信息 - 根据官方API文档更新，一级主分区
+// BSite partition information - official versionAPIDocument update, primary main partition
 export const BILIBILI_PARTITIONS = [
-  { id: 1, name: "动画" },
-  { id: 4, name: "游戏" },
-  { id: 8, name: "鬼畜" },
-  { id: 3, name: "音乐" },
-  { id: 129, name: "舞蹈" },
-  { id: 181, name: "影视" },
-  { id: 5, name: "娱乐" },
-  { id: 36, name: "知识" },
-  { id: 188, name: "科技数码" },
-  { id: 202, name: "资讯" },
-  { id: 76, name: "美食" },
-  { id: 138, name: "小剧场" },
-  { id: 176, name: "汽车" },
-  { id: 155, name: "时尚美妆" },
-  { id: 235, name: "体育运动" },
-  { id: 75, name: "动物" },
+  { id: 1, name: "Animation/Cartoons" },
+  { id: 4, name: "Games" },
+  { id: 8, name: "Grue (Meme/Video Editing)" },
+  { id: 3, name: "Music" },
+  { id: 129, name: "Dance" },
+  { id: 181, name: "Film & TV" },
+  { id: 5, name: "Entertainment" },
+  { id: 36, name: "knowledge" },
+  { id: 188, name: "Science and technology, digital products" },
+  { id: 202, name: "News/Information" },
+  { id: 76, name: "Food" },
+  { id: 138, name: "Mini Theater" },
+  { id: 176, name: "Automobile" },
+  { id: 155, name: "Fashion and cosmetics" },
+  { id: 235, name: "Sports" },
+  { id: 75, name: "Animals" },
   { id: 21, name: "vlog" },
-  { id: 162, name: "绘画" },
-  { id: 207, name: "人工智能" },
-  { id: 208, name: "家装房产" },
-  { id: 209, name: "户外潮流" },
-  { id: 164, name: "健身" },
-  { id: 161, name: "手工" },
-  { id: 165, name: "旅游出行" },
-  { id: 158, name: "三农" },
-  { id: 159, name: "亲子" },
-  { id: 160, name: "健康" },
-  { id: 163, name: "情感" },
-  { id: 22, name: "生活兴趣" },
-  { id: 23, name: "生活经验" }
+  { id: 162, name: "Painting/Art" },
+  { id: 207, name: "Artificial intelligence" },
+  { id: 208, name: "Home decoration and real estate" },
+  { id: 209, name: "Outdoor fashion and trend" },
+  { id: 164, name: "Fitness" },
+  { id: 161, name: "Manual" },
+  { id: 165, name: "Travel & Outdoors" },
+  { id: 158, name: "Rural Areas (Agriculture, Countryside, Farmers)" },
+  { id: 159, name: "Parenting" },
+  { id: 160, name: "Health" },
+  { id: 163, name: "emotion" },
+  { id: 22, name: "Daily life interests" },
+  { id: 23, name: "Daily life experience" }
 ]
 
-// 投稿API
+// SubmissionsAPI
 export const uploadApi = {
-  // 账号管理
+  // Account management
   createAccount: async (username: string, password: string, nickname?: string, cookieContent?: string): Promise<BilibiliAccount> => {
     return api.post('/upload/accounts', { username, password, nickname, cookie_content: cookieContent })
   },
 
-  // 获取支持的登录方式
+  // Get supported login methods
   getLoginMethods: async (): Promise<{methods: Array<{
     id: string,
     name: string,
@@ -109,17 +109,17 @@ export const uploadApi = {
     return api.get('/upload/login-methods')
   },
 
-  // 账号密码登录
+  // Account password login
   passwordLogin: async (username: string, password: string, nickname?: string): Promise<BilibiliAccount> => {
     return api.post('/upload/password-login', { username, password, nickname })
   },
 
-  // Cookie导入登录
+  // CookieImport login
   cookieLogin: async (cookies: Record<string, string>, nickname?: string): Promise<BilibiliAccount> => {
     return api.post('/upload/cookie-login', { cookies, nickname })
   },
 
-  // 第三方登录
+  // Third-party login
   thirdPartyLogin: async (type: 'wechat' | 'qq', nickname?: string): Promise<{login_url: string, message: string}> => {
     return api.post('/upload/third-party-login', { type, nickname })
   },
@@ -148,7 +148,7 @@ export const uploadApi = {
     return api.post(`/upload/accounts/${accountId}/check`)
   },
 
-  // 投稿管理
+  // Submission management
   createUploadTask: async (projectId: string, uploadData: UploadRequest): Promise<{message: string, record_id: string, clip_count: number}> => {
     return api.post(`/upload/projects/${projectId}/upload`, uploadData)
   },
@@ -174,7 +174,7 @@ export const uploadApi = {
     return api.get('/upload/accounts')
   },
 
-  // 投稿任务管理
+  // Submission task management
   retryUpload: async (recordId: string | number): Promise<{message: string}> => {
     return api.post(`/upload/records/${recordId}/retry`)
   },

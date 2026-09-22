@@ -7,53 +7,40 @@
 Supporting YouTube/Bilibili video download, automatic clipping, and smart collection
 generation
 
-[![Python](https://img.shields.io/badge/Python-3.8+-green?style=flat&logo=python)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.10+-green?style=flat&logo=python)](https://python.org)
 [![React](https://img.shields.io/badge/React-18+-blue?style=flat&logo=react)](https://reactjs.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Latest-red?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat&logo=typescript)](https://www.typescriptlang.org)
-[![Celery](https://img.shields.io/badge/Celery-Latest-green?style=flat&logo=celery)](https://celeryproject.org)
+[![Ollama Ready](https://img.shields.io/badge/Local_LLM-Ollama_Ready-22c55e?style=flat&logo=ollama)](https://ollama.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=flat)](LICENSE)
-
-[![GitHub stars](https://img.shields.io/badge/Stars-0-blue?style=social)](https://github.com/zhouxiaoka/autoclip)
-[![GitHub forks](https://img.shields.io/badge/Forks-0-blue?style=social)](https://github.com/zhouxiaoka/autoclip)
-[![GitHub issues](https://img.shields.io/badge/Issues-0-blue)](https://github.com/zhouxiaoka/autoclip/issues)
 
 **Language**: [English](README-EN.md) | [中文](README.md)
 
-</div>
-
 ## 🎯 Project Overview
 
-AutoClip is an AI-powered intelligent video clipping system that can automatically
-download videos from YouTube, Bilibili, and other platforms, extract exciting clips
-through AI analysis, and intelligently generate collections. The system adopts a
-modern frontend-backend separation architecture, providing an intuitive web
-interface and powerful backend processing capabilities.
+AutoClip is an AI-powered intelligent video clipping studio that turns long-form content (YouTube, Bilibili, local MP4/MOV) into high-engagement vertical short clips (TikTok, Shorts, Reels) with automated face tracking, karaoke subtitles, and viral highlight detection.
+
+Run **100% locally and privately** with Ollama/LM Studio with zero API costs, or connect any cloud model (OpenAI, Gemini, DeepSeek, DashScope).
 
 ### ✨ Core Features
 
-- 🎬 **Multi-platform Support**: One-click download from YouTube, Bilibili, and local
-  file upload
-- 🤖 **AI Intelligent Analysis**: Video content understanding based on Qwen large
-  language model
-- ✂️ **Automatic Clipping**: Intelligent recognition of exciting clips with automatic
-  cutting, supporting multiple video categories
-- 📚 **Smart Collections**: AI-recommended and manually created video collections
-  with drag-and-drop sorting
-- 🚀 **Real-time Processing**: Asynchronous task queue with real-time progress feedback
-  and WebSocket communication
-- 🎨 **Modern Interface**: React + TypeScript + Ant Design with responsive design
-- 📱 **Mobile Support** **[In Development]**: Responsive design, improving mobile
-  experience
-- 🔐 **Account Management** **[In Development]**: Support for multiple Bilibili account
-  management with automatic health checks
-- 📊 **Data Statistics**: Complete project management and data statistics functionality
-- 🛠️ **Easy Deployment**: One-click startup scripts, Docker support, and detailed
-  documentation
-- 📤 **Bilibili Upload** **[In Development]**: Automatic upload of clipped videos
-  to Bilibili
-- ✏️ **Subtitle Editing** **[In Development]**: Visual subtitle editing and
-  synchronization functionality
+- 🏠 **100% Local AI & Privacy-First**: Native support for Ollama (`llama3.2`, `qwen2.5`, `mistral`, `deepseek-r1`) or LM Studio. Zero API keys, zero data sent to external servers.
+- 🌐 **Any API Compatible**: Connect custom OpenAI-compatible endpoints (DeepSeek, OpenRouter, Groq, vLLM) with 1-click model discovery.
+- 🎯 **Smart Framing & Face Tracking**: Automatically tracks faces and converts widescreen 16:9 videos into dynamic 9:16 vertical shorts.
+- 🎨 **Dynamic Styled Subtitles**: Word-level karaoke highlighting, animated hook titles, customizable fonts, and background music overlays.
+- 🎬 **Multi-platform Ingestion**: One-click download from YouTube, Bilibili, or drag-and-drop local file uploads.
+- ✂️ **AI Intelligent Highlight Extraction**: Natural moment detection, virality scoring, and automatic title generation.
+- 📚 **Smart Collections**: AI-recommended clip playlists with manual timeline fine-tuning and drag-and-drop reordering.
+- 🚀 **Real-time Pipeline**: Asynchronous processing queue with live stage-by-stage WebSocket progress feedback.
+- 🛠️ **Desktop & Web**: Cross-platform desktop application powered by Tauri alongside web browser deployment.
+
+### 💻 Hardware & Execution Modes
+
+| Mode | Minimum Spec | Recommended Spec | Privacy / Cost |
+| :--- | :--- | :--- | :--- |
+| **Cloud LLM + Whisper Base** | 8 GB RAM, Any modern CPU | 8 GB - 16 GB RAM | Cloud API cost (cents/hour) |
+| **Local LLM (Ollama 3B) + Whisper Small** | 16 GB RAM, Quad-core CPU | Apple Silicon M-series or 6GB+ NVIDIA GPU | **100% Free & Private** |
+| **Full Local Heavy (Whisper Large + 7B/14B LLM)** | 16 GB - 32 GB RAM | RTX 3060 / 4060 (8GB+ VRAM) or Apple M-Pro | **100% Free & Maximum Accuracy** |
 
 ## 🏗️ System Architecture
 
@@ -814,32 +801,14 @@ A:
 3. Delete unnecessary projects
 4. Use external storage
 
-## 📞 Support & Feedback
+## 📞 Community & Support
 
-### Get Help
+### Get Help & Contribute
 
-- **Issue Reports**: [GitHub Issues](https://github.com/zhouxiaoka/autoclip/issues)
-- **Feature Suggestions**: [GitHub Discussions](https://github.com/zhouxiaoka/autoclip/discussions)
-- **Bug Reports**: Please use GitHub Issues template
-- **Documentation**: [Project Documentation](docs/)
-
-### Contact
-
-For questions or suggestions, please contact us through:
-
-#### 💬 QQ
-
-![QQ QR Code](./qq_qr.jpg)
-
-#### 📱 Feishu
-
-![Feishu QR Code](./feishu_qr.jpg)
-
-#### 📧 Other Contact Methods
-
-- Submit a [GitHub Issue](https://github.com/zhouxiaoka/autoclip/issues)
-- Send email to: [christine_zhouye@163.com](mailto:christine_zhouye@163.com)
-- Add the above QQ or Feishu contact
+- **Issue Reports**: Submit bug reports and feature requests via GitHub Issues
+- **Feature Suggestions**: Propose ideas and workflows via GitHub Discussions
+- **Contribution Guide**: Read [CONTRIBUTING.md](CONTRIBUTING.md) to submit pull requests
+- **Documentation**: Browse [Project Documentation](docs/)
 
 ## 📄 License
 

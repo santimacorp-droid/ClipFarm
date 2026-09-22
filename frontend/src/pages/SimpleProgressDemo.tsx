@@ -1,5 +1,5 @@
 /**
- * 简化进度系统演示页面
+ * Simplified progress system demo page
  */
 
 import React, { useState } from 'react'
@@ -29,12 +29,12 @@ import { useSimpleProgressStore } from '../stores/useSimpleProgressStore'
 const { Title, Text, Paragraph } = Typography
 const { Option } = Select
 
-// 模拟项目数据
+// Simulated project data
 const mockProjects = [
   {
     id: 'demo-project-1',
-    title: 'AI技术解析视频',
-    description: '深度解析人工智能技术发展历程',
+    title: 'AITechnology analysis video',
+    description: 'Deeply analyzing artificial intelligence technology development process',
     status: 'pending',
     created_at: '2024-01-15T10:00:00Z',
     updated_at: '2024-01-15T10:00:00Z',
@@ -42,8 +42,8 @@ const mockProjects = [
   },
   {
     id: 'demo-project-2', 
-    title: '创业经验分享',
-    description: '分享创业路上的酸甜苦辣',
+    title: 'Startup experience sharing',
+    description: 'Share the ups and downs of starting up a business',
     status: 'processing',
     created_at: '2024-01-14T15:30:00Z',
     updated_at: '2024-01-15T09:45:00Z',
@@ -51,8 +51,8 @@ const mockProjects = [
   },
   {
     id: 'demo-project-3',
-    title: '游戏评测视频',
-    description: '最新游戏深度评测',
+    title: 'Game review video',
+    description: 'In‑depth game review',
     status: 'completed',
     created_at: '2024-01-13T20:15:00Z',
     updated_at: '2024-01-14T16:20:00Z',
@@ -74,44 +74,44 @@ export const SimpleProgressDemo: React.FC = () => {
   const [pollingInterval, setPollingInterval] = useState(2000)
   const [newProjectId, setNewProjectId] = useState('')
 
-  // 模拟开始处理项目
+  // Simulating start processing project
   const handleStartProcessing = (projectId: string) => {
     setProjects(prev => prev.map(p => 
       p.id === projectId ? { ...p, status: 'processing' } : p
     ))
-    message.success(`开始处理项目: ${projectId}`)
+    message.success(`Starting to process project: ${projectId}`)
   }
 
-  // 模拟查看详情
+  // View simulation details
   const handleViewDetails = (projectId: string) => {
-    message.info(`查看项目详情: ${projectId}`)
+    message.info(`View project details: ${projectId}`)
   }
 
-  // 模拟删除项目
+  // Simulate deleting project
   const handleDelete = (projectId: string) => {
     setProjects(prev => prev.filter(p => p.id !== projectId))
-    message.success(`删除项目: ${projectId}`)
+    message.success(`Delete project: ${projectId}`)
   }
 
-  // 模拟重试项目
+  // Simulate retrying project
   const handleRetry = (projectId: string) => {
     setProjects(prev => prev.map(p => 
       p.id === projectId ? { ...p, status: 'processing' } : p
     ))
-    message.success(`重试项目: ${projectId}`)
+    message.success(`Retry project: ${projectId}`)
   }
 
-  // 添加新项目
+  // Add new project
   const handleAddProject = () => {
     if (!newProjectId.trim()) {
-      message.warning('请输入项目ID')
+      message.warning('Please enter projectID')
       return
     }
 
     const newProject = {
       id: newProjectId,
-      title: `新项目 ${newProjectId}`,
-      description: '这是一个新添加的演示项目',
+      title: `New project ${newProjectId}`,
+      description: 'This is a newly added demo project',
       status: 'pending' as const,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -120,74 +120,73 @@ export const SimpleProgressDemo: React.FC = () => {
 
     setProjects(prev => [...prev, newProject])
     setNewProjectId('')
-    message.success(`添加项目: ${newProjectId}`)
+    message.success(`Add project: ${newProjectId}`)
   }
 
-  // 开始轮询选中的项目
+  // Start polling selected projects
   const handleStartPolling = () => {
     if (selectedProjectIds.length === 0) {
-      message.warning('请选择要轮询的项目')
+      message.warning('Please select the project to poll')
       return
     }
     startPolling(selectedProjectIds, pollingInterval)
-    message.success(`开始轮询 ${selectedProjectIds.length} 个项目`)
+    message.success(`Start polling ${selectedProjectIds.length} projects`)
   }
 
-  // 停止轮询
+  // Stopping polling
   const handleStopPolling = () => {
     stopPolling()
-    message.info('停止轮询')
+    message.info('Stopping polling')
   }
 
-  // 清除所有进度
+  // Clear all progress
   const handleClearProgress = () => {
     clearAllProgress()
-    message.success('清除所有进度数据')
+    message.success('Clear all progress data')
   }
 
   const allProgress = getAllProgress()
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
-      <Title level={2}>简化进度系统演示</Title>
+      <Title level={2}>Simplified progress system demo</Title>
       
       <Paragraph>
-        这是一个基于固定阶段和轮询的简化进度系统演示。
-        系统使用6个固定阶段，每个阶段有固定的权重，通过轮询API获取最新进度。
+        This is a simplified progress system demonstration based on fixed phases and polling.6The system usesAPIGet latest progress. 
       </Paragraph>
 
       <Divider />
 
-      {/* 控制面板 */}
-      <Card title="控制面板" style={{ marginBottom: '24px' }}>
+      {/* Control panel */}
+      <Card title="Control panel" style={{ marginBottom: '24px' }}>
         <Space direction="vertical" style={{ width: '100%' }}>
           <Row gutter={16}>
             <Col span={8}>
-              <Text strong>轮询间隔:</Text>
+              <Text strong>Polling interval:</Text>
               <Select
                 value={pollingInterval}
                 onChange={setPollingInterval}
                 style={{ width: '100%', marginTop: '8px' }}
               >
-                <Option value={1000}>1秒</Option>
-                <Option value={2000}>2秒</Option>
-                <Option value={3000}>3秒</Option>
-                <Option value={5000}>5秒</Option>
+                <Option value={1000}>1seconds</Option>
+                <Option value={2000}>2seconds</Option>
+                <Option value={3000}>3seconds</Option>
+                <Option value={5000}>5seconds</Option>
               </Select>
             </Col>
             <Col span={8}>
-              <Text strong>轮询状态:</Text>
+              <Text strong>Polling status:</Text>
               <div style={{ marginTop: '8px' }}>
                 <Tag color={isPolling ? 'green' : 'red'}>
-                  {isPolling ? '正在轮询' : '未轮询'}
+                  {isPolling ? 'Polling' : 'Not yet polling'}
                 </Tag>
               </div>
             </Col>
             <Col span={8}>
-              <Text strong>进度数据:</Text>
+              <Text strong>Progress data:</Text>
               <div style={{ marginTop: '8px' }}>
                 <Tag color="blue">
-                  {Object.keys(allProgress).length} 个项目
+                  {Object.keys(allProgress).length} projects
                 </Tag>
               </div>
             </Col>
@@ -202,27 +201,27 @@ export const SimpleProgressDemo: React.FC = () => {
                   onClick={handleStartPolling}
                   disabled={isPolling}
                 >
-                  开始轮询
+                  Start polling
                 </Button>
                 <Button 
                   icon={<StopOutlined />}
                   onClick={handleStopPolling}
                   disabled={!isPolling}
                 >
-                  停止轮询
+                  Stopping polling
                 </Button>
                 <Button 
                   icon={<ReloadOutlined />}
                   onClick={handleClearProgress}
                 >
-                  清除进度
+                  Clear progress
                 </Button>
               </Space>
             </Col>
             <Col span={12}>
               <Space>
                 <Input
-                  placeholder="输入新项目ID"
+                  placeholder="Enter new projectID"
                   value={newProjectId}
                   onChange={(e) => setNewProjectId(e.target.value)}
                   onPressEnter={handleAddProject}
@@ -232,7 +231,7 @@ export const SimpleProgressDemo: React.FC = () => {
                   icon={<PlusOutlined />}
                   onClick={handleAddProject}
                 >
-                  添加项目
+                  Add project
                 </Button>
               </Space>
             </Col>
@@ -240,11 +239,11 @@ export const SimpleProgressDemo: React.FC = () => {
 
           <Row>
             <Col span={24}>
-              <Text strong>选择要轮询的项目:</Text>
+              <Text strong>Select the project to poll:</Text>
               <div style={{ marginTop: '8px' }}>
                 <Select
                   mode="multiple"
-                  placeholder="选择项目"
+                  placeholder="Select project"
                   value={selectedProjectIds}
                   onChange={setSelectedProjectIds}
                   style={{ width: '100%' }}
@@ -261,23 +260,23 @@ export const SimpleProgressDemo: React.FC = () => {
         </Space>
       </Card>
 
-      {/* 批量进度显示 */}
+      {/* Batch progress display */}
       {selectedProjectIds.length > 0 && (
-        <Card title="批量进度显示" style={{ marginBottom: '24px' }}>
+        <Card title="Batch progress display" style={{ marginBottom: '24px' }}>
           <BatchProgressBar
             projectIds={selectedProjectIds}
             autoStart={false}
             pollingInterval={pollingInterval}
             showDetails={true}
             onProgressUpdate={(projectId, progress) => {
-              console.log(`项目 ${projectId} 进度更新:`, progress)
+              console.log(`Project ${projectId} Progress update:`, progress)
             }}
           />
         </Card>
       )}
 
-      {/* 项目卡片列表 */}
-      <Card title="项目列表">
+      {/* Project card list */}
+      <Card title="Project list">
         <Row gutter={[16, 16]}>
           {projects.map(project => (
             <Col span={24} key={project.id}>
@@ -293,9 +292,9 @@ export const SimpleProgressDemo: React.FC = () => {
         </Row>
       </Card>
 
-      {/* 当前进度数据 */}
+      {/* Current progress data */}
       {Object.keys(allProgress).length > 0 && (
-        <Card title="当前进度数据" style={{ marginTop: '24px' }}>
+        <Card title="Current progress data" style={{ marginTop: '24px' }}>
           <pre style={{ 
             background: '#f5f5f5', 
             padding: '12px', 

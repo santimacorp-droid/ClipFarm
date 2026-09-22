@@ -1,5 +1,5 @@
 """
-B站相关Schema
+BBilibili-relatedSchema
 """
 
 from pydantic import BaseModel, Field
@@ -9,16 +9,16 @@ from datetime import datetime
 
 
 class BilibiliAccountCreate(BaseModel):
-    """创建B站账号"""
-    username: str = Field(default="qr_login", description="用户名")
-    password: str = Field(default="", description="密码")
-    nickname: Optional[str] = Field(None, description="昵称")
-    cookie_content: str = Field(..., description="cookie文件内容")
+    """Creating Bilibili account"""
+    username: str = Field(default="qr_login", description="Username")
+    password: str = Field(default="", description="Password")
+    nickname: Optional[str] = Field(None, description="Nickname")
+    cookie_content: str = Field(..., description="cookieFile content")
 
 
 class BilibiliAccountResponse(BaseModel):
-    """B站账号响应"""
-    id: Union[int, str]  # 支持Integer和UUID
+    """BAccount response"""
+    id: Union[int, str]  # Supports Integer andUUID
     username: str
     nickname: Optional[str]
     status: str
@@ -30,30 +30,30 @@ class BilibiliAccountResponse(BaseModel):
 
 
 class QRLoginRequest(BaseModel):
-    """二维码登录请求"""
-    nickname: Optional[str] = Field(None, description="昵称")
+    """QR code login request"""
+    nickname: Optional[str] = Field(None, description="Nickname")
 
 
 class QRLoginResponse(BaseModel):
-    """二维码登录响应"""
+    """QR code login response"""
     session_id: str
     status: str
     message: str
 
 
 class UploadRequest(BaseModel):
-    """投稿请求"""
-    clip_ids: List[str] = Field(..., description="要投稿的切片ID列表")
-    account_id: Union[int, str] = Field(..., description="使用的账号ID")
-    title: str = Field(..., description="标题")
-    description: str = Field(..., description="描述")
-    tags: List[str] = Field(default=[], description="标签列表")
-    partition_id: int = Field(..., description="分区ID")
-    sub_partition_id: Optional[int] = Field(None, description="子分区ID（可选）")
+    """Submission request"""
+    clip_ids: List[str] = Field(..., description="Slice IDs to be submitted")
+    account_id: Union[int, str] = Field(..., description="Used accountID")
+    title: str = Field(..., description="Title")
+    description: str = Field(..., description="Description")
+    tags: List[str] = Field(default=[], description="Tag list")
+    partition_id: int = Field(..., description="CategoryID")
+    sub_partition_id: Optional[int] = Field(None, description="Sub-partition ID (optional))")
 
 
 class UploadRecordResponse(BaseModel):
-    """投稿记录响应"""
+    """Submission record response"""
     id: Union[int, str]
     task_id: Optional[str]
     project_id: Optional[UUID]
@@ -74,7 +74,7 @@ class UploadRecordResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    # 关联信息
+    # Associated information
     account_username: Optional[str] = None
     account_nickname: Optional[str] = None
     project_name: Optional[str] = None
@@ -84,7 +84,7 @@ class UploadRecordResponse(BaseModel):
 
 
 class UploadStatusResponse(BaseModel):
-    """投稿状态响应"""
+    """Submission status response"""
     id: UUID
     status: str
     bvid: Optional[str]

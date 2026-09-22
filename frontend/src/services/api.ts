@@ -6,9 +6,9 @@ import {
   trackVideoImported,
   trackClipsExported,
   trackProcessingFailed,
-} from '../analytics/events'
+} from '../appEvents/events'
 
-// 扩展Axios配置类型
+// ExtensionAxiosConfiguration type
 declare module 'axios' {
   interface InternalAxiosRequestConfig {
     metadata?: {
@@ -18,11 +18,11 @@ declare module 'axios' {
   }
 }
 
-// 格式化时间函数（暂时未使用，保留备用）
+// Formatting time function (not currently used; retain as standby))
 
 const api = axios.create({
   baseURL: apiConfigManager.getBaseUrl(),
-  timeout: 300000, // 增加到5分钟超时
+  timeout: 300000, // Add to5Minute timeout
   headers: {
     'Content-Type': 'application/json',
   },
@@ -54,7 +54,7 @@ const isTauriRuntime = () => (
   ((window as any).__TAURI__ || (window as any).__TAURI_INTERNALS__)
 )
 
-// 请求拦截器
+// Request interceptor
 api.interceptors.request.use(
   async (config) => {
     if (isTauriRuntime() && !apiConfigManager.isReady()) {
@@ -62,7 +62,7 @@ api.interceptors.request.use(
     }
 
     config.baseURL = apiConfigManager.getBaseUrl()
-    // 添加请求ID用于追踪
+    // Add requestIDFor tracking
     config.metadata = { startTime: Date.now() }
     return config
   },
@@ -72,13 +72,13 @@ api.interceptors.request.use(
   }
 )
 
-// 响应拦截器
+// Response interceptor
 api.interceptors.response.use(
   (response) => {
-    // 记录请求耗时
+    // Record request duration
     if (response.config.metadata?.startTime) {
       const duration = Date.now() - response.config.metadata.startTime
-      if (duration > 5000) { // 超过5秒的请求
+      if (duration > 5000) { // Over5Second request
         console.warn(`Slow API request: ${response.config.url} took ${duration}ms`)
       }
     }
@@ -98,23 +98,37 @@ api.interceptors.response.use(
       }
     }
 
-    // 使用统一的错误处理器
+    // Use unified error handler
     errorHandler.handleError(error, 'API')
     
-    // 保持原有的错误对象结构，确保向后兼容
-    if (error.response?.status === 429) {
-      const message = error.response?.data?.detail || '系统正在处理其他项目，请稍后再试'
-      error.userMessage = message
+    // Keep original error object structure, ensure backward compatibility and convert non-string errors to clear text
+    let userMsg = 'An unexpected error occurred'
+    if (error.response?.data?.detail) {
+      if (typeof error.response.data.detail === 'string') {
+        userMsg = error.response.data.detail
+      } else if (Array.isArray(error.response.data.detail)) {
+        // FastAPI / Pydantic validation errors (array of {loc, msg, type})
+        userMsg = error.response.data.detail
+          .map((d: any) => d.msg || d.message || (typeof d === 'string' ? d : JSON.stringify(d)))
+          .join('; ')
+      } else if (typeof error.response.data.detail === 'object') {
+        userMsg = error.response.data.detail.msg || error.response.data.detail.message || JSON.stringify(error.response.data.detail)
+      }
+      // Ensure response.data.detail Always be a string to prevent direct injection React DOM Crash caused by rendering object during server-side rendering
+      error.response.data.detail = userMsg
+    } else if (error.response?.status === 429) {
+      userMsg = 'System is currently busy processing other requests. Please try again later.'
+    } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      userMsg = 'Request timed out. The project may still be processing in the background.'
+    } else if (error.code === 'NETWORK_ERROR' || !error.response) {
+      userMsg = 'Network connection failed. Please check your connection.'
+    } else if (error.response?.status >= 500) {
+      userMsg = 'Internal server error. Please try again later.'
+    } else if (typeof error.message === 'string') {
+      userMsg = error.message
     }
-    else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-      error.userMessage = '请求超时，项目可能仍在后台处理中，请稍后查看项目状态'
-    }
-    else if (error.code === 'NETWORK_ERROR' || !error.response) {
-      error.userMessage = '网络连接失败，请检查网络连接'
-    }
-    else if (error.response?.status >= 500) {
-      error.userMessage = '服务器内部错误，请稍后重试'
-    }
+    
+    error.userMessage = userMsg
     
     return Promise.reject(error)
   }
@@ -125,6 +139,28 @@ export interface UploadFilesRequest {
   srt_file?: File
   project_name: string
   video_category?: string
+  caption_style?: string
+  duration_mode?: string
+  aspect_ratio?: string
+  show_hook_banner?: boolean
+  watermark_preset_id?: string
+  watermark_text?: string
+  watermark_text_opacity?: number
+  watermark_text_position?: string
+}
+
+export interface WatermarkPreset {
+  id: string
+  name: string
+  logo_filename: string
+  logo_url?: string
+  logo_exists?: boolean
+  position: 'bottom_right' | 'bottom_left' | 'top_right' | 'top_left'
+  scale_percent: number
+  opacity: number
+  margin: number
+  is_default: boolean
+  created_at?: string
 }
 
 export interface VideoCategory {
@@ -149,7 +185,7 @@ export interface ProcessingStatus {
   error_message?: string
 }
 
-// B站相关接口类型
+// BSite-related interface types
 export interface BilibiliVideoInfo {
   title: string
   description: string
@@ -167,6 +203,10 @@ export interface BilibiliDownloadRequest {
   project_name: string
   video_category?: string
   browser?: string
+  caption_style?: string
+  duration_mode?: string
+  show_hook_banner?: boolean
+  watermark_preset_id?: string
 }
 
 export interface BilibiliDownloadTask {
@@ -184,62 +224,93 @@ export interface BilibiliDownloadTask {
   updated_at: string
 }
 
-// 设置相关API
+// Settings relatedAPI
 export const settingsApi = {
-  // 获取系统配置
+  // Get system configuration
   getSettings: (): Promise<any> => {
     return api.get('/settings')
   },
 
-  // 更新系统配置
+  // Update system configuration
   updateSettings: (settings: any): Promise<any> => {
     return api.put('/settings/', settings)
   },
 
-  // 测试API密钥
-  testApiKey: (provider: string, apiKey: string): Promise<{ success: boolean; error?: string }> => {
+  // Testing API Key and connectivity
+  testApiKey: (provider: string, apiKey?: string, modelName?: string, baseUrl?: string): Promise<{ success: boolean; message?: string; error?: string }> => {
     return api.post('/settings/test-api', { 
       provider, 
-      api_key: apiKey
+      api_key: apiKey,
+      model_name: modelName,
+      base_url: baseUrl
     })
   },
 
-  // 获取所有可用模型
+  // Dynamically fetch models from local or custom OpenAI-compatible endpoint
+  fetchRemoteModels: (provider: string, apiKey?: string, baseUrl?: string): Promise<{ success: boolean; models?: string[]; count?: number; error?: string }> => {
+    return api.post('/settings/fetch-models', {
+      provider,
+      api_key: apiKey,
+      base_url: baseUrl
+    })
+  },
+
+  // Get all available models
   getAvailableModels: (): Promise<any> => {
     return api.get('/settings/available-models')
   },
 
-  // 获取当前提供商信息
+  // Get current provider information
   getCurrentProvider: (): Promise<any> => {
     return api.get('/settings/current-provider')
   },
 
-  // 检查桌面模式
+  // Check desktop mode
   checkDesktopMode: (): Promise<{ is_desktop_mode: boolean; environment: any }> => {
     return api.get('/settings/desktop-mode')
+  },
+
+  // RetrievingTokenUsage statistics and rates
+  getTokenStats: (): Promise<{
+    total_tokens: number
+    total_prompt_tokens: number
+    total_completion_tokens: number
+    total_cost_usd: number
+    total_requests: number
+    by_model: Record<string, any>
+    by_provider: Record<string, any>
+    recent_history: any[]
+    model_rates: Record<string, any>
+  }> => {
+    return api.get('/settings/token-stats')
+  },
+
+  // ResetTokenConsumption statistics
+  resetTokenStats: (): Promise<{ message: string }> => {
+    return api.post('/settings/token-stats/reset')
   }
 }
 
-// 项目相关API
+// Project-relatedAPI
 export const projectApi = {
-  // 获取视频分类配置
+  // Get video category configuration
   getVideoCategories: async (): Promise<VideoCategoriesResponse> => {
     return api.get('/video-categories')
   },
 
-  // 获取所有项目
+  // Get all projects
   getProjects: async (): Promise<Project[]> => {
     const response = await api.get('/projects/')
-    // 处理分页响应结构，返回items数组
+    // Process pagination response structure and returnitemsArray
     return (response as any).items || response || []
   },
 
-  // 获取单个项目
+  // Get single project
   getProject: async (id: string): Promise<Project> => {
     return api.get(`/projects/${id}`)
   },
 
-  // 上传文件并创建项目
+  // Upload file and create project
   uploadFiles: async (data: UploadFilesRequest): Promise<Project> => {
     const formData = new FormData()
     formData.append('video_file', data.video_file)
@@ -249,6 +320,30 @@ export const projectApi = {
     formData.append('project_name', data.project_name)
     if (data.video_category) {
       formData.append('video_category', data.video_category)
+    }
+    if (data.caption_style) {
+      formData.append('caption_style', data.caption_style)
+    }
+    if (data.duration_mode) {
+      formData.append('duration_mode', data.duration_mode)
+    }
+    if (data.aspect_ratio) {
+      formData.append('aspect_ratio', data.aspect_ratio)
+    }
+    if (data.show_hook_banner !== undefined) {
+      formData.append('show_hook_banner', String(data.show_hook_banner))
+    }
+    if (data.watermark_preset_id) {
+      formData.append('watermark_preset_id', data.watermark_preset_id)
+    }
+    if (data.watermark_text) {
+      formData.append('watermark_text', data.watermark_text)
+    }
+    if (data.watermark_text_opacity !== undefined) {
+      formData.append('watermark_text_opacity', String(data.watermark_text_opacity))
+    }
+    if (data.watermark_text_position) {
+      formData.append('watermark_text_position', data.watermark_text_position)
     }
     
     try {
@@ -273,44 +368,44 @@ export const projectApi = {
     }
   },
 
-  // 删除项目
+  // Delete project
   deleteProject: async (id: string): Promise<void> => {
     await api.delete(`/projects/${id}`)
   },
 
-  // 开始处理项目
+  // Start processing project
   startProcessing: async (id: string): Promise<void> => {
     await api.post(`/projects/${id}/process`)
   },
 
-  // 重试处理项目
+  // Retry processing project
   retryProcessing: async (id: string): Promise<void> => {
     await api.post(`/projects/${id}/retry`)
   },
 
-  // 获取处理状态
+  // Get processing status
   getProcessingStatus: async (id: string): Promise<ProcessingStatus> => {
     return api.get(`/projects/${id}/status`)
   },
 
-  // 获取项目日志
+  // Get project logs
   getProjectLogs: async (id: string, lines: number = 50): Promise<{logs: Array<{timestamp: string, module: string, level: string, message: string}>}> => {
     return api.get(`/projects/${id}/logs?lines=${lines}`)
   },
 
-  // 获取项目切片
+  // Get project slice
   getClips: async (projectId: string): Promise<any[]> => {
     try {
-      // 只从数据库获取数据，不再回退到文件系统
+      // Retrieve data only from database; no longer fall back to file system
       console.log('🔍 Calling clips API for project:', projectId)
       const response = await api.get(`/clips/?project_id=${projectId}`)
       console.log('📦 Raw API response:', response)
       const clips = (response as any).items || response || []
       console.log('📋 Extracted clips:', clips.length, 'clips found')
       
-      // 转换后端数据格式为前端期望的格式
+      // Convert backend data format to frontend expected format
       const convertedClips = clips.map((clip: any) => {
-        // 转换秒数为时间字符串格式
+        // Convert seconds to time string format
         const formatSecondsToTime = (seconds: number) => {
           const hours = Math.floor(seconds / 3600)
           const minutes = Math.floor((seconds % 3600) / 60)
@@ -318,7 +413,7 @@ export const projectApi = {
           return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
         }
         
-        // 获取metadata中的内容
+        // RetrievingmetadataContents of
         const metadata = clip.clip_metadata || {}
         
         return {
@@ -331,9 +426,19 @@ export const projectApi = {
           final_score: clip.score || 0,
           recommend_reason: metadata.recommend_reason || '',
           outline: metadata.outline || '',
-          // 只使用metadata中的content，避免使用description（可能是转写文本）
+          // Only usemetadataIncontent, Avoid usingdescription(May be transcription text)
           content: metadata.content || [],
-          chunk_index: metadata.chunk_index || 0
+          chunk_index: metadata.chunk_index || 0,
+          video_url: `/api/v1/clips/${clip.id}/video`,
+          video_path: clip.video_path,
+          clip_metadata: metadata,
+          cta_platforms: metadata.cta_platforms || metadata.platform_videos || {},
+          cta_style: metadata.cta_style,
+          cta_position: metadata.cta_position,
+          platform_advisory: clip.platform_advisory || metadata.platform_advisory,
+          social_copy: clip.social_copy || metadata.social_copy,
+          post_caption: clip.social_copy?.post_caption || metadata.post_caption || metadata.social_copy?.post_caption,
+          hashtags: clip.social_copy?.hashtags || metadata.hashtags || metadata.social_copy?.hashtags || []
         }
       })
       
@@ -346,14 +451,14 @@ export const projectApi = {
     }
   },
 
-  // 获取项目合集
+  // Get project collection
   getCollections: async (projectId: string): Promise<any[]> => {
     try {
-      // 只从数据库获取数据，不再回退到文件系统
+      // Retrieve data only from database; no longer fall back to file system
       const response = await api.get(`/collections/?project_id=${projectId}`)
       const collections = (response as any).items || response || []
       
-      // 转换后端数据格式为前端期望的格式
+      // Convert backend data format to frontend expected format
       return collections.map((collection: any) => ({
         id: collection.id,
         collection_title: collection.name || collection.collection_title || '',
@@ -370,27 +475,37 @@ export const projectApi = {
     }
   },
 
-  // 重启指定步骤
+  // Restart specified step
   restartStep: async (id: string, step: number): Promise<void> => {
     await api.post(`/projects/${id}/restart-step`, { step })
   },
 
-  // 更新切片信息
+  // Update slice information
   updateClip: (projectId: string, clipId: string, updates: Partial<Clip>): Promise<Clip> => {
     return api.patch(`/projects/${projectId}/clips/${clipId}`, updates)
   },
 
-  // 更新切片标题
+  // Update slice title
   updateClipTitle: async (clipId: string, title: string): Promise<any> => {
     return api.patch(`/clips/${clipId}/title`, { title })
   },
 
-  // 生成切片标题
+  // Generate slice title
   generateClipTitle: async (clipId: string): Promise<{clip_id: string, generated_title: string, success: boolean}> => {
     return api.post(`/clips/${clipId}/generate-title`)
   },
 
-  // 创建合集
+  // Generate / regenerate social posting caption and hashtags
+  generateSocialCaption: async (clipId: string, payload?: { category?: string, model?: string }): Promise<{ clip_id: string, social_copy: any, success: boolean }> => {
+    return api.post(`/clips/${clipId}/social-caption`, payload || {})
+  },
+
+  // Save custom edited social caption
+  updateSocialCaption: async (clipId: string, socialCopy: any): Promise<{ clip_id: string, social_copy: any, success: boolean }> => {
+    return api.patch(`/clips/${clipId}/social-caption`, { social_copy: socialCopy })
+  },
+
+  // Create collection
   createCollection: (projectId: string, collectionData: { collection_title: string, collection_summary: string, clip_ids: string[] }): Promise<Collection> => {
     return api.post(`/collections/`, {
       project_id: projectId,
@@ -401,53 +516,53 @@ export const projectApi = {
     })
   },
 
-  // 更新合集信息
+  // Update collection information
   updateCollection: (_projectId: string, collectionId: string, updates: Partial<Collection>): Promise<Collection> => {
     return api.put(`/collections/${collectionId}`, updates)
   },
 
-  // 重新排序合集切片
+  // Reorder collection slices
   reorderCollectionClips: (projectId: string, collectionId: string, clipIds: string[]): Promise<Collection> => {
     return api.patch(`/projects/${projectId}/collections/${collectionId}/reorder`, clipIds)
   },
 
-  // 删除合集
+  // Delete collection
   deleteCollection: (_projectId: string, collectionId: string): Promise<{message: string, deleted_collection: string}> => {
     return api.delete(`/collections/${collectionId}`)
   },
 
-  // 生成合集标题
+  // Generate collection title
   generateCollectionTitle: (collectionId: string): Promise<{collection_id: string, generated_title: string, success: boolean}> => {
     return api.post(`/collections/${collectionId}/generate-title`)
   },
 
-  // 更新合集标题
+  // Update collection title
   updateCollectionTitle: (collectionId: string, title: string): Promise<{collection_id: string, title: string, success: boolean}> => {
     return api.put(`/collections/${collectionId}/title`, { title })
   },
 
-  // 下载切片视频
+  // Download slice video
   downloadClip: (_projectId: string, clipId: string): Promise<Blob> => {
     return api.get(`/files/projects/${_projectId}/clips/${clipId}`, {
       responseType: 'blob'
     })
   },
 
-  // 下载合集视频
+  // Download collection video
   downloadCollection: (projectId: string, collectionId: string): Promise<Blob> => {
     return api.get(`/files/projects/${projectId}/collections/${collectionId}`, {
       responseType: 'blob'
     })
   },
 
-  // 导出元数据
+  // Export metadata
   exportMetadata: (projectId: string): Promise<Blob> => {
     return api.get(`/projects/${projectId}/export`, {
       responseType: 'blob'
     })
   },
 
-  // 生成合集视频
+  // Generate collection video
   generateCollectionVideo: (projectId: string, collectionId: string) => {
     return api.post(`/projects/${projectId}/collections/${collectionId}/generate`)
   },
@@ -461,42 +576,44 @@ export const projectApi = {
     }
     
     try {
-      // 对于blob类型的响应，需要直接使用axios而不是经过拦截器
-      const response = await axios.get(`/api/v1${url}`, { 
+      const baseUrl = apiConfigManager.getBaseUrl().replace(/\/+$/, '')
+      const fullUrl = `${baseUrl}${url.startsWith('/') ? url : `/${url}`}`
+
+      const response = await axios.get(fullUrl, { 
         responseType: 'blob',
         headers: {
           'Accept': 'application/octet-stream'
         }
       })
       
-      // 从响应头获取文件名，如果没有则使用默认名称
-      const contentDisposition = response.headers['content-disposition']
+      // Get filename from response headers; use default name if not present
+      const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition']
       let filename = clipId ? `clip_${clipId}.mp4` : 
                      collectionId ? `collection_${collectionId}.mp4` : 
                      `project_${projectId}.mp4`
       
       if (contentDisposition) {
-        // 优先尝试解析 RFC 6266 格式的 filename* 参数
-        const filenameStarMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/)
+        // Prioritize attempting parsing RFC 6266 In format filename* Parameters
+        const filenameStarMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
         if (filenameStarMatch) {
           filename = decodeURIComponent(filenameStarMatch[1])
         } else {
-          // 回退到传统的 filename 参数
-          const filenameMatch = contentDisposition.match(/filename="([^"]+)"/)
+          // Roll back to traditional filename Parameters
+          const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i)
           if (filenameMatch) {
             filename = filenameMatch[1]
           }
         }
       }
       
-      // 创建下载链接
+      // Create download link
       const blob = new Blob([response.data], { type: 'video/mp4' })
       const downloadUrl = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = downloadUrl
       link.download = filename
       
-      // 触发下载
+      // Trigger download
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -504,52 +621,130 @@ export const projectApi = {
 
       trackClipsExported({
         clipCount: 1,
-        // 区分导出粒度：单切片 / 合集 / 整片
+        // Export granularity differentiation: single slice / Collection / Whole film
         exportType: clipId ? 'clip' : collectionId ? 'collection' : 'project',
       })
       return response.data
     } catch (error: any) {
-      console.error('下载失败:', error)
+      let errorMessage = error?.message || 'Download failed'
+      if (error?.response?.data instanceof Blob) {
+        try {
+          const errorText = await error.response.data.text()
+          const parsed = JSON.parse(errorText)
+          if (parsed?.detail) {
+            errorMessage = parsed.detail
+          }
+        } catch {
+          // Keep default message
+        }
+      }
+      console.error('Download video failed:', errorMessage, error)
       trackProcessingFailed({
         stage: 'export',
-        message: error?.message,
+        message: errorMessage,
         code: error?.response?.status,
       })
-      throw error
+      const customError = new Error(errorMessage)
+      ;(customError as any).response = error?.response
+      throw customError
     }
   },
 
-  // 获取项目文件URL
+  // Export all slices as ZIP Compressed file
+  exportAllClipsZip: async (projectId: string, platform?: string): Promise<Blob> => {
+    try {
+      const baseUrl = apiConfigManager.getBaseUrl().replace(/\/+$/, '')
+      const query = platform ? `?platform=${encodeURIComponent(platform)}` : ''
+      const fullUrl = `${baseUrl}/projects/${projectId}/export-zip${query}`
+
+      const response = await axios.get(fullUrl, {
+        responseType: 'blob',
+        timeout: 120000 // 2 minutes timeout for zipping
+      })
+
+      // Parse file name
+      const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition']
+      let filename = `project_${projectId}_clips.zip`
+
+      if (contentDisposition) {
+        const filenameStarMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+        if (filenameStarMatch) {
+          filename = decodeURIComponent(filenameStarMatch[1])
+        } else {
+          const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i)
+          if (filenameMatch) {
+            filename = filenameMatch[1]
+          }
+        }
+      }
+
+      const blob = new Blob([response.data], { type: 'application/zip' })
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+
+      trackClipsExported({
+        clipCount: 1,
+        exportType: 'zip_bundle'
+      })
+
+      return response.data
+    } catch (error: any) {
+      let errorMessage = error?.message || 'ZIP Export failed'
+      if (error?.response?.data instanceof Blob) {
+        try {
+          const errorText = await error.response.data.text()
+          const parsed = JSON.parse(errorText)
+          if (parsed?.detail) {
+            errorMessage = parsed.detail
+          }
+        } catch {
+          // Keep default message
+        }
+      }
+      console.error('ZIP Export failed:', errorMessage, error)
+      const customError = new Error(errorMessage)
+      ;(customError as any).response = error?.response
+      throw customError
+    }
+  },
+
+  // Get project filesURL
   getProjectFileUrl: (projectId: string, filename: string): string => {
     return `${api.defaults.baseURL}/projects/${projectId}/files/${filename}`
   },
 
-  // 获取项目视频URL
+  // Get project videoURL
   getProjectVideoUrl: (projectId: string): string => {
     return `${api.defaults.baseURL}/projects/${projectId}/video`
   },
 
-  // 获取切片视频URL
-  getClipVideoUrl: (projectId: string, clipId: string, _clipTitle?: string): string => {
-    // 使用projects路由获取切片视频
-    return `/api/v1/projects/${projectId}/clips/${clipId}`
+  // Get slice videoURL
+  getClipVideoUrl: (_projectId: string, clipId: string, _clipTitle?: string, platform?: string): string => {
+    const query = platform ? `?platform=${encodeURIComponent(platform)}` : ''
+    return `/api/v1/clips/${clipId}/video${query}`
   },
 
-  // 获取合集视频URL
+  // Get collection videoURL
   getCollectionVideoUrl: (projectId: string, collectionId: string): string => {
-    // 使用files路由获取合集视频
+    // UsagefilesRoute to get collection videos
     return `/api/v1/files/projects/${projectId}/collections/${collectionId}`
   },
 
-  // 生成项目缩略图
+  // Generate project thumbnail
   generateThumbnail: async (projectId: string): Promise<{success: boolean, thumbnail: string, message: string}> => {
     return api.post(`/projects/${projectId}/generate-thumbnail`)
   }
 }
 
-// 视频下载相关API
+// Video download relatedAPI
 export const bilibiliApi = {
-  // 解析B站视频信息
+  // ParsingBSite video information
   parseVideoInfo: async (url: string, browser?: string): Promise<{success: boolean, video_info: BilibiliVideoInfo}> => {
     const formData = new FormData()
     formData.append('url', url)
@@ -563,7 +758,7 @@ export const bilibiliApi = {
     })
   },
 
-  // 解析YouTube视频信息
+  // ParsingYouTubeVideo information
   parseYouTubeVideoInfo: async (url: string, browser?: string): Promise<{success: boolean, video_info: BilibiliVideoInfo}> => {
     const formData = new FormData()
     formData.append('url', url)
@@ -577,44 +772,51 @@ export const bilibiliApi = {
     })
   },
 
-  // 创建B站下载任务
+  // CreationBSite download task
   createDownloadTask: async (data: BilibiliDownloadRequest): Promise<BilibiliDownloadTask> => {
     const task = await api.post<unknown, BilibiliDownloadTask>('/bilibili/download', data)
     trackVideoImported({ source: 'url', fileType: 'bilibili' })
     return task
   },
 
-  // 创建YouTube下载任务
+  // CreationYouTubeDownload task
   createYouTubeDownloadTask: async (data: BilibiliDownloadRequest): Promise<BilibiliDownloadTask> => {
     const task = await api.post<unknown, BilibiliDownloadTask>('/youtube/download', data)
     trackVideoImported({ source: 'url', fileType: 'youtube' })
     return task
   },
 
-  // 获取下载任务状态
+  // Get download task status
   getTaskStatus: async (taskId: string): Promise<BilibiliDownloadTask> => {
     return api.get(`/bilibili/tasks/${taskId}`)
   },
 
-  // 获取YouTube下载任务状态
+  // RetrievingYouTubeDownload task status
   getYouTubeTaskStatus: async (taskId: string): Promise<BilibiliDownloadTask> => {
     return api.get(`/youtube/tasks/${taskId}`)
   },
 
-  // 获取所有下载任务
+  // Get all download tasks
   getAllTasks: async (): Promise<BilibiliDownloadTask[]> => {
     return api.get('/bilibili/tasks')
   },
 
-  // 获取所有YouTube下载任务
+  // Get allYouTubeDownload task
   getAllYouTubeTasks: async (): Promise<BilibiliDownloadTask[]> => {
     return api.get('/youtube/tasks')
   }
 }
 
-// 系统状态相关API
+export const youtubeApi = {
+  parseVideoInfo: bilibiliApi.parseYouTubeVideoInfo,
+  createDownloadTask: bilibiliApi.createYouTubeDownloadTask,
+  getTaskStatus: bilibiliApi.getYouTubeTaskStatus,
+  getAllTasks: bilibiliApi.getAllYouTubeTasks
+}
+
+// System status relatedAPI
 export const systemApi = {
-  // 获取系统状态
+  // Get system status
   getSystemStatus: (): Promise<{
     current_processing_count: number
     max_concurrent_processing: number
@@ -647,7 +849,23 @@ export interface WhisperModel {
   errorMessage?: string | null
 }
 
-// 语音识别 / Whisper 运行时与模型管理
+// Watermark preset managementAPI
+export const watermarkApi = {
+  getPresets: (): Promise<WatermarkPreset[]> => api.get('/watermarks/presets'),
+  createPreset: (formData: FormData): Promise<WatermarkPreset> => {
+    return api.post('/watermarks/presets', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
+  updatePreset: (id: string, updates: Partial<WatermarkPreset>): Promise<WatermarkPreset> => {
+    return api.put(`/watermarks/presets/${id}`, updates)
+  },
+  deletePreset: (id: string): Promise<{ success: boolean; message: string }> => {
+    return api.delete(`/watermarks/presets/${id}`)
+  }
+}
+
+// Speech recognition / Whisper Runtime and model management
 export const speechApi = {
   getRuntimeStatus: (): Promise<WhisperRuntimeStatus> => api.get('/whisper/runtime-status'),
   installRuntime: (): Promise<{ started: boolean; message: string }> => api.post('/whisper/install'),
@@ -655,6 +873,146 @@ export const speechApi = {
   getModels: (): Promise<WhisperModel[]> => api.get('/whisper-models'),
   downloadModel: (model: string): Promise<unknown> => api.post('/whisper-models/download', { model }),
   deleteModel: (model: string): Promise<unknown> => api.delete(`/whisper-models/${model}`),
+}
+
+export interface SubtitleWord {
+  word: string
+  startTime: number
+  endTime: number
+}
+
+export interface SubtitleSegment {
+  id?: string
+  startTime: number
+  endTime: number
+  text: string
+  words?: SubtitleWord[]
+  index?: number
+}
+
+export interface SubtitleDataResponse {
+  segments: SubtitleSegment[]
+  total_duration: number
+  word_count: number
+  segment_count: number
+}
+
+export interface UpdateClipSubtitlesRequest {
+  segments: SubtitleSegment[]
+  caption_style?: string
+  reburn_video?: boolean
+  hook_title?: string
+  show_hook_banner?: boolean
+  aspect_ratio?: string
+  dynamic_zoom?: boolean
+  bgm_track?: string
+  bgm_volume?: number
+  sfx_enabled?: boolean
+  custom_bgm_path?: string
+}
+
+// Subtitle editingAPI
+export const subtitleApi = {
+  getClipSubtitles: (projectId: string, clipId: string): Promise<SubtitleDataResponse> => {
+    return api.get(`/subtitle-editor/${projectId}/clips/${clipId}/subtitles`)
+  },
+  updateClipSubtitles: (
+    projectId: string,
+    clipId: string,
+    data: UpdateClipSubtitlesRequest
+  ): Promise<{ success: boolean; message: string; reburned: boolean; srt_path?: string; ass_path?: string }> => {
+    return api.put(`/subtitle-editor/${projectId}/clips/${clipId}/subtitles`, data)
+  },
+  getProjectSubtitles: (projectId: string): Promise<SubtitleDataResponse> => {
+    return api.get(`/subtitle-editor/${projectId}/subtitles`)
+  },
+  updateProjectSubtitles: (
+    projectId: string,
+    segments: SubtitleSegment[]
+  ): Promise<{ success: boolean; message: string; count: number }> => {
+    return api.put(`/subtitle-editor/${projectId}/subtitles`, { segments })
+  },
+  getBgmTracks: (): Promise<{ success: boolean; tracks: Array<{ id: string; name: string; description: string; default_volume: number; is_custom?: boolean; path?: string }> }> => {
+    return api.get(`/subtitle-editor/bgm-tracks`)
+  },
+  uploadCustomBgm: (file: File): Promise<{ success: boolean; message: string; track: { id: string; name: string; filename: string; path: string; default_volume: number } }> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post(`/subtitle-editor/upload-bgm`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+  getExportSrtUrl: (projectId: string, clipId: string): string => {
+    return `/api/v1/subtitle-editor/${projectId}/clips/${clipId}/export-srt`
+  }
+}
+
+// Creator Bounty & Brand Campaigns API (Kettle & Fire Fasting Campaign)
+export interface ApprovedSourceItem {
+  id: string
+  category: string
+  title: string
+  speaker: string
+  url: string
+  platform: string
+  type: 'celebrity' | 'sponsor'
+  recommended_use: string
+}
+
+export interface CampaignDetailsResponse {
+  id: string
+  name: string
+  brand_name: string
+  brand_tag: string
+  min_duration_sec: number
+  description: string
+  preferred_structure: string
+  tagging_requirements: {
+    tiktok: string
+    instagram: string
+    youtube_shorts: string
+  }
+  hook_suggestions: string[]
+  social_captions: string[]
+  approved_sources: ApprovedSourceItem[]
+}
+
+export interface CampaignStitchPayload {
+  campaign_id?: string
+  title?: string
+  hook_title: string
+  caption_style?: string
+  part_a_video_path: string
+  part_a_srt_path?: string
+  part_b_video_path: string
+  part_b_srt_path?: string
+}
+
+export interface CampaignStitchResult {
+  success: boolean
+  clip_id: string
+  title: string
+  video_path: string
+  duration: number
+  aspect_ratio: string
+  social_metadata: {
+    tiktok: string
+    instagram: string
+    youtube_shorts: string
+    required_tag: string
+  }
+  message: string
+}
+
+export const campaignApi = {
+  getKettleFireCampaign: (): Promise<CampaignDetailsResponse> => {
+    return api.get('/campaigns/kettle-fire')
+  },
+  stitchCampaignClip: (data: CampaignStitchPayload): Promise<CampaignStitchResult> => {
+    return api.post('/campaigns/stitch', data)
+  }
 }
 
 export default api

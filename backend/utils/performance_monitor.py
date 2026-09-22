@@ -1,6 +1,6 @@
 """
-性能监控工具
-监控系统性能指标，包括CPU、内存、磁盘、网络等
+Performance Monitoring Utility
+System performance metrics, including CPU, memory, disk, network, etc.
 """
 
 import psutil
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class MetricType(Enum):
-    """指标类型"""
+    """Metric type"""
     CPU = "cpu"
     MEMORY = "memory"
     DISK = "disk"
@@ -29,7 +29,7 @@ class MetricType(Enum):
 
 @dataclass
 class PerformanceMetric:
-    """性能指标"""
+    """Performance metric"""
     name: str
     value: float
     unit: str
@@ -40,7 +40,7 @@ class PerformanceMetric:
 
 @dataclass
 class SystemStats:
-    """系统统计信息"""
+    """System statistics"""
     timestamp: datetime
     cpu_percent: float
     memory_percent: float
@@ -55,7 +55,7 @@ class SystemStats:
 
 
 class PerformanceMonitor:
-    """性能监控器"""
+    """Performance monitor"""
     
     def __init__(self, max_history_size: int = 1000, collection_interval: int = 60):
         self.max_history_size = max_history_size
@@ -66,34 +66,34 @@ class PerformanceMonitor:
         self.monitor_task: Optional[asyncio.Task] = None
         self.lock = threading.Lock()
         
-        # 网络统计基准
+        # Network statistics baseline
         self._network_baseline = None
         self._last_network_check = None
     
     def _get_system_stats(self) -> SystemStats:
-        """获取系统统计信息"""
+        """Get system status information"""
         
-        # CPU使用率
+        # CPU utilization
         cpu_percent = psutil.cpu_percent(interval=1)
         
-        # 内存使用情况
+        # Memory utilization
         memory = psutil.virtual_memory()
         memory_percent = memory.percent
         memory_used = memory.used
         memory_total = memory.total
         
-        # 磁盘使用情况
+        # Disk utilization
         disk = psutil.disk_usage('/')
         disk_usage_percent = (disk.used / disk.total) * 100
         disk_used = disk.used
         disk_total = disk.total
         
-        # 网络统计
+        # Network statistics
         network = psutil.net_io_counters()
         network_bytes_sent = network.bytes_sent
         network_bytes_recv = network.bytes_recv
         
-        # 活跃进程数
+        # Active process count
         active_processes = len(psutil.pids())
         
         return SystemStats(
@@ -111,7 +111,7 @@ class PerformanceMonitor:
         )
     
     def _get_process_stats(self, process_name: str = None) -> List[Dict[str, Any]]:
-        """获取进程统计信息"""
+        """Get process statistics"""
         
         processes = []
         
@@ -134,7 +134,7 @@ class PerformanceMonitor:
         return processes
     
     def _calculate_network_delta(self, current_stats: SystemStats) -> Dict[str, int]:
-        """计算网络流量增量"""
+        """Calculate network traffic increment"""
         
         if self._network_baseline is None:
             self._network_baseline = current_stats
@@ -148,7 +148,7 @@ class PerformanceMonitor:
         bytes_sent_delta = current_stats.network_bytes_sent - self._network_baseline.network_bytes_sent
         bytes_recv_delta = current_stats.network_bytes_recv - self._network_baseline.network_bytes_recv
         
-        # 计算每秒流量
+        # Calculate throughput per second
         bytes_sent_per_sec = bytes_sent_delta / time_delta
         bytes_recv_per_sec = bytes_recv_delta / time_delta
         
@@ -163,19 +163,19 @@ class PerformanceMonitor:
         }
     
     async def collect_metrics(self):
-        """收集性能指标"""
+        """Collect performance metrics"""
         
         try:
-            # 获取系统统计信息
+            # Get system status information
             system_stats = self._get_system_stats()
             
             with self.lock:
                 self.system_stats_history.append(system_stats)
             
-            # 计算网络流量增量
+            # Calculate network traffic increment
             network_delta = self._calculate_network_delta(system_stats)
             
-            # 创建性能指标
+            # Create performance metrics
             metrics = [
                 PerformanceMetric(
                     name="cpu_usage",
@@ -238,25 +238,25 @@ class PerformanceMonitor:
             with self.lock:
                 self.metrics_history.extend(metrics)
             
-            logger.debug(f"收集性能指标: {len(metrics)} 个指标")
+            logger.debug(f"Collected performance metrics: {len(metrics)} metrics")
             
         except Exception as e:
-            logger.error(f"收集性能指标失败: {e}")
+            logger.error(f"Failed to collect performance indicators: {e}")
     
     async def start_monitoring(self):
-        """开始监控"""
+        """Start monitoring"""
         
         if self.is_monitoring:
-            logger.warning("性能监控已在运行")
+            logger.warning("Performance monitoring is already running")
             return
         
         self.is_monitoring = True
         self.monitor_task = asyncio.create_task(self._monitoring_loop())
         
-        logger.info(f"开始性能监控，收集间隔: {self.collection_interval} 秒")
+        logger.info(f"Start performance monitoring, collection interval: {self.collection_interval} seconds")
     
     async def stop_monitoring(self):
-        """停止监控"""
+        """Stop monitoring"""
         
         if not self.is_monitoring:
             return
@@ -270,10 +270,10 @@ class PerformanceMonitor:
             except asyncio.CancelledError:
                 pass
         
-        logger.info("停止性能监控")
+        logger.info("Stop performance monitoring")
     
     async def _monitoring_loop(self):
-        """监控循环"""
+        """Monitoring loop"""
         
         while self.is_monitoring:
             try:
@@ -282,11 +282,11 @@ class PerformanceMonitor:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"监控循环错误: {e}")
+                logger.error(f"Monitoring loop error: {e}")
                 await asyncio.sleep(self.collection_interval)
     
     def get_current_stats(self) -> SystemStats:
-        """获取当前系统统计信息"""
+        """Get current system statistics"""
         
         with self.lock:
             if self.system_stats_history:
@@ -295,25 +295,25 @@ class PerformanceMonitor:
                 return self._get_system_stats()
     
     def get_metrics_summary(self, time_range_minutes: int = 60) -> Dict[str, Any]:
-        """获取指标摘要"""
+        """Get metrics summary"""
         
         cutoff_time = datetime.now() - timedelta(minutes=time_range_minutes)
         
         with self.lock:
-            # 过滤时间范围内的指标
+            # Filter indicators within the specified time range
             recent_metrics = [
                 metric for metric in self.metrics_history
                 if metric.timestamp >= cutoff_time
             ]
             
-            # 按指标名称分组
+            # Group by metric name
             metrics_by_name = {}
             for metric in recent_metrics:
                 if metric.name not in metrics_by_name:
                     metrics_by_name[metric.name] = []
                 metrics_by_name[metric.name].append(metric.value)
             
-            # 计算统计信息
+            # Calculate statistics
             summary = {}
             for name, values in metrics_by_name.items():
                 if values:
@@ -328,25 +328,25 @@ class PerformanceMonitor:
             return summary
     
     def get_system_health(self) -> Dict[str, Any]:
-        """获取系统健康状态"""
+        """Get system health status"""
         
         current_stats = self.get_current_stats()
         
-        # 健康状态评估
+        # Health status assessment
         health_status = "healthy"
         warnings = []
         
         if current_stats.cpu_percent > 80:
             health_status = "warning"
-            warnings.append(f"CPU使用率过高: {current_stats.cpu_percent:.1f}%")
+            warnings.append(f"CPU utilization too high: {current_stats.cpu_percent:.1f}%")
         
         if current_stats.memory_percent > 85:
             health_status = "warning"
-            warnings.append(f"内存使用率过高: {current_stats.memory_percent:.1f}%")
+            warnings.append(f"High memory usage: {current_stats.memory_percent:.1f}%")
         
         if current_stats.disk_usage_percent > 90:
             health_status = "critical"
-            warnings.append(f"磁盘使用率过高: {current_stats.disk_usage_percent:.1f}%")
+            warnings.append(f"High disk usage: {current_stats.disk_usage_percent:.1f}%")
         
         return {
             "status": health_status,
@@ -361,11 +361,11 @@ class PerformanceMonitor:
         }
     
     def get_top_processes(self, limit: int = 10, sort_by: str = "cpu") -> List[Dict[str, Any]]:
-        """获取占用资源最多的进程"""
+        """Get the process with the highest resource consumption"""
         
         processes = self._get_process_stats()
         
-        # 按指定字段排序
+        # Sort by specified field
         if sort_by == "cpu":
             processes.sort(key=lambda x: x['cpu_percent'], reverse=True)
         elif sort_by == "memory":
@@ -374,7 +374,7 @@ class PerformanceMonitor:
         return processes[:limit]
     
     def add_custom_metric(self, name: str, value: float, unit: str = "", tags: Dict[str, str] = None):
-        """添加自定义指标"""
+        """Add custom indicator"""
         
         metric = PerformanceMetric(
             name=name,
@@ -389,22 +389,22 @@ class PerformanceMonitor:
             self.metrics_history.append(metric)
     
     def clear_history(self):
-        """清空历史数据"""
+        """Clear historical data"""
         
         with self.lock:
             self.metrics_history.clear()
             self.system_stats_history.clear()
         
-        logger.info("清空性能监控历史数据")
+        logger.info("Clear performance monitoring historical data")
 
 
-# 全局性能监控器实例
+# Global performance monitor instance
 performance_monitor = PerformanceMonitor()
 
 
-# 性能监控装饰器
+# Performance monitoring decorator
 def monitor_performance(metric_name: str, unit: str = ""):
-    """性能监控装饰器"""
+    """Performance monitoring decorator"""
     
     def decorator(func):
         async def async_wrapper(*args, **kwargs):

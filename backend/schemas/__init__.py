@@ -8,11 +8,17 @@ from .project import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectListR
 from .clip import ClipCreate, ClipUpdate, ClipResponse, ClipListResponse
 from .collection import CollectionCreate, CollectionUpdate, CollectionResponse, CollectionListResponse
 from .task import TaskCreate, TaskUpdate, TaskResponse, TaskListResponse
+from .campaign import (
+    CampaignSchema, CampaignResponse, CampaignCreateRequest,
+    CampaignUpdateRequest, ClipPackage, MomentDefinition
+)
 
 __all__ = [
     "BaseSchema",
     "ProjectCreate", "ProjectUpdate", "ProjectResponse", "ProjectListResponse",
     "ClipCreate", "ClipUpdate", "ClipResponse", "ClipListResponse", 
     "CollectionCreate", "CollectionUpdate", "CollectionResponse", "CollectionListResponse",
-    "TaskCreate", "TaskUpdate", "TaskResponse", "TaskListResponse"
+    "TaskCreate", "TaskUpdate", "TaskResponse", "TaskListResponse",
+    "CampaignSchema", "CampaignResponse", "CampaignCreateRequest",
+    "CampaignUpdateRequest", "ClipPackage", "MomentDefinition"
 ]

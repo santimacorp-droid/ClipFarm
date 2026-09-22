@@ -1,16 +1,16 @@
 #!/bin/bash
 
-# AutoClip Docker 状态检查脚本
-# 版本: 1.0
-# 功能: 检查AutoClip Docker服务状态
+# AutoClip Docker Status check script
+# Version: 1.0
+# Function: CheckAutoClip DockerService status
 
 set -euo pipefail
 
 # =============================================================================
-# 配置区域
+# configuration region
 # =============================================================================
 
-# 颜色定义
+# color definitions
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -20,7 +20,7 @@ CYAN='\033[0;36m'
 WHITE='\033[1;37m'
 NC='\033[0m' # No Color
 
-# 图标定义
+# Icon definition
 ICON_SUCCESS="✅"
 ICON_ERROR="❌"
 ICON_WARNING="⚠️"
@@ -31,7 +31,7 @@ ICON_ROCKET="🚀"
 ICON_DOCKER="🐳"
 
 # =============================================================================
-# 工具函数
+# utility functions
 # =============================================================================
 
 log_info() {
@@ -56,44 +56,44 @@ log_header() {
 }
 
 # =============================================================================
-# 检查函数
+# check function
 # =============================================================================
 
 check_docker() {
-    log_header "Docker环境检查"
+    log_header "Dockerenvironment check"
     
     if ! command -v docker >/dev/null 2>&1; then
-        log_error "Docker未安装"
+        log_error "DockerNot installed"
         return 1
     fi
-    log_success "Docker已安装"
+    log_success "DockerInstalled"
     
     if ! command -v docker-compose >/dev/null 2>&1; then
-        log_error "Docker Compose未安装"
+        log_error "Docker ComposeNot installed"
         return 1
     fi
-    log_success "Docker Compose已安装"
+    log_success "Docker ComposeInstalled"
     
     if ! docker info >/dev/null 2>&1; then
-        log_error "Docker服务未运行"
+        log_error "Dockerservice not running"
         return 1
     fi
-    log_success "Docker服务运行正常"
+    log_success "DockerService is running normally"
     
     return 0
 }
 
 check_containers() {
-    log_header "容器状态检查"
+    log_header "Container status check"
     
     local containers=$(docker ps -a --filter "name=autoclip" --format "{{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || true)
     
     if [[ -z "$containers" ]]; then
-        log_warning "没有发现AutoClip容器"
+        log_warning "Not foundAutoClipcontainer"
         return 1
     fi
     
-    echo -e "${CYAN}📊 容器状态:${NC}"
+    echo -e "${CYAN}📊 container status:${NC}"
     echo "$containers" | while IFS=$'\t' read -r name status ports; do
         if [[ "$status" == *"Up"* ]]; then
             echo -e "  ${GREEN}${ICON_HEALTH} $name${NC} - $status"
@@ -106,41 +106,41 @@ check_containers() {
 }
 
 check_services() {
-    log_header "服务健康检查"
+    log_header "Service health check"
     
-    # 检查后端API
+    # Check backendAPI
     if curl -fsS "http://localhost:8000/api/v1/health/" >/dev/null 2>&1; then
-        log_success "后端API服务健康"
+        log_success "backendAPIservice healthy"
     else
-        log_error "后端API服务不健康"
+        log_error "backendAPIservice unhealthy"
     fi
     
-    # 检查前端服务
+    # Check frontend service
     if curl -fsS "http://localhost:3000/" >/dev/null 2>&1; then
-        log_success "前端服务健康"
+        log_success "Frontend service healthy"
     else
-        log_error "前端服务不健康"
+        log_error "Frontend service is unhealthy"
     fi
     
-    # 检查Redis
+    # checkRedis
     if docker exec autoclip-redis redis-cli ping >/dev/null 2>&1; then
-        log_success "Redis服务健康"
+        log_success "Redisservice healthy"
     else
-        log_error "Redis服务不健康"
+        log_error "Redisservice unhealthy"
     fi
 }
 
 check_volumes() {
-    log_header "数据卷检查"
+    log_header "data volume check"
     
     local volumes=$(docker volume ls --filter "name=autoclip" --format "{{.Name}}\t{{.Driver}}\t{{.Size}}" 2>/dev/null || true)
     
     if [[ -z "$volumes" ]]; then
-        log_warning "没有发现AutoClip数据卷"
+        log_warning "Not foundAutoClipData volume"
         return 1
     fi
     
-    echo -e "${CYAN}💾 数据卷:${NC}"
+    echo -e "${CYAN}💾 Data volume:${NC}"
     echo "$volumes" | while IFS=$'\t' read -r name driver size; do
         echo -e "  ${ICON_INFO} $name ($driver) - $size"
     done
@@ -149,16 +149,16 @@ check_volumes() {
 }
 
 check_networks() {
-    log_header "网络检查"
+    log_header "Network check"
     
     local networks=$(docker network ls --filter "name=autoclip" --format "{{.Name}}\t{{.Driver}}\t{{.Scope}}" 2>/dev/null || true)
     
     if [[ -z "$networks" ]]; then
-        log_warning "没有发现AutoClip网络"
+        log_warning "Not foundAutoClipnetwork"
         return 1
     fi
     
-    echo -e "${CYAN}🌐 网络:${NC}"
+    echo -e "${CYAN}🌐 network:${NC}"
     echo "$networks" | while IFS=$'\t' read -r name driver scope; do
         echo -e "  ${ICON_INFO} $name ($driver) - $scope"
     done
@@ -167,93 +167,93 @@ check_networks() {
 }
 
 check_resources() {
-    log_header "资源使用情况"
+    log_header "Resource usage details"
     
-    echo -e "${CYAN}📊 容器资源使用:${NC}"
-    docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}" $(docker ps --filter "name=autoclip" --format "{{.Names}}" 2>/dev/null || true) 2>/dev/null || log_warning "无法获取资源使用情况"
+    echo -e "${CYAN}📊 Container resource usage:${NC}"
+    docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}" $(docker ps --filter "name=autoclip" --format "{{.Names}}" 2>/dev/null || true) 2>/dev/null || log_warning "Failed to retrieve resource usage"
 }
 
 show_access_info() {
-    log_header "访问信息"
+    log_header "access information"
     
-    echo -e "${CYAN}🌐 服务访问地址:${NC}"
-    echo -e "  前端界面: http://localhost:3000"
-    echo -e "  后端API:  http://localhost:8000"
-    echo -e "  API文档:  http://localhost:8000/docs"
-    echo -e "  Flower监控: http://localhost:5555"
+    echo -e "${CYAN}🌐 Service access address:${NC}"
+    echo -e "  Frontend interface: http://localhost:3000"
+    echo -e "  backendAPI:  http://localhost:8000"
+    echo -e "  APIDocumentation:  http://localhost:8000/docs"
+    echo -e "  Flowermonitoring: http://localhost:5555"
     
-    echo -e "\n${CYAN}📝 常用命令:${NC}"
-    echo -e "  查看日志: docker-compose logs -f"
-    echo -e "  停止服务: docker-compose down"
-    echo -e "  重启服务: docker-compose restart"
-    echo -e "  进入容器: docker-compose exec autoclip bash"
+    echo -e "\n${CYAN}📝 common commands:${NC}"
+    echo -e "  view logs: docker-compose logs -f"
+    echo -e "  stop service: docker-compose down"
+    echo -e "  restart service: docker-compose restart"
+    echo -e "  Enter container: docker-compose exec autoclip bash"
 }
 
 # =============================================================================
-# 主函数
+# Main function
 # =============================================================================
 
 main() {
-    log_header "AutoClip Docker 状态检查 v1.0"
+    log_header "AutoClip Docker status check v1.0"
     
     local overall_status=0
     
-    # 检查Docker环境
+    # checkDockerenvironment
     if ! check_docker; then
         overall_status=1
     fi
     
-    # 检查容器状态
+    # Check container status
     if ! check_containers; then
         overall_status=1
     fi
     
-    # 检查服务健康状态
+    # Check service health status
     check_services
     
-    # 检查数据卷
+    # check data volume
     check_volumes
     
-    # 检查网络
+    # Check network
     check_networks
     
-    # 检查资源使用
+    # Check resource usage
     check_resources
     
-    # 显示访问信息
+    # display access information
     show_access_info
     
-    # 显示总体状态
-    log_header "总体状态"
+    # Display overall status
+    log_header "Overall status"
     
     if [[ $overall_status -eq 0 ]]; then
-        log_success "AutoClip Docker服务运行正常"
-        echo -e "\n${WHITE}🎉 所有服务健康！${NC}"
+        log_success "AutoClip DockerService is running normally"
+        echo -e "\n${WHITE}🎉 All services are healthy! ${NC}"
     else
-        log_error "部分服务存在问题"
-        echo -e "\n${YELLOW}💡 建议操作:${NC}"
-        echo -e "  1. 查看详细日志: docker-compose logs"
-        echo -e "  2. 重启服务: docker-compose restart"
-        echo -e "  3. 重新启动: ./docker-start.sh"
+        log_error "Some services have problems"
+        echo -e "\n${YELLOW}💡 Suggested action:${NC}"
+        echo -e "  1. view detailed logs: docker-compose logs"
+        echo -e "  2. restart service: docker-compose restart"
+        echo -e "  3. restart: ./docker-start.sh"
     fi
 }
 
-# 显示帮助信息
+# Show help information
 show_help() {
-    echo "AutoClip Docker 状态检查脚本"
+    echo "AutoClip Docker Status check script"
     echo ""
-    echo "用法:"
-    echo "  $0 [选项]"
+    echo "usage:"
+    echo "  $0 [Options]"
     echo ""
-    echo "选项:"
-    echo "  help    显示帮助信息"
+    echo "Options:"
+    echo "  help    Show help information"
     echo ""
-    echo "示例:"
-    echo "  $0          # 检查服务状态"
-    echo "  $0 help     # 显示帮助"
+    echo "Example:"
+    echo "  $0          # Check service status"
+    echo "  $0 help     # Show help"
 }
 
-# 处理参数
+# Process parameters
 case "${1:-}" in
     "help"|"-h"|"--help")
         show_help

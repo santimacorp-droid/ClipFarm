@@ -1,6 +1,5 @@
 """
-改进的YouTube下载处理
-解决403错误和异常处理问题
+ImprovedYouTubeDownload processing403Issues with error and exception handling
 """
 
 import logging
@@ -14,15 +13,15 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 class YouTubeDownloadError(Exception):
-    """YouTube下载异常"""
+    """YouTubeDownload exception"""
     pass
 
 class YouTubeDownloader:
-    """改进的YouTube下载器"""
+    """ImprovedYouTubeDownloader"""
     
     def __init__(self):
         self.max_retries = 3
-        self.retry_delay = 5  # 秒
+        self.retry_delay = 5  # seconds
         
     async def download_video(
         self, 
@@ -32,47 +31,47 @@ class YouTubeDownloader:
         retry_count: int = 0
     ) -> Dict[str, Any]:
         """
-        下载YouTube视频
+        DownloadingYouTubeVideo
         
         Args:
-            url: YouTube视频URL
-            output_dir: 输出目录
-            browser: 浏览器类型（用于cookies）
-            retry_count: 当前重试次数
+            url: YouTubeVideoURL
+            output_dir: Output directory
+            browser: Browser type (forcookies)
+            retry_count: current retry count
             
         Returns:
-            包含下载信息的字典
+            Contains dictionary with download information
         """
         
         try:
-            # 构建下载选项
+            # build download options
             ydl_opts = self._build_download_options(output_dir, browser)
             
-            # 执行下载
+            # execute download
             def download_sync():
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    # 先获取视频信息
+                    # First retrieve video information
                     info = ydl.extract_info(url, download=False)
                     
-                    # 检查视频是否可下载
+                    # Checking if video is downloadable
                     if not self._is_video_downloadable(info):
-                        raise YouTubeDownloadError(f"视频不可下载: {info.get('title', 'Unknown')}")
+                        raise YouTubeDownloadError(f"Video cannot be downloaded: {info.get('title', 'Unknown')}")
                     
-                    # 执行下载
+                    # execute download
                     ydl.download([url])
                     
                     return info
             
-            # 在异步环境中执行同步下载
+            # Executing synchronous download in asynchronous environment
             loop = asyncio.get_event_loop()
             video_info = await loop.run_in_executor(None, download_sync)
             
-            # 查找下载的文件
+            # Finding downloaded file
             video_files = list(output_dir.glob("*.mp4"))
             subtitle_files = list(output_dir.glob("*.srt"))
             
             if not video_files:
-                raise YouTubeDownloadError("视频文件下载失败")
+                raise YouTubeDownloadError("Video file download failed")
             
             return {
                 "success": True,
@@ -83,29 +82,29 @@ class YouTubeDownloader:
             
         except yt_dlp.DownloadError as e:
             error_msg = str(e)
-            logger.error(f"YouTube下载错误: {error_msg}")
+            logger.error(f"YouTubedownload error: {error_msg}")
             
-            # 分析错误类型
+            # analyze error type
             if "HTTP Error 403" in error_msg:
                 if retry_count < self.max_retries:
-                    logger.info(f"403错误，尝试重试 ({retry_count + 1}/{self.max_retries})")
+                    logger.info(f"403Error, attempting retry ({retry_count + 1}/{self.max_retries})")
                     await asyncio.sleep(self.retry_delay)
                     return await self.download_video(url, output_dir, browser, retry_count + 1)
                 else:
-                    raise YouTubeDownloadError("视频访问被拒绝，可能需要登录或视频受保护")
+                    raise YouTubeDownloadError("Video access denied, may require login or video is protected")
             elif "Video unavailable" in error_msg:
-                raise YouTubeDownloadError("视频不可用，可能已被删除或设为私有")
+                raise YouTubeDownloadError("Video unavailable, possibly deleted or set to private")
             elif "Private video" in error_msg:
-                raise YouTubeDownloadError("视频为私有，无法下载")
+                raise YouTubeDownloadError("Video is private, cannot download")
             else:
-                raise YouTubeDownloadError(f"下载失败: {error_msg}")
+                raise YouTubeDownloadError(f"Download failed: {error_msg}")
                 
         except Exception as e:
-            logger.error(f"下载过程中发生未知错误: {e}")
-            raise YouTubeDownloadError(f"下载失败: {str(e)}")
+            logger.error(f"Unknown error occurred during download: {e}")
+            raise YouTubeDownloadError(f"Download failed: {str(e)}")
     
     def _build_download_options(self, output_dir: Path, browser: Optional[str] = None) -> Dict[str, Any]:
-        """构建下载选项"""
+        """build download options"""
         
         options = {
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
@@ -117,40 +116,40 @@ class YouTubeDownloader:
             'noplaylist': True,
             'quiet': True,
             'no_warnings': False,
-            # 添加User-Agent以避免被检测
+            # AddedUser-Agentto avoid detection
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             },
-            # 添加重试机制
+            # add retry mechanism
             'retries': 3,
             'fragment_retries': 3,
-            # 设置超时
+            # set timeout
             'socket_timeout': 30,
             'retries': 3,
         }
         
-        # 如果指定了浏览器，使用cookies
+        # If browser specified, usecookies
         if browser:
             options['cookiesfrombrowser'] = (browser.lower(),)
         
         return options
     
     def _is_video_downloadable(self, video_info: Dict[str, Any]) -> bool:
-        """检查视频是否可下载"""
+        """Checking if video is downloadable"""
         
-        # 检查视频状态
+        # Checking video status
         if video_info.get('availability') == 'private':
             return False
         
         if video_info.get('availability') == 'premium_only':
             return False
         
-        # 检查是否有可用的格式
+        # Checking for available formats
         formats = video_info.get('formats', [])
         if not formats:
             return False
         
-        # 检查是否有视频格式
+        # Checking for video format
         video_formats = [f for f in formats if f.get('vcodec') != 'none']
         if not video_formats:
             return False
@@ -165,31 +164,31 @@ async def improved_youtube_download_task(
     browser: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    改进的YouTube下载任务处理
+    ImprovedYouTubedownload task handling
     
     Args:
-        task_id: 任务ID
-        url: YouTube视频URL
-        project_name: 项目名称
-        output_dir: 输出目录
-        browser: 浏览器类型
+        task_id: TaskID
+        url: YouTubeVideoURL
+        project_name: Project name
+        output_dir: Output directory
+        browser: browser type
         
     Returns:
-        下载结果
+        download result
     """
     
     downloader = YouTubeDownloader()
     
     try:
-        logger.info(f"开始下载YouTube视频: {url}")
+        logger.info(f"Starting downloadYouTubeVideo: {url}")
         
-        # 创建输出目录
+        # create output directory
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # 执行下载
+        # execute download
         result = await downloader.download_video(url, output_dir, browser)
         
-        logger.info(f"YouTube视频下载成功: {result['video_file']}")
+        logger.info(f"YouTubeVideo download successful: {result['video_file']}")
         
         return {
             "success": True,
@@ -200,7 +199,7 @@ async def improved_youtube_download_task(
         }
         
     except YouTubeDownloadError as e:
-        logger.error(f"YouTube下载失败: {e}")
+        logger.error(f"YouTubeDownload failed: {e}")
         return {
             "success": False,
             "task_id": task_id,
@@ -209,7 +208,7 @@ async def improved_youtube_download_task(
         }
         
     except Exception as e:
-        logger.error(f"YouTube下载过程中发生未知错误: {e}")
+        logger.error(f"YouTubeUnknown error occurred during download: {e}")
         return {
             "success": False,
             "task_id": task_id,
@@ -217,9 +216,9 @@ async def improved_youtube_download_task(
             "error_type": "unknown_error"
         }
 
-# 使用示例
+# Usage example
 async def main():
-    """测试改进的下载功能"""
+    """Testing improved download functionality"""
     
     test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     output_dir = Path("/tmp/youtube_test")
@@ -228,14 +227,14 @@ async def main():
     result = await improved_youtube_download_task(
         task_id=task_id,
         url=test_url,
-        project_name="测试项目",
+        project_name="test project",
         output_dir=output_dir
     )
     
     if result["success"]:
-        print(f"✅ 下载成功: {result['video_file']}")
+        print(f"✅ Download successful: {result['video_file']}")
     else:
-        print(f"❌ 下载失败: {result['error']}")
+        print(f"❌ Download failed: {result['error']}")
 
 if __name__ == "__main__":
     asyncio.run(main())

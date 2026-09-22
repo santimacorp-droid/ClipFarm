@@ -84,9 +84,9 @@ export const AffiliatePage: React.FC = () => {
           setSelectedCandidatePath(cand[0].path)
         }
       }
-      // If there are recent videos, set the latest as active preview
+      // If there are recent videos, set the latest as active preview with cache-buster
       if (recent && recent.length > 0) {
-        setActivePreviewUrl(recent[0].video_url)
+        setActivePreviewUrl(`${recent[0].video_url}&t=${Date.now()}`)
       }
     } catch (err) {
       console.error('Failed to load affiliate page data:', err)
@@ -162,7 +162,7 @@ export const AffiliatePage: React.FC = () => {
       }
 
       setResult(res)
-      setActivePreviewUrl(res.video_url)
+      setActivePreviewUrl(`${res.video_url}&t=${Date.now()}`)
       message.success('Affiliate video created successfully!')
       // Refresh recent videos list
       const rec = await affiliateApi.getRecentVideos()
@@ -467,12 +467,16 @@ export const AffiliatePage: React.FC = () => {
             </div>
 
             <Divider style={{ borderColor: 'var(--ac-line-2)' }} />
-
-            {/* Step 4: Facebook Follow CTA */}
+            {/* Step 4: Facebook Follow CTA & Anti-Theft Watermark */}
             <div style={{ marginBottom: '28px' }}>
-              <Text strong style={{ display: 'block', marginBottom: '10px' }}>
-                4. Facebook Follow CTA Configuration
-              </Text>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <Text strong style={{ fontSize: '14px' }}>
+                  4. Facebook Follow CTA & Anti-Theft Watermark
+                </Text>
+                <Tag color={watermark ? 'blue' : 'default'} icon={<FacebookOutlined />}>
+                  {watermark ? 'Facebook Watermark Active' : 'Watermark Disabled'}
+                </Tag>
+              </div>
 
               <Row gutter={16} style={{ marginBottom: '12px' }}>
                 <Col span={14}>
@@ -528,10 +532,10 @@ export const AffiliatePage: React.FC = () => {
               }}>
                 <div>
                   <Text strong style={{ fontSize: '13px', display: 'block' }}>
-                    🛡️ Persistent Anti-Theft Watermark
+                    🛡️ Persistent Facebook Anti-Theft Watermark
                   </Text>
                   <Text style={{ fontSize: '11px', color: 'var(--ac-sub)' }}>
-                    Stamps your Facebook handle throughout the clip in lower middle so no one can steal or reupload your video, with animated Follow CTA at the end.
+                    Stamps your Facebook handle badge throughout the video in lower middle so no one can steal your clip, then plays an animated Follow CTA at the end.
                   </Text>
                 </div>
                 <Switch
@@ -633,6 +637,9 @@ export const AffiliatePage: React.FC = () => {
                         <div>Subtitle Cues: <b>{result.segment_count} segments</b> ({result.word_count} words)</div>
                         <div>Duration: <b>{result.video_duration.toFixed(1)}s</b> ({result.video_width}x{result.video_height})</div>
                         <div>Render Time: <b>{result.processing_time_sec}s</b></div>
+                        <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {result.cta_watermark && <Tag color="blue">🛡️ Facebook Watermark Active</Tag>}
+                        </div>
                       </div>
                     }
                     style={{ marginBottom: '16px' }}
@@ -683,7 +690,7 @@ export const AffiliatePage: React.FC = () => {
                 {recentVideos.map((rv) => (
                   <div
                     key={rv.filename}
-                    onClick={() => setActivePreviewUrl(rv.video_url)}
+                    onClick={() => setActivePreviewUrl(`${rv.video_url}&t=${Date.now()}`)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -693,7 +700,7 @@ export const AffiliatePage: React.FC = () => {
                       cursor: 'pointer',
                       border: '1px solid var(--ac-line-2)',
                       marginBottom: '8px',
-                      background: activePreviewUrl === rv.video_url ? 'rgba(24, 119, 242, 0.08)' : 'transparent'
+                      background: activePreviewUrl && activePreviewUrl.startsWith(rv.video_url) ? 'rgba(24, 119, 242, 0.08)' : 'transparent'
                     }}
                   >
                     <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '8px' }}>
@@ -711,7 +718,7 @@ export const AffiliatePage: React.FC = () => {
                         icon={<PlayCircleOutlined />}
                         onClick={(e) => {
                           e.stopPropagation()
-                          setActivePreviewUrl(rv.video_url)
+                          setActivePreviewUrl(`${rv.video_url}&t=${Date.now()}`)
                         }}
                       >
                         Play
