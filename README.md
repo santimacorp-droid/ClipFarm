@@ -10,9 +10,10 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat&logo=typescript)](https://www.typescriptlang.org)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D5?style=flat&logo=tauri)](https://tauri.app)
 [![Ollama Ready](https://img.shields.io/badge/Local_LLM-Ollama_Ready-22c55e?style=flat&logo=ollama)](https://ollama.com)
+[![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-Support_Development-FF5E5B?style=flat&logo=ko-fi&logoColor=white)](https://ko-fi.com/santima)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[Features](#-key-features) • [Supported AI Engines](#-universal-ai-engine-support) • [Quick Start](#-quick-start) • [Hardware Guide](#-hardware-guide) • [Attribution](#-acknowledgments--prior-art)
+[Features](#-key-features) • [Supported AI Engines](#-universal-ai-engine-support) • [Quick Start](#-quick-start) • [Support](#-support-the-project) • [Attribution](#-acknowledgments--prior-art)
 
 </div>
 
@@ -129,6 +130,25 @@ ClipFarm/
 ├── docker-compose.yml        # Multi-container orchestration
 └── .env.example              # Environment configuration template
 ```
+
+---
+
+## ☕ Support the Project
+
+If ClipFarm saves you hours of video editing, powers your creator workflow, or helps grow your channels, please consider supporting ongoing development:
+
+<div align="center">
+
+[![Buy Me a Coffee at ko-fi.com](https://img.shields.io/badge/Support_on-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/santima)
+
+👉 **[Support ClipFarm on Ko-fi (ko-fi.com/santima)](https://ko-fi.com/santima)**
+
+</div>
+
+Your support directly helps fund:
+- 🧪 Continuous testing, bug fixes, and library upgrades
+- 🧠 Integration of new open-source models (ASR, LLM, face-tracking)
+- 🚀 Community feature requests and documentation
 
 ---
 

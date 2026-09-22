@@ -1,6 +1,6 @@
 import React from 'react'
 import { Layout, Button } from 'antd'
-import { SettingOutlined, ArrowLeftOutlined, BulbOutlined, MoonOutlined, ThunderboltOutlined, FireOutlined, ShopOutlined } from '@ant-design/icons'
+import { SettingOutlined, ArrowLeftOutlined, BulbOutlined, MoonOutlined, ThunderboltOutlined, FireOutlined, ShopOutlined, HeartOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTheme } from '../context/ThemeContext'
 
@@ -134,6 +134,25 @@ const Header: React.FC = () => {
           }}
         >
           Tokens & Rates
+        </Button>
+        <Button
+          type="text"
+          icon={<HeartOutlined style={{ color: '#ff4d4f' }} />}
+          href="https://ko-fi.com/santima"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Support ClipFarm on Ko-fi"
+          style={{
+            color: 'var(--ac-sub)',
+            border: '1px solid var(--ac-line)',
+            borderRadius: '999px',
+            height: '36px',
+            padding: '0 14px',
+            background: 'var(--ac-card)',
+            fontSize: '13px'
+          }}
+        >
+          Ko-fi
         </Button>
         <Button
           type="text"
