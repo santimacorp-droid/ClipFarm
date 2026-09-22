@@ -1,6 +1,6 @@
 import React from 'react'
 import { Layout, Button } from 'antd'
-import { SettingOutlined, ArrowLeftOutlined, BulbOutlined, MoonOutlined, ThunderboltOutlined, FireOutlined, ShopOutlined, HeartOutlined } from '@ant-design/icons'
+import { SettingOutlined, ArrowLeftOutlined, BulbOutlined, MoonOutlined, ThunderboltOutlined, FireOutlined, ShopOutlined, CoffeeOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTheme } from '../context/ThemeContext'
 
@@ -136,23 +136,28 @@ const Header: React.FC = () => {
           Tokens & Rates
         </Button>
         <Button
-          type="text"
-          icon={<HeartOutlined style={{ color: '#ff4d4f' }} />}
+          type="primary"
+          icon={<CoffeeOutlined style={{ fontSize: '15px' }} />}
           href="https://ko-fi.com/santima"
           target="_blank"
           rel="noopener noreferrer"
-          title="Support ClipFarm on Ko-fi"
+          title="Buy the developer a coffee on Ko-fi!"
           style={{
-            color: 'var(--ac-sub)',
-            border: '1px solid var(--ac-line)',
+            background: 'linear-gradient(135deg, #FF5E5B 0%, #FF7E67 100%)',
+            borderColor: '#FF5E5B',
+            color: '#ffffff',
             borderRadius: '999px',
             height: '36px',
-            padding: '0 14px',
-            background: 'var(--ac-card)',
-            fontSize: '13px'
+            padding: '0 16px',
+            fontSize: '13px',
+            fontWeight: 600,
+            boxShadow: '0 2px 10px rgba(255, 94, 91, 0.4)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px'
           }}
         >
-          Ko-fi
+          Support on Ko-fi
         </Button>
         <Button
           type="text"

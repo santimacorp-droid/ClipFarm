@@ -34,7 +34,8 @@ import {
   ReloadOutlined,
   DeleteOutlined,
   ThunderboltOutlined,
-  PictureOutlined
+  PictureOutlined,
+  CoffeeOutlined
 } from '@ant-design/icons'
 import { settingsApi } from '../services/api'
 import BilibiliManager from '../components/BilibiliManager'
@@ -837,6 +838,43 @@ const SettingsPage: React.FC = () => {
                   </Paragraph>
                 </div>
               </Space>
+            </Card>
+
+            <Card 
+              title={
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#FF5E5B', fontWeight: 600 }}>
+                  <CoffeeOutlined /> Support ClipFarm Development
+                </span>
+              } 
+              className="settings-card"
+              style={{ marginTop: 16, border: '1px solid rgba(255, 94, 91, 0.35)', background: 'rgba(255, 94, 91, 0.03)' }}
+            >
+              <Paragraph style={{ color: 'var(--ac-sub)', marginBottom: 16, fontSize: '13px', lineHeight: '1.6' }}>
+                ClipFarm is an independent, 100% free and open-source studio. If it saves you hours of video editing, helps grow your social channels, or powers your creator pipeline, please consider buying a coffee!
+              </Paragraph>
+              <Button
+                type="primary"
+                icon={<CoffeeOutlined style={{ fontSize: '16px' }} />}
+                href="https://ko-fi.com/santima"
+                target="_blank"
+                rel="noopener noreferrer"
+                block
+                style={{
+                  background: 'linear-gradient(135deg, #FF5E5B 0%, #FF7E67 100%)',
+                  borderColor: '#FF5E5B',
+                  fontWeight: 600,
+                  height: '42px',
+                  borderRadius: '10px',
+                  fontSize: '14px',
+                  boxShadow: '0 4px 14px rgba(255, 94, 91, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                Buy me a coffee on Ko-fi
+              </Button>
             </Card>
           </TabPane>
 
