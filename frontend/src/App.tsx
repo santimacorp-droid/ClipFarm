@@ -6,13 +6,12 @@ import ProjectDetailPage from './pages/ProjectDetailPage'
 import SettingsPage from './pages/SettingsPage'
 import CampaignsPage from './pages/CampaignsPage'
 import CampaignDetailPage from './pages/CampaignDetailPage'
-import AffiliatePage from './pages/AffiliatePage'
 import Header from './components/Header'
 import { trackPageview } from './appEvents/client'
 
 const { Content } = Layout
 
-// HashRouter Please upload manually now pageview(init Auto-upload has already been disabled pageview)
+// Track page views on route change
 function usePageviewTracking() {
   const location = useLocation()
   useEffect(() => {
@@ -22,7 +21,7 @@ function usePageviewTracking() {
 
 function App() {
   useEffect(() => {
-    console.log('🎬 App initialized')
+    console.log('🎬 ClipFarm initialized')
   }, [])
   usePageviewTracking()
 
@@ -37,7 +36,6 @@ function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/campaigns" element={<CampaignsPage />} />
           <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
-          <Route path="/affiliate" element={<AffiliatePage />} />
         </Routes>
       </Content>
     </Layout>

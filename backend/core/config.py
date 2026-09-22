@@ -21,7 +21,7 @@ class APISettings(BaseModel):
 
 class DatabaseSettings(BaseModel):
     """Database configuration"""
-    url: str = Field(default='sqlite:///./data/autoclip.db', validation_alias=AliasChoices('DATABASE_URL'))
+    url: str = Field(default='sqlite:///./data/clipfarm.db', validation_alias=AliasChoices('DATABASE_URL'))
 
 class RedisSettings(BaseModel):
     """RedisConfigure"""
@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     encryption_key: str = Field(default='', validation_alias=AliasChoices('ENCRYPTION_KEY'))
 
     # Define fields directly, without using nested BaseModel
-    database_url: str = Field(default='sqlite:///./data/autoclip.db', validation_alias=AliasChoices('DATABASE_URL'))
+    database_url: str = Field(default='sqlite:///./data/clipfarm.db', validation_alias=AliasChoices('DATABASE_URL'))
     redis_url: str = Field(default='redis://localhost:6379/0', validation_alias=AliasChoices('REDIS_URL'))
     api_dashscope_api_key: str = Field(default='', validation_alias=AliasChoices('API_DASHSCOPE_API_KEY'))
     api_model_name: str = Field(default='qwen-plus', validation_alias=AliasChoices('API_MODEL_NAME'))

@@ -23,7 +23,6 @@ import {
   ClockCircleOutlined,
   ExclamationCircleOutlined
 } from '@ant-design/icons'
-import { uploadApi, BILIBILI_PARTITIONS } from '../services/uploadApi'
 
 const { Option } = Select
 const { TextArea } = Input
@@ -75,18 +74,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
   const [accounts, setAccounts] = useState<any[]>([])
   useEffect(() => {
     if (visible) {
-      // InvokingAPIGettingBSite account list
-      uploadApi.getBilibiliAccounts()
-        .then(data => {
-          setAccounts(data)
-        })
-        .catch(error => {
-          console.error('GettingBAccount list fetch failed:', error)
-          // IfAPICall failed, using default account
-          setAccounts([
-            { id: '1', name: 'Primary account', username: 'main_account' }
-          ])
-        })
+      setAccounts([])
     }
   }, [visible])
 
@@ -241,9 +229,6 @@ const UploadModal: React.FC<UploadModalProps> = ({
     }
 
     try {
-      // Call cancel postingAPI
-      await uploadApi.cancelUploadTask(uploadRecordId)
-      
       // Cleanup status
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
@@ -337,14 +322,8 @@ const UploadModal: React.FC<UploadModalProps> = ({
               <Form.Item
                 label="Partition"
                 name="partition_id"
-                rules={[{ required: true, message: 'Please select a partition' }]}
               >
-                <Select placeholder="Select partition" showSearch>
-                  {BILIBILI_PARTITIONS.map(partition => (
-                    <Option key={partition.id} value={partition.id}>
-                      {partition.name}
-                    </Option>
-                  ))}
+                <Select placeholder="Select partition" showSearch disabled>
                 </Select>
               </Form.Item>
             </Col>

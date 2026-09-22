@@ -10,7 +10,6 @@ import {
 import { useNavigate } from 'react-router-dom'
 import ProjectCard from '../components/ProjectCard'
 import FileUpload from '../components/FileUpload'
-import BilibiliDownload from '../components/BilibiliDownload'
 
 import { projectApi } from '../services/api'
 import { useSimpleProgressStore } from '../stores/useSimpleProgressStore'
@@ -24,7 +23,6 @@ const HomePage: React.FC = () => {
   const navigate = useNavigate()
   const { projects, setProjects, deleteProject, loading, setLoading } = useProjectStore()
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [activeTab, setActiveTab] = useState<'upload' | 'bilibili'>('bilibili')
 
   // Use project pollingHook
   const { startPolling: startProjectPolling, stopPolling: stopProjectPolling } = useProjectPolling({
@@ -199,68 +197,12 @@ const HomePage: React.FC = () => {
                 padding: '18px',
                 boxShadow: 'var(--ac-shadow)'
               }}>
-              {/* Tab switch — Capsule segment */}
-              <div style={{
-                display: 'inline-flex',
-                marginBottom: '14px',
-                borderRadius: '999px',
-                background: 'var(--ac-line-2)',
-                padding: '3px',
-                gap: '2px'
-              }}>
-                 <button
-                   style={{
-                     padding: '8px 18px',
-                     borderRadius: '999px',
-                     background: activeTab === 'bilibili' ? 'var(--ac-card)' : 'transparent',
-                     color: activeTab === 'bilibili' ? 'var(--ac-ink)' : 'var(--ac-sub)',
-                     cursor: 'pointer',
-                     fontSize: '14px',
-                     fontWeight: 500,
-                     transition: 'all 0.2s ease',
-                     border: 'none',
-                     boxShadow: activeTab === 'bilibili' ? '0 1px 2px rgba(0,0,0,.08)' : 'none'
-                   }}
-                   onClick={() => setActiveTab('bilibili')}
-                 >
-                   YouTube / Bilibili URL
-                 </button>
-                <button
-                   style={{
-                     padding: '8px 18px',
-                     borderRadius: '999px',
-                     background: activeTab === 'upload' ? 'var(--ac-card)' : 'transparent',
-                     color: activeTab === 'upload' ? 'var(--ac-ink)' : 'var(--ac-sub)',
-                     cursor: 'pointer',
-                     fontSize: '14px',
-                     fontWeight: 500,
-                     transition: 'all 0.2s ease',
-                     border: 'none',
-                     boxShadow: activeTab === 'upload' ? '0 1px 2px rgba(0,0,0,.08)' : 'none'
-                   }}
-                   onClick={() => setActiveTab('upload')}
-                 >
-                   File Upload
-                 </button>
-              </div>
-              
-              {/* Content area */}
-              <div>
-                {activeTab === 'bilibili' && (
-                  <BilibiliDownload onDownloadSuccess={async () => {
-                    // After processing is complete, refresh project list
-                    await loadProjects()
-                    // Do not display duplicatetoastHint, BilibiliDownloadComponent already displays unified prompt
-                  }} />
-                )}
-                {activeTab === 'upload' && (
-                  <FileUpload onUploadSuccess={async () => {
-                    // After processing is complete, refresh project list
-                    await loadProjects()
-                    message.success('Project created, processing started...')
-                  }} />
-                )}
-              </div>
+              {/* File Upload */}
+              <FileUpload onUploadSuccess={async () => {
+                // After processing is complete, refresh project list
+                await loadProjects()
+                message.success('Project created, processing started...')
+              }} />
               </div>
             </div>
           </div>

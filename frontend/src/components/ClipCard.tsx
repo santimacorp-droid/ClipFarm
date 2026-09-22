@@ -12,7 +12,6 @@ import {
   AppstoreOutlined
 } from '@ant-design/icons'
 import { Clip } from '../store/useProjectStore'
-import BilibiliManager from './BilibiliManager'
 import EditableTitle from './EditableTitle'
 import CaptionEditorModal from './CaptionEditorModal'
 import './ClipCard.css'
@@ -101,7 +100,6 @@ const ClipCard: React.FC<ClipCardProps> = ({
   const [showPlayer, setShowPlayer] = useState(false)
   const [showCaptionEditor, setShowCaptionEditor] = useState(false)
   const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null)
-  const [showBilibiliManager, setShowBilibiliManager] = useState(false)
   const [videoVersion, setVideoVersion] = useState<number>(() => Date.now())
   const [localPlatform, setLocalPlatform] = useState<string>('tiktok')
 
@@ -896,17 +894,6 @@ const ClipCard: React.FC<ClipCardProps> = ({
         </div>
       </Modal>
 
-      {/* Bilibili popup */}
-      <BilibiliManager
-        visible={showBilibiliManager}
-        onClose={() => setShowBilibiliManager(false)}
-        projectId={projectId || ''}
-        clipIds={[clip.id]}
-        clipTitles={[clip.title || clip.generated_title || 'Video Clip']}
-        onUploadSuccess={() => {
-          console.log('submission successful')
-        }}
-      />
 
       {/* Caption Editor popup */}
       <CaptionEditorModal

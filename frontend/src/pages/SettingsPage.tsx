@@ -26,7 +26,6 @@ import {
   ApiOutlined, 
   SettingOutlined, 
   InfoCircleOutlined, 
-  UserOutlined, 
   RobotOutlined, 
   SoundOutlined, 
   PoweroffOutlined,
@@ -38,7 +37,6 @@ import {
   CoffeeOutlined
 } from '@ant-design/icons'
 import { settingsApi } from '../services/api'
-import BilibiliManager from '../components/BilibiliManager'
 import SpeechRecognitionConfig from '../components/SpeechRecognitionConfig'
 import WatermarkManager from '../components/WatermarkManager'
 import { isDesktopMode } from '../utils/desktopMode'
@@ -53,7 +51,6 @@ const { TabPane } = Tabs
 const SettingsPage: React.FC = () => {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
-  const [showBilibiliManager, setShowBilibiliManager] = useState(false)
   const [currentProvider, setCurrentProvider] = useState<any>({})
   const [selectedProvider, setSelectedProvider] = useState('dashscope')
   const [activeModelName, setActiveModelName] = useState<string>('qwen-plus-character')
@@ -1248,52 +1245,8 @@ const SettingsPage: React.FC = () => {
               </div>
             </Card>
           </TabPane>
-
-          <TabPane tab="Bilibili Accounts" key="bilibili">
-            <Card title="Bilibili Account Management" className="settings-card">
-              <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                <div style={{ marginBottom: '24px' }}>
-                  <UserOutlined style={{ fontSize: '48px', color: '#1890ff', marginBottom: '16px' }} />
-                  <Title level={3} style={{ color: 'var(--ac-ink)', margin: '0 0 8px 0' }}>
-                    Bilibili Account Management
-                  </Title>
-                  <Text type="secondary" style={{ color: '#b0b0b0', fontSize: '16px' }}>
-                    Manage Bilibili accounts for video publishing
-                  </Text>
-                </div>
-                
-                <Space size="large">
-                  <Button
-                    type="primary"
-                    size="large"
-                    icon={<UserOutlined />}
-                    onClick={() => message.info('Feature under development', 3)}
-                    style={{
-                      borderRadius: '8px',
-                      background: 'linear-gradient(45deg, #1890ff, #36cfc9)',
-                      border: 'none',
-                      fontWeight: 500,
-                      height: '48px',
-                      padding: '0 32px',
-                      fontSize: '16px'
-                    }}
-                  >
-                    Manage Accounts
-                  </Button>
-                </Space>
-              </div>
-            </Card>
-          </TabPane>
         </Tabs>
 
-        {/* Bilibili Management Modal */}
-        <BilibiliManager
-          visible={showBilibiliManager}
-          onClose={() => setShowBilibiliManager(false)}
-          onUploadSuccess={() => {
-            message.success('Operation succeeded')
-          }}
-        />
       </div>
     </Content>
   )

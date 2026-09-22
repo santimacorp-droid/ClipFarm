@@ -24,7 +24,7 @@ def create_app(mode: str = "web") -> FastAPI:
         mode: Run mode supports "web" or "desktop"
     """
     # Set mode environment variable
-    os.environ["AUTOCLIP_MODE"] = mode
+    os.environ["CLIPFARM_MODE"] = mode
     
     # configure logs
     logging_config = get_logging_config()
@@ -68,7 +68,6 @@ def create_app(mode: str = "web") -> FastAPI:
         logger.info(f"Starting ClipFarm API Service (mode: {mode})...")
         
         # Import all models to ensure tables are created
-        from backend.models.bilibili import BilibiliAccount, UploadRecord
         Base.metadata.create_all(bind=engine)
         logger.info("Database table creation complete")
 
