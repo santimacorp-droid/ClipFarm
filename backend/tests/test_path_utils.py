@@ -50,3 +50,30 @@ def test_get_log_file_path_uses_data_logs_in_desktop_mode(monkeypatch, tmp_path)
     result = path_utils.get_log_file_path()
     assert result == app_dir / "logs" / "backend.log"
     assert result.parent.exists()
+
+
+def test_reveal_in_file_manager_nonexistent():
+    from pathlib import Path
+    assert path_utils.reveal_in_file_manager(Path("/nonexistent/directory/path/never/exists")) is False
+
+
+def test_reveal_in_file_manager_existing(tmp_path, monkeypatch):
+    import subprocess
+    test_dir = tmp_path / "test_reveal_folder"
+    test_dir.mkdir()
+    test_file = test_dir / "sample.mp4"
+    test_file.write_text("dummy")
+
+    launched_cmds = []
+
+    def mock_popen(cmd, *args, **kwargs):
+        launched_cmds.append(cmd)
+        return None
+
+    monkeypatch.setattr(subprocess, "Popen", mock_popen)
+
+    assert path_utils.reveal_in_file_manager(test_file) is True
+    assert len(launched_cmds) == 1
+
+    assert path_utils.reveal_in_file_manager(test_dir) is True
+    assert len(launched_cmds) == 2

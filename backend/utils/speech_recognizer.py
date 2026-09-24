@@ -297,10 +297,10 @@ def transcribe_with_whisper(audio_path: Union[str, Path], model_size: str = "sma
 
     logger.info(f"[AutoClip] Local faster-whisper transcribing: model={model_size}, lang={lang or 'auto'}")
     model = WhisperModel(model_size, device="auto", compute_type="int8", download_root=models_dir)
-    seg_iter, _info = model.transcribe(str(audio_path), language=lang, vad_filter=True, word_timestamps=True)
+    seg_iter, _info = model.transcribe(str(audio_path), language=lang, vad_filter=True, word_timestamps=True, condition_on_previous_text=False)
     segments_raw = list(seg_iter)
     if not segments_raw:
-        seg_iter, _info = model.transcribe(str(audio_path), language=lang, vad_filter=False, word_timestamps=True)
+        seg_iter, _info = model.transcribe(str(audio_path), language=lang, vad_filter=False, word_timestamps=True, condition_on_previous_text=False)
         segments_raw = list(seg_iter)
 
     segments: List[Dict[str, Any]] = []
@@ -520,8 +520,8 @@ class SpeechRecognizer:
             return False
     
     def _check_openai_availability(self) -> bool:
-        """Check if OpenAI API is available"""
-        api_key = os.getenv("OPENAI_API_KEY")
+        """Check if OpenAI API or Groq API is available"""
+        api_key = getattr(self.config, "openai_api_key", None) or os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY")
         return api_key is not None and len(api_key.strip()) > 0
     
     def _check_azure_speech_availability(self) -> bool:
@@ -879,13 +879,13 @@ class SpeechRecognizer:
             model = WhisperModel(
                 config.model, device="auto", compute_type="int8", download_root=models_dir,
             )
-            seg_iter, _info = model.transcribe(str(video_path), language=language, vad_filter=True, word_timestamps=True)
+            seg_iter, _info = model.transcribe(str(video_path), language=language, vad_filter=True, word_timestamps=True, condition_on_previous_text=False)
             segments = list(seg_iter)
             
             # If VAD filtered everything, retry without VAD
             if not segments:
                 logger.info("VAD filtered all segments, retrying with vad_filter=False...")
-                seg_iter, _info = model.transcribe(str(video_path), language=language, vad_filter=False, word_timestamps=True)
+                seg_iter, _info = model.transcribe(str(video_path), language=language, vad_filter=False, word_timestamps=True, condition_on_previous_text=False)
                 segments = list(seg_iter)
 
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -944,20 +944,78 @@ class SpeechRecognizer:
     
     def _generate_subtitle_openai_api(self, video_path: Path, output_path: Path, 
                                     config: SpeechRecognitionConfig) -> Path:
-        """Generate subtitles using OpenAI API"""
-        if not self.available_methods[SpeechRecognitionMethod.OPENAI_API]:
-            raise SpeechRecognitionError("OpenAI API is unavailable, please set OPENAI_API_KEY environment variable")
-        
+        """Generate subtitles using OpenAI / Groq / OpenAI-compatible audio transcriptions API."""
+        api_key = config.openai_api_key or os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY")
+        if not api_key:
+            if config.enable_fallback:
+                logger.warning("No OpenAI / Groq API key configured; falling back to local Whisper...")
+                return self._generate_subtitle_whisper_local(video_path, output_path, config)
+            raise SpeechRecognitionError("OpenAI / Groq API key is required. Please configure it in Settings -> Speech Recognition.")
+
         try:
-            logger.info(f"Starting subtitle generation with OpenAI API: {video_path}")
-            
-            # OpenAI API call implementation
-            # Raise exception until dependency installed
-            raise SpeechRecognitionError("OpenAI API not implemented yet, please use local Whisper")
-            
+            logger.info(f"Starting subtitle generation with OpenAI-compatible API: {video_path}")
+            if not video_path.exists():
+                raise SpeechRecognitionError(f"Video file does not exist: {video_path}")
+
+            # Extract audio file
+            audio_path = self._extract_audio_from_video(video_path, output_path.parent)
+
+            # Determine endpoint and model
+            endpoint = config.custom_api_url or os.getenv("OPENAI_BASE_URL")
+            if not endpoint:
+                if api_key.startswith("gsk_") or (config.model and "groq" in config.model.lower()):
+                    endpoint = "https://api.groq.com/openai/v1"
+                else:
+                    endpoint = "https://api.openai.com/v1"
+
+            if "groq.com" in endpoint:
+                default_model = "whisper-large-v3"
+            else:
+                default_model = "whisper-1"
+
+            model = config.model or default_model
+            if model in ["default", "openai", "whisper"]:
+                model = default_model
+
+            headers = {"Authorization": f"Bearer {api_key}"}
+            data = {
+                "model": model,
+                "response_format": "srt",
+            }
+            if config.language and config.language != LanguageCode.AUTO:
+                data["language"] = str(config.language.value).split("-")[0]
+
+            logger.info(f"Dispatching transcription to {endpoint}/audio/transcriptions (model: {model})")
+            with open(audio_path, "rb") as af:
+                files = {"file": (audio_path.name, af, "audio/wav")}
+                resp = requests.post(
+                    f"{endpoint.rstrip('/')}/audio/transcriptions",
+                    headers=headers,
+                    data=data,
+                    files=files,
+                    timeout=config.timeout if config.timeout > 0 else 600
+                )
+
+            if resp.status_code != 200:
+                raise SpeechRecognitionError(f"API transcription failed (HTTP {resp.status_code}): {resp.text}")
+
+            srt_content = resp.text.strip()
+            if not srt_content:
+                srt_content = "# No speech detected\n"
+
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(srt_content + "\n", encoding="utf-8")
+            logger.info(f"OpenAI-compatible subtitles generated successfully: {output_path}")
+            return output_path
+
+        except SpeechRecognitionError:
+            raise
         except Exception as e:
-            error_msg = f"Error generating subtitles with OpenAI API: {e}"
-            logger.error(error_msg)
+            error_msg = f"Error generating subtitles with OpenAI-compatible API: {e}"
+            logger.error(error_msg, exc_info=True)
+            if config.enable_fallback:
+                logger.warning("Cloud transcription failed; attempting fallback to local Whisper...")
+                return self._generate_subtitle_whisper_local(video_path, output_path, config)
             raise SpeechRecognitionError(error_msg)
     
     def _generate_subtitle_azure_speech(self, video_path: Path, output_path: Path, 

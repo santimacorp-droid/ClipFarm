@@ -8,6 +8,8 @@ from celery import Celery
 from celery.schedules import crontab
 
 from ..core.celery_app import celery_app
+from .data_cleanup import cleanup_expired_data, check_data_consistency, cleanup_orphaned_data
+from .maintenance import health_check
 
 logger = logging.getLogger(__name__)
 

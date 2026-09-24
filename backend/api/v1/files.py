@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pathlib import Path
 import shutil
+import tempfile
 import uuid
 
 from ...core.database import get_db
@@ -57,7 +58,7 @@ async def upload_files(
                     file_type = "video"
             
             # Saving file to filesystem
-            file_path = Path(f"/tmp/{safe_filename}")
+            file_path = Path(tempfile.gettempdir()) / safe_filename
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             

@@ -77,6 +77,8 @@ src-tauri/gen/
 # Python / 打包产物
 build/
 dist/
+dist_standalone/
+release/
 releases/
 *.toc
 *.pkg

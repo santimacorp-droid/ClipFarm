@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class DatabaseConfig(BaseModel):
     """Database configuration"""
-    url: str = Field(default="sqlite:///./data/autoclip.db", description="Database connectionURL")
+    url: str = Field(default="sqlite:///./data/clipfarm.db", description="Database connection URL")
     echo: bool = Field(default=False, description="Whether to print SQL statements")
     pool_size: int = Field(default=5, description="Connection pool size")
     max_overflow: int = Field(default=10, description="Maximum overflow connection count")

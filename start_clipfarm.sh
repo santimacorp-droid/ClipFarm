@@ -291,7 +291,7 @@ init_database() {
 import sys
 sys.path.insert(0, '.')
 from backend.core.database import engine, Base
-from backend.models import project, task, clip, collection, bilibili, campaign
+from backend.models import project, task, clip, collection, campaign
 try:
     Base.metadata.create_all(bind=engine)
     print('Database tables created successfully')

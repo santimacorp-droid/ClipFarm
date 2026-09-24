@@ -22,7 +22,7 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 class BasicSettings(BaseModel):
     """Base settings"""
-    app_name: str = Field(default="AutoClip Desktop", description="App name")
+    app_name: str = Field(default="ClipFarm Desktop", description="App name")
     app_version: str = Field(default="1.0.0", description="App version")
     debug_mode: bool = Field(default=False, description="Debug mode")
     auto_start: bool = Field(default=True, description="Automatic startup")
@@ -351,7 +351,14 @@ async def test_api_connection(request: TestApiRequest):
         
         if provider_name == "dashscope":
             from backend.core.llm_providers import DashScopeProvider
-            provider_instance = DashScopeProvider(api_key=api_key, model_name=model_name or "qwen-plus-character")
+            is_intl = api_key.startswith("sk-ws-") or (base_url and "intl" in base_url)
+            default_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1" if is_intl else (base_url or "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")
+            provider_instance = DashScopeProvider(
+                api_key=api_key,
+                model_name=model_name or "qwen-plus",
+                mode="compatible",
+                base_url=default_url
+            )
         elif provider_name == "openai":
             from backend.core.llm_providers import OpenAIProvider
             provider_instance = OpenAIProvider(api_key=api_key, model_name=model_name or "gpt-4o-mini", base_url=base_url or None)
@@ -427,6 +434,64 @@ class FetchModelsRequest(BaseModel):
     base_url: Optional[str] = None
 
 
+@router.get("/local-status")
+async def get_local_ai_status():
+    """Detect presence and available models of local AI runtimes (Ollama, LM Studio)."""
+    check_desktop_mode()
+    import httpx
+
+    results = {
+        "ollama": {
+            "available": False,
+            "base_url": "http://localhost:11434/v1",
+            "models": [],
+            "message": "Ollama service offline"
+        },
+        "lmstudio": {
+            "available": False,
+            "base_url": "http://localhost:1234/v1",
+            "models": [],
+            "message": "LM Studio local server offline"
+        }
+    }
+
+    async with httpx.AsyncClient(timeout=1.5) as client:
+        # Check Ollama native /api/tags
+        try:
+            r = await client.get("http://localhost:11434/api/tags")
+            if r.status_code == 200:
+                data = r.json()
+                models = [m.get("name") for m in data.get("models", []) if m.get("name")]
+                results["ollama"] = {
+                    "available": True,
+                    "base_url": "http://localhost:11434/v1",
+                    "models": models,
+                    "message": f"Online ({len(models)} model{'s' if len(models) != 1 else ''} installed)"
+                }
+        except Exception:
+            pass
+
+        # Check LM Studio /v1/models
+        try:
+            r = await client.get("http://localhost:1234/v1/models")
+            if r.status_code == 200:
+                data = r.json()
+                models = [m.get("id") for m in data.get("data", []) if m.get("id")]
+                results["lmstudio"] = {
+                    "available": True,
+                    "base_url": "http://localhost:1234/v1",
+                    "models": models,
+                    "message": f"Online ({len(models)} model{'s' if len(models) != 1 else ''} loaded)"
+                }
+        except Exception:
+            pass
+
+    return {
+        "success": True,
+        "data": results
+    }
+
+
 @router.post("/fetch-models")
 async def fetch_models(request: FetchModelsRequest):
     """Fetch remote models list from local or custom OpenAI-compatible endpoint."""
@@ -450,8 +515,27 @@ async def fetch_models(request: FetchModelsRequest):
             }
 
         # Resolve known endpoint base URLs
-        if provider == "ollama" and not base_url:
-            base_url = "http://localhost:11434/v1"
+        if provider == "ollama":
+            if not base_url:
+                base_url = "http://localhost:11434/v1"
+            # Attempt direct Ollama /api/tags inspection for faster local discovery
+            try:
+                import httpx
+                host = base_url.replace("/v1", "").rstrip("/")
+                with httpx.Client(timeout=1.5) as client:
+                    resp = client.get(f"{host}/api/tags")
+                    if resp.status_code == 200:
+                        tag_data = resp.json()
+                        tag_models = [m.get("name") for m in tag_data.get("models", []) if m.get("name")]
+                        if tag_models:
+                            return {
+                                "success": True,
+                                "models": tag_models,
+                                "count": len(tag_models),
+                                "provider": request.provider
+                            }
+            except Exception:
+                pass
         elif provider == "lmstudio" and not base_url:
             base_url = "http://localhost:1234/v1"
         elif provider == "deepseek" and not base_url:
@@ -467,7 +551,7 @@ async def fetch_models(request: FetchModelsRequest):
             raise HTTPException(status_code=400, detail="Base URL is required to fetch models")
 
         import openai
-        client = openai.OpenAI(api_key=api_key or "local", base_url=base_url.rstrip("/"))
+        client = openai.OpenAI(api_key=api_key or "local", base_url=base_url.rstrip("/"), timeout=5.0)
         response = client.models.list()
         
         model_names = []
@@ -623,7 +707,7 @@ async def export_settings():
         settings = await get_settings()
         
         # Creating export file
-        export_file = config.paths.data_dir / "autoclip-settings-export.json"
+        export_file = config.paths.data_dir / "clipfarm-settings-export.json"
         with open(export_file, 'w', encoding='utf-8') as f:
             json.dump(settings.dict(), f, indent=2, ensure_ascii=False)
         

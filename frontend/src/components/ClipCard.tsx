@@ -9,9 +9,11 @@ import {
   CopyOutlined,
   DownOutlined,
   CheckCircleFilled,
-  AppstoreOutlined
+  AppstoreOutlined,
+  FolderOpenOutlined
 } from '@ant-design/icons'
 import { Clip } from '../store/useProjectStore'
+import { projectApi } from '../services/api'
 import EditableTitle from './EditableTitle'
 import CaptionEditorModal from './CaptionEditorModal'
 import './ClipCard.css'
@@ -155,6 +157,16 @@ const ClipCard: React.FC<ClipCardProps> = ({
       }, index * 350)
     })
     message.success('Starting download of all 4 platform deliverables!')
+  }
+
+  const handleRevealClip = async () => {
+    try {
+      await projectApi.revealClipInFolder(clip.id, activePlatform)
+      message.success('Opening clip in system file explorer...')
+    } catch (e: any) {
+      console.error('Failed to reveal clip:', e)
+      message.error(e.response?.data?.detail || 'Failed to open file in system explorer')
+    }
   }
 
   const getSocialCopyText = (platformKey: 'all' | 'tiktok' | 'instagram' | 'youtube_shorts' = 'all'): string => {
@@ -330,6 +342,17 @@ const ClipCard: React.FC<ClipCardProps> = ({
         </span>
       ),
       onClick: handleDownloadAll4
+    },
+    { type: 'divider' },
+    {
+      key: 'reveal',
+      label: (
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0' }}>
+          <FolderOpenOutlined />
+          <span>Show in Folder (File Explorer)</span>
+        </span>
+      ),
+      onClick: handleRevealClip
     }
   ]
 
@@ -704,6 +727,29 @@ const ClipCard: React.FC<ClipCardProps> = ({
                 Copy Post <DownOutlined style={{ fontSize: '9px', marginLeft: '2px' }} />
               </Button>
             </Dropdown>
+            <Tooltip title="Show in System File Explorer">
+              <Button
+                size="small"
+                icon={<FolderOpenOutlined />}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleRevealClip()
+                }}
+                style={{
+                  borderRadius: '6px',
+                  height: '28px',
+                  width: '32px',
+                  fontSize: '12px',
+                  background: 'var(--ac-line-2)',
+                  border: '1px solid var(--ac-line)',
+                  color: 'var(--ac-ink)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0
+                }}
+              />
+            </Tooltip>
           </div>
         </div>
       </Card>

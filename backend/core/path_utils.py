@@ -4,6 +4,7 @@ Resolve inconsistent path construction within the project
 """
 
 import os
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -13,9 +14,36 @@ DESKTOP_TRUE_VALUES = {"1", "true", "yes", "on"}
 def is_desktop_mode() -> bool:
     """Determine if current execution is in desktop runtime mode"""
     return (
-        os.getenv("AUTOCLIP_DESKTOP_MODE", "").lower() in DESKTOP_TRUE_VALUES
-        or os.getenv("AUTOCLIP_MODE", "").lower() == "desktop"
+        os.getenv("CLIPFARM_DESKTOP_MODE", "").lower() in DESKTOP_TRUE_VALUES
+        or os.getenv("AUTOCLIP_DESKTOP_MODE", "").lower() in DESKTOP_TRUE_VALUES
+        or os.getenv("AUTOCLIP_MODE", "").lower() in {"desktop", "standalone"}
+        or os.getenv("CLIPFARM_MODE", "").lower() in {"desktop", "standalone"}
+        or os.getenv("CLIPFARM_STANDALONE", "").lower() in DESKTOP_TRUE_VALUES
     )
+
+def get_default_app_data_dir() -> Path:
+    """Get platform-standard user application data directory across Windows, macOS, and Linux."""
+    configured = os.getenv("CLIPFARM_APP_DIR") or os.getenv("AUTOCLIP_APP_DIR")
+    if configured:
+        return Path(configured).expanduser()
+
+    if sys.platform == "win32":
+        appdata = os.getenv("APPDATA") or os.getenv("LOCALAPPDATA")
+        if appdata:
+            return Path(appdata) / "ClipFarm"
+        return Path.home() / "AppData" / "Roaming" / "ClipFarm"
+    elif sys.platform == "darwin":
+        old_dir = Path.home() / "Library" / "Application Support" / "AutoClip"
+        new_dir = Path.home() / "Library" / "Application Support" / "ClipFarm"
+        if old_dir.exists() and not new_dir.exists():
+            return old_dir
+        return new_dir
+    else:
+        # Linux / BSD / Unix (XDG standard)
+        xdg = os.getenv("XDG_DATA_HOME")
+        if xdg:
+            return Path(xdg) / "clipfarm"
+        return Path.home() / ".local" / "share" / "clipfarm"
 
 def get_project_root() -> Path:
     """
@@ -34,16 +62,22 @@ def get_project_root() -> Path:
     return Path(__file__).parent.parent.parent
 
 def get_data_directory() -> Path:
-    """Get data directory"""
-    configured_data_dir = os.getenv("AUTOCLIP_DATA_DIR")
+    """Get data directory with automatic fallback to user home directory if root is read-only"""
+    configured_data_dir = os.getenv("CLIPFARM_DATA_DIR") or os.getenv("AUTOCLIP_DATA_DIR")
     if configured_data_dir:
         data_dir = Path(configured_data_dir).expanduser()
     elif is_desktop_mode():
-        app_dir = os.getenv("AUTOCLIP_APP_DIR", "~/Library/Application Support/AutoClip")
-        data_dir = Path(app_dir).expanduser()
+        data_dir = get_default_app_data_dir()
     else:
-        # Consistently use the data directory at the project root, matching config.py
-        data_dir = get_project_root() / "data"
+        root_data = get_project_root() / "data"
+        try:
+            root_data.mkdir(parents=True, exist_ok=True)
+            test_file = root_data / ".perm_check"
+            test_file.touch()
+            test_file.unlink()
+            data_dir = root_data
+        except (PermissionError, OSError):
+            data_dir = get_default_app_data_dir()
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
 
@@ -149,11 +183,9 @@ def get_log_file_path() -> Path:
         log_file = Path(configured_log_file).expanduser()
         log_file.parent.mkdir(parents=True, exist_ok=True)
         return log_file
-    if is_desktop_mode() or os.getenv("AUTOCLIP_DATA_DIR"):
-        logs_dir = get_data_directory() / "logs"
-        logs_dir.mkdir(parents=True, exist_ok=True)
-        return logs_dir / "backend.log"
-    return get_project_root() / "backend.log"
+    logs_dir = get_data_directory() / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    return logs_dir / "backend.log"
 
 def get_cache_directory() -> Path:
     """Get cache directory"""
@@ -399,4 +431,48 @@ def find_collection_video_file(
         return None, collection_obj
     except Exception:
         return None, collection_obj
+
+
+def reveal_in_file_manager(target_path: Path) -> bool:
+    """
+    Open native file explorer and highlight/reveal the target file or directory.
+    Cross-platform support:
+      - Windows: explorer.exe /select,path (or explorer.exe folder)
+      - macOS: open -R path (or open folder)
+      - Linux: xdg-open folder (opens native file manager such as Nautilus, Dolphin, Thunar)
+    """
+    import logging
+    import platform
+    import subprocess
+
+    log = logging.getLogger(__name__)
+    try:
+        target = Path(target_path).resolve()
+        if not target.exists():
+            target = target.parent
+        if not target.exists():
+            log.warning(f"Path does not exist to reveal: {target_path}")
+            return False
+
+        sys_name = platform.system()
+        if sys_name == "Windows":
+            if target.is_file():
+                subprocess.Popen(["explorer.exe", f"/select,{str(target)}"])
+            else:
+                subprocess.Popen(["explorer.exe", str(target)])
+            return True
+        elif sys_name == "Darwin":
+            if target.is_file():
+                subprocess.Popen(["open", "-R", str(target)])
+            else:
+                subprocess.Popen(["open", str(target)])
+            return True
+        else:
+            # Linux / Unix
+            folder = target if target.is_dir() else target.parent
+            subprocess.Popen(["xdg-open", str(folder)])
+            return True
+    except Exception as e:
+        log.warning(f"Failed to reveal in file manager: {e}")
+        return False
 

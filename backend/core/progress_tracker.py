@@ -85,6 +85,20 @@ class ProgressTracker:
         self._start_auto_heartbeat()
         self._update_store()
 
+    def _append_to_file(self, message: str, level: str = "INFO"):
+        """Append log message to the project's dedicated processing.log on disk."""
+        try:
+            from backend.core.path_utils import get_project_directory
+            from datetime import datetime, timezone
+            proj_dir = get_project_directory(self.state.project_id)
+            proj_dir.mkdir(parents=True, exist_ok=True)
+            log_file = proj_dir / "processing.log"
+            iso_ts = datetime.now(timezone.utc).isoformat()
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(f"{iso_ts} - pipeline - {level} - {message}\n")
+        except Exception:
+            pass
+
     def set_step(self, step_number: int, step_name: Optional[str] = None, total_steps: Optional[int] = None):
         """Call at the beginning of each major pipeline step."""
         with self._lock:
@@ -101,6 +115,7 @@ class ProgressTracker:
             self.state.elapsed_seconds = time.time() - self.state.started_at
             self._update_store()
             logger.info(f"[Progress] Step {step_number}: {self.state.step_name}")
+            self._append_to_file(f"Step {step_number}: {self.state.step_name}", "INFO")
 
     def set_substep(self, detail: str, current: int = 0, total: int = 0):
         """
@@ -129,8 +144,8 @@ class ProgressTracker:
             self.state.elapsed_seconds = time.time() - self.state.started_at
             self._update_store()
 
-    def log(self, message: str):
-        """Add a line to the recent log buffer visible in the UI."""
+    def log(self, message: str, level: str = "INFO"):
+        """Add a line to the recent log buffer visible in the UI and write to project log."""
         with self._lock:
             timestamp = time.strftime("%H:%M:%S")
             entry = f"[{timestamp}] {message}"
@@ -140,6 +155,7 @@ class ProgressTracker:
             self.state.last_heartbeat = time.time()
             self._update_store()
             logger.info(f"[Progress Log] {message}")
+            self._append_to_file(message, level)
 
     def complete(self):
         """Call when the entire pipeline finishes successfully."""
@@ -152,6 +168,7 @@ class ProgressTracker:
             self.state.is_alive = False
             self._stop_auto_heartbeat()
             self._update_store()
+            self._append_to_file("Pipeline completed successfully. All clips rendered.", "INFO")
 
     def fail(self, error_message: str):
         """Call when the pipeline fails."""
@@ -161,6 +178,7 @@ class ProgressTracker:
             self.state.is_alive = False
             self._stop_auto_heartbeat()
             self._update_store()
+            self._append_to_file(f"Pipeline failed: {error_message}", "ERROR")
 
     def to_dict(self) -> dict:
         """Returns current state as a JSON-serializable dict."""

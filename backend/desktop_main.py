@@ -18,12 +18,26 @@ from fastapi import FastAPI
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-app_data_dir = Path(os.getenv("AUTOCLIP_APP_DIR", "~/Library/Application Support/AutoClip")).expanduser()
+from backend.core.path_utils import get_default_app_data_dir
+
+app_data_dir = get_default_app_data_dir()
 app_data_dir.mkdir(parents=True, exist_ok=True)
 (app_data_dir / "logs").mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("CLIPFARM_APP_DIR", str(app_data_dir))
 os.environ.setdefault("AUTOCLIP_APP_DIR", str(app_data_dir))
+os.environ.setdefault("CLIPFARM_DATA_DIR", str(app_data_dir))
 os.environ.setdefault("AUTOCLIP_DATA_DIR", str(app_data_dir))
-os.environ.setdefault("DATABASE_URL", f"sqlite:///{app_data_dir / 'autoclip.db'}")
+
+db_file = app_data_dir / "clipfarm.db"
+legacy_db = app_data_dir / "autoclip.db"
+if not db_file.exists() and legacy_db.exists():
+    try:
+        import shutil
+        shutil.copy2(legacy_db, db_file)
+    except Exception:
+        db_file = legacy_db
+
+os.environ.setdefault("DATABASE_URL", f"sqlite:///{db_file}")
 os.environ.setdefault("LOG_FILE", str(app_data_dir / "logs" / "backend.log"))
 
 from backend.app_factory import create_app
@@ -55,11 +69,14 @@ class DesktopServiceManager:
     
     def _setup_logging(self):
         """set log configuration"""
+        from logging.handlers import RotatingFileHandler
+        log_path = self.config.paths.data_dir / "logs" / "clipfarm.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
         logging.basicConfig(
             level=getattr(logging, self.config.log_level.upper()),
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler(self.config.paths.data_dir / "logs" / "autoclip.log"),
+                RotatingFileHandler(str(log_path), maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"),
                 logging.StreamHandler()
             ]
         )

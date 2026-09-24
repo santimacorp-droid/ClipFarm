@@ -15,6 +15,7 @@ import os
 import math
 import logging
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
@@ -568,7 +569,11 @@ def build_cta_animation_clip(
     safe_mode = "wm" if as_watermark else "slide"
 
     if output_mov_path is None:
-        cache_dir = Path("data/assets/cta_templates")
+        try:
+            from ..core.path_utils import get_data_directory
+            cache_dir = get_data_directory() / "assets" / "cta_templates"
+        except Exception:
+            cache_dir = Path("data/assets/cta_templates")
         cache_dir.mkdir(parents=True, exist_ok=True)
         output_mov_path = cache_dir / f"cta_v8_{safe_plat}_{safe_style}_{safe_pos}_{safe_h}_{safe_mode}_{video_width}x{video_height}.mov"
 
@@ -576,7 +581,7 @@ def build_cta_animation_clip(
         return output_mov_path
 
     total_frames = int(fps * duration_sec)
-    tmp_frames_dir = Path(f"/tmp/cta_build_{os.getpid()}_{platform}_{safe_mode}")
+    tmp_frames_dir = Path(tempfile.gettempdir()) / f"cta_build_{os.getpid()}_{platform}_{safe_mode}"
     tmp_frames_dir.mkdir(parents=True, exist_ok=True)
 
     # Normalize style
@@ -865,7 +870,7 @@ def apply_cta_overlay(
     tmp_wm_dir = None
     if is_wm:
         try:
-            tmp_wm_dir = Path(f"/tmp/cta_wm_{os.getpid()}")
+            tmp_wm_dir = Path(tempfile.gettempdir()) / f"cta_wm_{os.getpid()}"
             tmp_wm_dir.mkdir(parents=True, exist_ok=True)
             safe_h = handle.replace("@", "").replace("/", "_").strip() or "nohandle"
             wm_png_path = tmp_wm_dir / f"wm_{w}x{h}_{safe_h}_{position}.png"

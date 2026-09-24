@@ -22,7 +22,7 @@ class CeleryConfig:
     task_serializer = 'json'
     accept_content = ['json']
     result_serializer = 'json'
-    timezone = 'Asia/Shanghai'
+    timezone = 'UTC'
     enable_utc = True
     
     # Redis configuration settings.
@@ -72,12 +72,28 @@ class CeleryConfig:
 celery_app.config_from_object(CeleryConfig)
 
 
-def _is_desktop_mode() -> bool:
-    return os.getenv("AUTOCLIP_DESKTOP_MODE", "").lower() in {"1", "true", "yes"}
+def should_run_locally() -> bool:
+    """Determine whether tasks should execute in a local background thread.
+    
+    In ClipFarm standalone / desktop software, tasks execute in local background threads
+    by default so that video processing never stalls waiting on an external queue.
+    Celery execution is only enabled when explicitly opted in via USE_CELERY=true or CLIPFARM_USE_CELERY=true.
+    """
+    # Explicit override: Force Celery
+    force_celery = (
+        os.getenv("USE_CELERY", "").lower() in {"1", "true", "yes"}
+        or os.getenv("CLIPFARM_USE_CELERY", "").lower() in {"1", "true", "yes"}
+    )
+    if force_celery:
+        return False
+
+    # Default to True for all local desktop/standalone usage and testing.
+    # This prevents third-party or unrelated Redis instances on localhost:6379 from hijacking ClipFarm tasks.
+    return True
 
 
 class _LocalAsyncResult:
-    """A lightweight substitute for `AsyncResult`, returned when tasks run locally on the desktop in a separate thread.. """
+    """A lightweight substitute for `AsyncResult`, returned when tasks run locally in a background thread."""
 
     def __init__(self, task_id: str):
         self.id = task_id
@@ -91,38 +107,50 @@ class _LocalAsyncResult:
         return False
 
 
+from concurrent.futures import ThreadPoolExecutor
+
+# Dedicated bounded worker pool for local desktop task execution (max 2 concurrent heavy video tasks)
+_LOCAL_TASK_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="clipfarm-task")
+
 class DesktopAwareTask(celery_app.Task):
-    """The desktop installer does not include a Redis broker; in production mode, `core.celery_app` refers to... redis://localhost. 
+    """Zero-Redis capable task runner.
 
-    All endpoints use... `task.delay(...)` / `apply_async(...)` By default, dispatching a task adds it to...
-    Redis Queue —— Because nobody consumes the queue on the desktop, it will always be stuck on... 0%「Initializing」. 
-
-    Here, under desktop mode, change `apply_async` to...「Executes synchronously in a background daemon thread. apply()」: 
-    No dependencies on any broker; returns immediately, progress is written to the database for polling by the frontend. The behavior in production mode remains unchanged.. 
+    When running in desktop/standalone mode or when no Redis broker is available,
+    tasks execute asynchronously in a background worker pool with SQLite persistence.
+    If Redis fails at dispatch time, it gracefully falls back to local execution.
     """
 
     def apply_async(self, args=None, kwargs=None, task_id=None, **options):
-        if _is_desktop_mode():
-            import threading
-            import uuid
+        import uuid
 
-            tid = task_id or str(uuid.uuid4())
-            call_args = list(args) if args else []
-            call_kwargs = dict(kwargs) if kwargs else {}
+        tid = task_id or str(uuid.uuid4())
+        call_args = list(args) if args else []
+        call_kwargs = dict(kwargs) if kwargs else {}
 
-            def _run():
+        def _run_locally():
+            def _thread_target():
                 try:
                     self.apply(args=call_args, kwargs=call_kwargs, task_id=tid)
                 except Exception as exc:  # noqa: BLE001
                     import logging
                     logging.getLogger(__name__).error(
-                        f"Local execution of a task fails on the desktop. {self.name} ({tid}): {exc}", exc_info=True
+                        f"Local in-process task failed: {self.name} ({tid}): {exc}", exc_info=True
                     )
 
-            threading.Thread(target=_run, name=f"task-{self.name}", daemon=True).start()
+            _LOCAL_TASK_EXECUTOR.submit(_thread_target)
             return _LocalAsyncResult(tid)
 
-        return super().apply_async(args=args, kwargs=kwargs, task_id=task_id, **options)
+        if should_run_locally():
+            return _run_locally()
+
+        try:
+            return super().apply_async(args=args, kwargs=kwargs, task_id=task_id, **options)
+        except Exception as broker_exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Celery broker dispatch failed ({broker_exc}); falling back to local execution for {self.name} ({tid})"
+            )
+            return _run_locally()
 
 
 # On the desktop, make all `@celery_app.task` decorators use the local execution base class described above.

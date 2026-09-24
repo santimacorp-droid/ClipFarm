@@ -44,18 +44,12 @@ class APIKeyManager:
     def _get_master_password(self) -> str:
         """Retrieve master password"""
         # Prefer to obtain from environment variables
-        master_password = os.getenv("AUTO_CLIPS_MASTER_PASSWORD")
+        master_password = os.getenv("CLIPFARM_MASTER_PASSWORD") or os.getenv("AUTO_CLIPS_MASTER_PASSWORD")
         if master_password:
             return master_password
         
-        # If not set, use default password (for development environments only)
-        if os.getenv("AUTO_CLIPS_DEV_MODE"):
-            return "dev_master_password"
-        
-        # Production should set environment variables
-        raise ConfigurationError(
-            "Master password not set. Please set the AUTO_CLIPS_MASTER_PASSWORD environment variable. "
-        )
+        # Default key for desktop and development environments
+        return "clipfarm_default_master_password"
     
     def _create_fernet(self) -> Fernet:
         """Create Fernet cipher"""

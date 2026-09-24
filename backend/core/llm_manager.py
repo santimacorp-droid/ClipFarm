@@ -29,14 +29,11 @@ class LLMManager:
     
     def _get_default_settings_file(self) -> Path:
         """Get default settings file path"""
-        # Prefer desktop mode application directory (matches front-end save location)
-        app_dir = os.getenv("AUTOCLIP_APP_DIR")
-        if app_dir:
-            return Path(app_dir) / "settings.json"
+        from .path_utils import get_default_app_data_dir
         
-        # Prefer the default user directory on macOS - client configuration location
-        default_app_dir = Path.home() / "Library" / "Application Support" / "AutoClip"
-        default_settings = default_app_dir / "settings.json"
+        # Check standard user app data dir across Windows, macOS, and Linux
+        app_dir = get_default_app_data_dir()
+        default_settings = app_dir / "settings.json"
         if default_settings.exists():
             return default_settings
             

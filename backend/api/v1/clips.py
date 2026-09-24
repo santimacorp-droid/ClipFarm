@@ -4,6 +4,7 @@ SliceAPIRoute
 
 from typing import List, Optional
 import os
+import json
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -334,6 +335,59 @@ async def download_clip(
             "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
         }
     )
+
+
+@router.post("/{clip_id}/reveal")
+async def reveal_clip_in_folder(
+    clip_id: str,
+    platform: Optional[str] = Query(None),
+    clip_service: ClipService = Depends(get_clip_service)
+):
+    """Reveal the clip video file in native OS file manager (Finder / Explorer / Nautilus)."""
+    from ...core.path_utils import find_clip_video_file, get_project_directory, reveal_in_file_manager
+
+    clip = clip_service.get(clip_id)
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+
+    metadata = getattr(clip, 'clip_metadata', {}) or {}
+    if isinstance(metadata, str):
+        try:
+            metadata = json.loads(metadata)
+        except Exception:
+            metadata = {}
+
+    target_video_path = None
+    if platform:
+        plat_key = str(platform).lower().replace("-", "_").strip()
+        cta_plats = metadata.get("cta_platforms") or metadata.get("platform_videos") or {}
+        if isinstance(cta_plats, dict) and plat_key in cta_plats:
+            cand = cta_plats[plat_key]
+            if cand and os.path.exists(cand) and os.path.getsize(cand) > 0:
+                target_video_path = Path(cand)
+
+    if not target_video_path:
+        cta_f = metadata.get("cta_video_file")
+        if cta_f and os.path.exists(cta_f) and os.path.getsize(cta_f) > 0:
+            target_video_path = Path(cta_f)
+
+    if not target_video_path:
+        file_path, _ = find_clip_video_file(clip.project_id if clip else None, clip_id, clip_obj=clip, db=clip_service.db)
+        if file_path and file_path.exists():
+            target_video_path = file_path
+
+    if not target_video_path or not target_video_path.exists():
+        # Fall back to project directory
+        proj_dir = get_project_directory(clip.project_id)
+        if proj_dir.exists():
+            target_video_path = proj_dir
+        else:
+            raise HTTPException(status_code=404, detail="Clip file not found on disk")
+
+    success = reveal_in_file_manager(target_video_path)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to open system file explorer")
+    return {"success": True, "path": str(target_video_path)}
 
 
 @router.get("/{clip_id}", response_model=ClipResponse)

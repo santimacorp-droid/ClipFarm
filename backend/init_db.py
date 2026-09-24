@@ -6,20 +6,19 @@ Database initialization script
 import sys
 from pathlib import Path
 
-# AddbackendPath toPythonPath
-backend_dir = Path(__file__).parent
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
+# Ensure project root is in sys.path
+project_root = Path(__file__).resolve().parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
-from ..core.database import init_database, get_database_url
-from ..core.config import init_paths, get_data_directory
-from ..models.base import Base
-from ..models.project import Project, ProjectStatus, ProjectType
-from ..models.clip import Clip
-from ..models.collection import Collection
-from ..models.task import Task, TaskStatus, TaskType
+from backend.core.database import init_database, get_database_url, SessionLocal
+from backend.core.config import init_paths, get_data_directory
+from backend.models.base import Base
+from backend.models.project import Project, ProjectStatus, ProjectType
+from backend.models.clip import Clip
+from backend.models.collection import Collection
+from backend.models.task import Task, TaskStatus, TaskType
 from sqlalchemy.orm import Session
-from ..core.database import SessionLocal
 
 def create_initial_data():
     """Create initial test data"""

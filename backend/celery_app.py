@@ -3,8 +3,9 @@ UnifiedCeleryApp Configuration
 """
 
 import os
+from backend.core.path_utils import is_desktop_mode
 
-IS_DESKTOP = os.getenv("AUTOCLIP_DESKTOP_MODE") == "1"
+IS_DESKTOP = is_desktop_mode()
 
 if IS_DESKTOP:
     # Only Desktop Mode Uses FileSystem broker / sqlite backend Lightweight Celery
@@ -21,7 +22,7 @@ else:
         task_serializer='json',
         accept_content=['json'],
         result_serializer='json',
-        timezone='Asia/Shanghai',
+        timezone='UTC',
         enable_utc=True,
         task_always_eager=False,  # Server Mode Async Execution
         task_eager_propagates=True,

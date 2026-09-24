@@ -137,7 +137,7 @@ const DesktopSettings: React.FC = () => {
         host: values.host || "127.0.0.1",
         port: values.port || 8000,
         max_memory_usage: values.max_memory_usage || 2048,
-        database_url: values.database_url || "sqlite:///data/autoclip.db",
+        database_url: values.database_url || "sqlite:///data/clipfarm.db",
         celery_broker_url: values.celery_broker_url || "db+sqlite:///data/celery_broker.db",
         celery_result_backend: values.celery_result_backend || "db+sqlite:///data/celery_results.db",
         celery_worker_concurrency: values.celery_worker_concurrency || 1,

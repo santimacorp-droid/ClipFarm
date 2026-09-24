@@ -85,6 +85,7 @@ interface ProjectStore {
   addProject: (project: Project) => void
   updateProject: (id: string, updates: Partial<Project>) => void
   deleteProject: (id: string) => void
+  deleteProjects: (ids: string[]) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   updateClip: (projectId: string, clipId: string, updates: Partial<Clip>) => void
@@ -158,6 +159,17 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set((state) => ({
       projects: state.projects.filter(p => p.id !== id),
       currentProject: state.currentProject?.id === id ? null : state.currentProject
+    }))
+  },
+
+  deleteProjects: (ids) => {
+    const idSet = new Set(ids)
+    ids.forEach(id => {
+      localStorage.removeItem(`thumbnail_${id}`)
+    })
+    set((state) => ({
+      projects: state.projects.filter(p => !idSet.has(p.id)),
+      currentProject: state.currentProject && idSet.has(state.currentProject.id) ? null : state.currentProject
     }))
   },
   

@@ -13,13 +13,13 @@ export PYTHONUNBUFFERED=1
 mkdir -p /app/data/projects /app/data/uploads /app/data/temp /app/data/output /app/logs
 
 # If data directory is empty, create necessary files
-if [[ ! -f /app/data/autoclip.db ]]; then
+if [[ ! -f /app/data/clipfarm.db && ! -f /app/data/autoclip.db ]]; then
     echo "Initialize database..."
     python -c "
 import sys
 sys.path.insert(0, '/app')
 from backend.core.database import engine, Base
-from backend.models import project, task, clip, collection, bilibili
+from backend.models import project, task, clip, collection, campaign
 try:
     Base.metadata.create_all(bind=engine)
     print('Database initialization succeeded')

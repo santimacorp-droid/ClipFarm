@@ -92,13 +92,29 @@ async def get_logs(lines: int = 100):
     
     try:
         config = get_desktop_config()
-        log_file = config.data_dir / "logs" / "autoclip.log"
+        candidates = [
+            config.data_dir / "logs" / "clipfarm.log",
+            config.data_dir / "logs" / "worker.log",
+            config.data_dir / "logs" / "backend.log",
+            config.data_dir / "logs" / "autoclip.log",
+            Path("backend.log"),
+        ]
+        log_file = None
+        for candidate in candidates:
+            if candidate.exists() and candidate.stat().st_size > 0:
+                log_file = candidate
+                break
+        if not log_file:
+            for candidate in candidates:
+                if candidate.exists():
+                    log_file = candidate
+                    break
         
-        if not log_file.exists():
+        if not log_file or not log_file.exists():
             return {"logs": [], "message": "Log file does not exist"}
         
         # Reading lastNLine logging
-        with open(log_file, 'r', encoding='utf-8') as f:
+        with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
             all_lines = f.readlines()
             recent_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
         
@@ -169,20 +185,23 @@ async def detailed_health_check():
         # Check database connection
         db_status = "healthy"
         try:
-            from backend.core.database import get_db
-            # Simple database connection test
-            db_status = "healthy"
+            from backend.core.database import test_connection
+            if not test_connection():
+                db_status = "unhealthy"
         except Exception:
             db_status = "unhealthy"
         
-        # CheckingCeleryConnecting
-        celery_status = "healthy"
-        try:
-            from backend.desktop_celery import celery_app
-            celery_app.control.inspect().stats()
+        # Checking task runner status
+        from backend.core.celery_app import should_run_locally
+        if should_run_locally():
+            celery_status = "healthy (local runner)"
+        else:
             celery_status = "healthy"
-        except Exception:
-            celery_status = "unhealthy"
+            try:
+                from backend.desktop_celery import celery_app
+                celery_app.control.inspect().stats()
+            except Exception:
+                celery_status = "unhealthy"
         
         return {
             "status": "healthy",

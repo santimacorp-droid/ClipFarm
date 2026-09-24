@@ -40,6 +40,7 @@ class ApiConfig:
     api_key: str = ""
     region: str = ""
     endpoint: str = ""
+    model_name: str = "whisper-1"
     language: str = "auto"
     enable_timestamps: bool = True
     enable_punctuation: bool = True
@@ -80,18 +81,21 @@ class DesktopConfig:
         self._siliconflow_api_key = os.getenv("API_SILICONFLOW_API_KEY", "")
         self._jimeng_access_key = os.getenv("API_JIMENG_ACCESS_KEY", "")
         self._jimeng_secret_key = os.getenv("API_JIMENG_SECRET_KEY", "")
-        self._max_memory_usage = int(os.getenv("AUTOCLIP_MAX_MEMORY_USAGE", "2048"))
-        self._log_retention_days = int(os.getenv("AUTOCLIP_LOG_RETENTION_DAYS", "7"))
+        self._max_memory_usage = int(os.getenv("CLIPFARM_MAX_MEMORY_USAGE") or os.getenv("AUTOCLIP_MAX_MEMORY_USAGE", "2048"))
+        self._log_retention_days = int(os.getenv("CLIPFARM_LOG_RETENTION_DAYS") or os.getenv("AUTOCLIP_LOG_RETENTION_DAYS", "7"))
 
     def _build_paths(self) -> DesktopPaths:
         data_dir = path_utils.get_data_directory()
         cache_dir = path_utils.get_cache_directory()
         temp_dir = path_utils.get_temp_directory()
+        db_file = data_dir / "clipfarm.db"
+        if not db_file.exists() and (data_dir / "autoclip.db").exists():
+            db_file = data_dir / "autoclip.db"
         return DesktopPaths(
             data_dir=data_dir,
             cache_dir=cache_dir,
             temp_dir=temp_dir,
-            database_url=f"sqlite:///{data_dir / 'autoclip.db'}",
+            database_url=f"sqlite:///{db_file}",
         )
 
     def set_data_dir(self, new_data_dir: Path, migrate_from_old: bool = True):
@@ -111,12 +115,16 @@ class DesktopConfig:
                     shutil.copy2(item, target)
             migrated = True
 
+        os.environ["CLIPFARM_DATA_DIR"] = str(new_data_dir)
         os.environ["AUTOCLIP_DATA_DIR"] = str(new_data_dir)
+        db_file = new_data_dir / "clipfarm.db"
+        if not db_file.exists() and (new_data_dir / "autoclip.db").exists():
+            db_file = new_data_dir / "autoclip.db"
         self.paths = DesktopPaths(
             data_dir=new_data_dir,
             cache_dir=new_data_dir / "cache",
             temp_dir=new_data_dir / "temp",
-            database_url=f"sqlite:///{new_data_dir / 'autoclip.db'}",
+            database_url=f"sqlite:///{db_file}",
         )
         self.paths.cache_dir.mkdir(parents=True, exist_ok=True)
         self.paths.temp_dir.mkdir(parents=True, exist_ok=True)

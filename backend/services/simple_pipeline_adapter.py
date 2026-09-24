@@ -768,6 +768,7 @@ class SimplePipelineAdapter:
                 "status": "failed",
                 "project_id": self.project_id,
                 "task_id": self.task_id,
+                "message": error_msg,
                 "error": error_msg
             }
 

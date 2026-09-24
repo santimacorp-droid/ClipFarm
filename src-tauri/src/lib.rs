@@ -31,6 +31,10 @@ pub fn run() {
             // 设置环境变量
             std::env::set_var("AUTOCLIP_DESKTOP_MODE", "true");
             std::env::set_var("AUTOCLIP_MODE", "desktop");
+            std::env::set_var("CLIPFARM_DESKTOP_MODE", "true");
+            std::env::set_var("CLIPFARM_MODE", "desktop");
+            std::env::set_var("CLIPFARM_STANDALONE", "true");
+            std::env::set_var("USE_CELERY", "false");
 
             // 设置系统托盘
             if let Err(e) = setup_system_tray(&app.handle()) {
@@ -50,6 +54,12 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                let backend_manager = app_handle.state::<BackendManager>();
+                let _ = backend_manager.stop();
+            }
+        });
 }

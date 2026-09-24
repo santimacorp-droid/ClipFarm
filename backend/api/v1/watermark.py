@@ -79,6 +79,34 @@ async def update_watermark_preset(preset_id: str, updates: WatermarkPresetUpdate
     return updated
 
 
+@router.post("/presets/{preset_id}/logo")
+async def update_preset_logo(
+    preset_id: str,
+    logo_file: UploadFile = File(...)
+) -> Dict[str, Any]:
+    """Upload and update the logo file of an existing watermark preset."""
+    try:
+        ext = Path(logo_file.filename or "").suffix.lower()
+        if ext not in [".png", ".jpg", ".jpeg", ".webp", ".svg"]:
+            raise HTTPException(status_code=400, detail="Invalid logo file format (use PNG, JPG, WEBP, or SVG)")
+
+        file_bytes = await logo_file.read()
+        if not file_bytes:
+            raise HTTPException(status_code=400, detail="Empty logo file uploaded")
+
+        saved_filename = watermark_service.save_logo_file(file_bytes, logo_file.filename or "logo.png")
+        updated = watermark_service.update_preset(preset_id, {"logo_filename": saved_filename})
+        if not updated:
+            raise HTTPException(status_code=404, detail="Watermark preset not found")
+        return updated
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update preset logo: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update preset logo: {str(e)}")
+
+
+
 @router.delete("/presets/{preset_id}")
 async def delete_watermark_preset(preset_id: str) -> Dict[str, Any]:
     """Delete a watermark preset."""

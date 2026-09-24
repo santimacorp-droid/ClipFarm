@@ -147,6 +147,8 @@ async def get_speech_config(config: DesktopConfig = Depends(get_desktop_config))
             },
             "openai_config": {
                 "api_key": speech_config.openai_config.api_key,
+                "endpoint": getattr(speech_config.openai_config, "endpoint", ""),
+                "model_name": getattr(speech_config.openai_config, "model_name", "whisper-1"),
                 "language": speech_config.openai_config.language,
                 "enable_timestamps": speech_config.openai_config.enable_timestamps,
                 "enable_punctuation": speech_config.openai_config.enable_punctuation
@@ -173,6 +175,7 @@ async def get_speech_config(config: DesktopConfig = Depends(get_desktop_config))
             "custom_api_config": {
                 "api_key": speech_config.custom_api_config.api_key,
                 "endpoint": speech_config.custom_api_config.endpoint,
+                "model_name": getattr(speech_config.custom_api_config, "model_name", "whisper-large-v3"),
                 "language": speech_config.custom_api_config.language,
                 "enable_timestamps": speech_config.custom_api_config.enable_timestamps,
                 "enable_punctuation": speech_config.custom_api_config.enable_punctuation

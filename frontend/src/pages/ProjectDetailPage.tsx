@@ -20,7 +20,8 @@ import {
   PlusOutlined, 
   DownloadOutlined, 
   DownOutlined, 
-  AppstoreOutlined 
+  AppstoreOutlined,
+  FolderOpenOutlined
 } from '@ant-design/icons'
 import { useProjectStore, Clip, Collection } from '../store/useProjectStore'
 import { projectApi } from '../services/api'
@@ -74,6 +75,17 @@ const ProjectDetailPage: React.FC = () => {
       message.error({ content: `Failed to export ZIP: ${e.message || 'Unknown error'}`, key: 'zip_export' })
     } finally {
       setExportingZip(false)
+    }
+  }
+
+  const handleRevealFolder = async () => {
+    if (!currentProject?.id) return
+    try {
+      await projectApi.revealProjectFolder(currentProject.id)
+      message.success('Opening clips output folder in system file manager...')
+    } catch (e: any) {
+      console.error('Failed to reveal folder:', e)
+      message.error(e.response?.data?.detail || 'Failed to open output folder')
     }
   }
 
@@ -172,13 +184,16 @@ const ProjectDetailPage: React.FC = () => {
 
   const handleStartProcessing = async () => {
     if (!id) return
+    setStatusLoading(true)
     try {
       await projectApi.startProcessing(id)
-      message.success('Processing started')
-      loadProcessingStatus()
-    } catch (error) {
+      message.success('Processing started! Opening studio...')
+      navigate(`/processing/${id}`)
+    } catch (error: any) {
       console.error('Failed to start processing:', error)
-      message.error('Failed to start processing')
+      message.error(error.response?.data?.detail || 'Failed to start processing')
+    } finally {
+      setStatusLoading(false)
     }
   }
 
@@ -332,6 +347,36 @@ const ProjectDetailPage: React.FC = () => {
         </Space>
       </div>
 
+      {/* Live Processing or Error Notification Banners */}
+      {currentProject.status === 'processing' && (
+        <Alert
+          message="Project is currently processing in the background"
+          description="AI transcription, viral scoring, and vertical 9:16 video rendering are running. You can monitor live progress and real-time logs in the Processing Studio."
+          type="info"
+          showIcon
+          action={
+            <Button type="primary" onClick={() => navigate(`/processing/${id}`)}>
+              Open Processing Studio
+            </Button>
+          }
+          style={{ marginBottom: '24px', borderRadius: '10px' }}
+        />
+      )}
+      {currentProject.status === 'failed' && (
+        <Alert
+          message="Project Processing Failed"
+          description="An error occurred while generating clips for this project. Check the processing studio to inspect logs and retry."
+          type="error"
+          showIcon
+          action={
+            <Button type="primary" danger onClick={() => navigate(`/processing/${id}`)}>
+              View Error & Retry
+            </Button>
+          }
+          style={{ marginBottom: '24px', borderRadius: '10px' }}
+        />
+      )}
+
       {/* Main content */}
       {currentProject.status === 'completed' ? (
         <div>
@@ -467,7 +512,24 @@ const ProjectDetailPage: React.FC = () => {
                 
                 <Space>
                   {currentProject.clips && currentProject.clips.length > 0 && (
-                    <Dropdown menu={{ items: zipMenuItems }} trigger={['click']}>
+                    <>
+                      <Button
+                        icon={<FolderOpenOutlined />}
+                        onClick={handleRevealFolder}
+                        style={{
+                          borderRadius: '8px',
+                          background: 'var(--ac-line-2)',
+                          border: '1px solid var(--ac-line)',
+                          color: 'var(--ac-ink)',
+                          fontWeight: 500,
+                          height: '36px',
+                          padding: '0 14px',
+                          fontSize: '13px'
+                        }}
+                      >
+                        Show in Folder
+                      </Button>
+                      <Dropdown menu={{ items: zipMenuItems }} trigger={['click']}>
                       <Button
                         icon={<DownloadOutlined />}
                         loading={exportingZip}
@@ -485,6 +547,7 @@ const ProjectDetailPage: React.FC = () => {
                         Download (ZIP) <DownOutlined style={{ fontSize: '10px' }} />
                       </Button>
                     </Dropdown>
+                    </>
                   )}
                   {(!currentProject.collections || currentProject.collections.length === 0) && (
                     <Button 

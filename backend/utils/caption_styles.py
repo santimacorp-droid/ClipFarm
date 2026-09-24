@@ -192,6 +192,7 @@ def _resolve_overlapping_segments(segments: List[Dict[str, Any]]) -> List[Dict[s
        - If overlap is > 0.5s (real speech overlap), push current segment to start after previous ends
          (prev['end'] + 0.05) rather than truncating words, shifting any word timestamps accordingly.
     3. Preserves 'speaker' and 'words' metadata.
+    4. Enforces strictly non-overlapping intervals within each speaker track.
     """
     if not segments:
         return []
@@ -203,7 +204,7 @@ def _resolve_overlapping_segments(segments: List[Dict[str, Any]]) -> List[Dict[s
         raw_start = max(0.0, float(seg.get('start', 0.0)))
         raw_end = max(raw_start + 0.1, float(seg.get('end', 0.0)))
         text = str(seg.get('text', '')).strip()
-        if not text:
+        if not text or raw_end <= raw_start:
             continue
 
         spk = seg.get('speaker', 'SPEAKER_00')
@@ -236,11 +237,10 @@ def _resolve_overlapping_segments(segments: List[Dict[str, Any]]) -> List[Dict[s
                 overlap_duration = prev['end'] - raw_start
                 if overlap_duration > 0.5:
                     # True simultaneous speech — push second segment to after first ends
-                    # rather than cutting both. Prevents word loss.
                     start = round(prev['end'] + 0.05, 3)
                     end = round(max(start + 0.2, raw_end), 3)
                 else:
-                    # Brief transcript timing artifact — truncate previous (existing behavior)
+                    # Brief transcript timing artifact — truncate previous
                     prev['end'] = round(raw_start, 3)
                     start = round(raw_start, 3)
                     end = round(max(start + 0.2, raw_end), 3)
@@ -262,7 +262,7 @@ def _resolve_overlapping_segments(segments: List[Dict[str, Any]]) -> List[Dict[s
                     })
                 seg_words = shifted
 
-        if end > start:
+        if end > start + 0.05:
             entry = {
                 'start': round(start, 3),
                 'end': round(end, 3),
@@ -295,7 +295,7 @@ def _resolve_overlapping_segments(segments: List[Dict[str, Any]]) -> List[Dict[s
             if resolved[curr_idx]['end'] <= resolved[curr_idx]['start']:
                 resolved[curr_idx]['end'] = round(resolved[curr_idx]['start'] + 0.05, 3)
 
-    return resolved
+    return [r for r in resolved if r['end'] > r['start'] + 0.05]
 
 
 def _clean_emojis_for_ass(text: str) -> str:
@@ -478,37 +478,87 @@ class ViralCaptionGenerator:
     ) -> List[Dict[str, Any]]:
         """
         Filters, shifts, and deduplicates subtitle segments to be relative to the clip start (00:00:00).
-        Preserves speaker and word timestamps.
+        Preserves speaker and word timestamps. Discards pre-clip/post-clip words to eliminate 0.00ms bursts.
         """
         clip_start = _parse_time_to_seconds(clip_start_sec)
         clip_end = _parse_time_to_seconds(clip_end_sec)
+        if clip_end <= clip_start:
+            return []
+
         raw_clip_segments = []
         for seg in all_segments:
             seg_start = _parse_time_to_seconds(seg.get('start', 0.0))
             seg_end = _parse_time_to_seconds(seg.get('end', 0.0))
-            if seg_end > clip_start and seg_start < clip_end:
+
+            # Segment is entirely outside the clip window
+            if seg_end <= clip_start + 0.05 or seg_start >= clip_end - 0.05:
+                continue
+
+            raw_words = seg.get('words') or []
+            if raw_words:
+                shifted_words = []
+                for w in raw_words:
+                    w_s = _parse_time_to_seconds(w.get('start', 0.0))
+                    w_e = _parse_time_to_seconds(w.get('end', 0.0))
+
+                    # Drop words that ended before clip start or start after clip end
+                    if w_e <= clip_start + 0.05 or w_s >= clip_end - 0.05:
+                        continue
+
+                    # Clip boundaries
+                    rel_w_s = max(0.0, w_s - clip_start)
+                    rel_w_e = min(clip_end - clip_start, max(rel_w_s + 0.05, w_e - clip_start))
+
+                    word_text = str(w.get('word', '')).strip()
+                    if word_text:
+                        shifted_words.append({
+                            'word': word_text,
+                            'start': round(rel_w_s, 3),
+                            'end': round(rel_w_e, 3)
+                        })
+
+                if not shifted_words:
+                    continue
+
+                rel_start = shifted_words[0]['start']
+                rel_end = shifted_words[-1]['end']
+                clean_text = _join_tokens([w['word'] for w in shifted_words])
+                if not clean_text:
+                    continue
+
+                item = {
+                    'start': rel_start,
+                    'end': rel_end,
+                    'text': clean_text,
+                    'words': shifted_words
+                }
+                if 'speaker' in seg:
+                    item['speaker'] = seg['speaker']
+                raw_clip_segments.append(item)
+            else:
+                # SRT cues without word-level timestamps
+                overlap_dur = min(seg_end, clip_end) - max(seg_start, clip_start)
+                if overlap_dur < 0.2:
+                    continue
+
                 rel_start = max(0.0, seg_start - clip_start)
                 rel_end = min(clip_end - clip_start, seg_end - clip_start)
-                if rel_end > rel_start:
-                    item = {
-                        'start': rel_start,
-                        'end': rel_end,
-                        'text': seg.get('text', '')
-                    }
-                    if 'speaker' in seg:
-                        item['speaker'] = seg['speaker']
-                    if 'words' in seg and seg['words']:
-                        shifted_words = []
-                        for w in seg['words']:
-                            w_s = _parse_time_to_seconds(w.get('start', 0.0))
-                            w_e = _parse_time_to_seconds(w.get('end', 0.0))
-                            shifted_words.append({
-                                'word': w.get('word', ''),
-                                'start': max(0.0, w_s - clip_start),
-                                'end': max(0.05, w_e - clip_start)
-                            })
-                        item['words'] = shifted_words
-                    raw_clip_segments.append(item)
+                if rel_end <= rel_start + 0.05:
+                    continue
+
+                clean_text = str(seg.get('text', '')).strip()
+                if not clean_text:
+                    continue
+
+                item = {
+                    'start': round(rel_start, 3),
+                    'end': round(rel_end, 3),
+                    'text': clean_text
+                }
+                if 'speaker' in seg:
+                    item['speaker'] = seg['speaker']
+                raw_clip_segments.append(item)
+
         return _resolve_overlapping_segments(raw_clip_segments)
 
     @classmethod
@@ -668,6 +718,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         f"Dialogue: 1,{_seconds_to_ass_time(0.0)},{_seconds_to_ass_time(hook_end_time)},HookTitle,,0,0,0,,{clean_hook}"
                     )
 
+            # Track last end time per speaker/style to guarantee zero collision in libass
+            speaker_last_end: Dict[str, float] = {}
+
             for seg in clip_segs:
                 seg_text = _clean_emojis_for_ass(seg['text'].strip())
                 if not seg_text:
@@ -681,16 +734,25 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 if not tokens:
                     continue
 
-                seg_start = seg['start']
-                seg_end = seg['end']
-                seg_duration = max(0.1, seg_end - seg_start)
-                total_tokens = len(tokens)
-                seg_words = seg.get('words') or []
+                # Deduplicate consecutive repeating tokens (e.g. Whisper stutter/hallucination loops)
+                deduped_tokens: List[str] = []
+                for tok in tokens:
+                    if len(deduped_tokens) >= 2 and deduped_tokens[-1].lower() == tok.lower() and deduped_tokens[-2].lower() == tok.lower():
+                        continue
+                    deduped_tokens.append(tok)
+                tokens = deduped_tokens if deduped_tokens else tokens
 
-                # Select style based on speaker label (Part B)
+                # Select style based on speaker label
                 style = "Default"
                 if seg.get('speaker') and seg['speaker'] != 'SPEAKER_00':
                     style = "SecondSpeaker"
+
+                last_end = speaker_last_end.get(style, 0.0)
+                seg_start = max(last_end, float(seg['start']))
+                seg_end = max(seg_start + 0.2, float(seg['end']))
+                seg_duration = max(0.2, seg_end - seg_start)
+                total_tokens = len(tokens)
+                seg_words = seg.get('words') or []
 
                 # Group chunking: 3-4 words for natural, readable short-form captions
                 group_limit = cjk_chars_per_group if has_cjk else words_per_group
@@ -706,12 +768,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     group_words_slice = seg_words[token_cursor:token_cursor + group_len] if has_word_timing else []
                     
                     if has_word_timing and group_words_slice:
-                        g_start = max(seg_start, min(float(group_words_slice[0]['start']), seg_end))
-                        g_end = min(seg_end, max(float(group_words_slice[-1]['end']), g_start + 0.1))
+                        raw_g_start = float(group_words_slice[0]['start'])
+                        raw_g_end = float(group_words_slice[-1]['end'])
+                        g_start = max(current_group_start, raw_g_start)
+                        g_end = max(g_start + 0.2, min(seg_end, max(raw_g_end, g_start + (group_len * 0.1))))
                     else:
-                        group_dur = seg_duration * (group_len / total_tokens)
+                        group_dur = max(0.2, seg_duration * (group_len / total_tokens))
                         g_start = current_group_start
-                        g_end = current_group_start + group_dur
+                        g_end = min(seg_end, current_group_start + group_dur)
+                        if g_end <= g_start + 0.1:
+                            g_end = g_start + 0.2
 
                     # If plain subtitles or single token: render cleanly without per-word cycling
                     if highlight_color == primary_color or group_len <= 1:
@@ -720,48 +786,51 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             f"Dialogue: 0,{_seconds_to_ass_time(g_start)},{_seconds_to_ass_time(g_end)},{style},,0,0,0,,{line_text}"
                         )
                     else:
+                        # Build strictly partition-based word intervals [t_start, t_end]
+                        # guaranteeing ZERO overlap between words in the same group
+                        word_starts: List[float] = []
                         if has_word_timing and group_words_slice:
-                            # Use actual word timestamps from faster-whisper
-                            for w_idx, current_tok in enumerate(group):
-                                w_data = group_words_slice[w_idx]
-                                w_start = float(w_data['start'])
-                                w_end = float(w_data['end'])
-                                if w_end <= w_start:
-                                    w_end = w_start + 0.15
-
-                                rendered_tokens = []
-                                for j, tok in enumerate(group):
-                                    if j == w_idx:
-                                        rendered_tokens.append(f"{{\\c{highlight_color}}}{tok}{{\\c{primary_color}}}")
-                                    else:
-                                        rendered_tokens.append(tok)
-
-                                line_text = _join_tokens(rendered_tokens)
-                                dialogue_lines.append(
-                                    f"Dialogue: 0,{_seconds_to_ass_time(w_start)},{_seconds_to_ass_time(w_end)},{style},,0,0,0,,{line_text}"
-                                )
+                            cur_w_start = g_start
+                            for w_idx in range(group_len):
+                                raw_w_s = float(group_words_slice[w_idx]['start'])
+                                if w_idx == 0:
+                                    w_s = max(g_start, raw_w_s)
+                                else:
+                                    w_s = max(cur_w_start + 0.08, raw_w_s)
+                                # Ensure room for remaining words
+                                remaining_words = group_len - 1 - w_idx
+                                max_allowed = g_end - (remaining_words * 0.08)
+                                if w_s > max_allowed:
+                                    w_s = max(cur_w_start + 0.05, max_allowed)
+                                word_starts.append(w_s)
+                                cur_w_start = w_s
                         else:
-                            # Fallback: even distribution
-                            group_dur = g_end - g_start
-                            token_dur = group_dur / group_len
-                            for w_idx, current_tok in enumerate(group):
-                                w_start = g_start + (w_idx * token_dur)
-                                w_end = g_start + ((w_idx + 1) * token_dur) if w_idx < group_len - 1 else g_end
+                            token_dur = (g_end - g_start) / group_len
+                            for w_idx in range(group_len):
+                                word_starts.append(g_start + (w_idx * token_dur))
 
-                                rendered_tokens = []
-                                for j, tok in enumerate(group):
-                                    if j == w_idx:
-                                        rendered_tokens.append(f"{{\\c{highlight_color}}}{tok}{{\\c{primary_color}}}")
-                                    else:
-                                        rendered_tokens.append(tok)
+                        for w_idx, current_tok in enumerate(group):
+                            w_start = word_starts[w_idx]
+                            w_end = word_starts[w_idx + 1] if w_idx < group_len - 1 else g_end
+                            if w_end <= w_start:
+                                w_end = w_start + 0.08
 
-                                line_text = _join_tokens(rendered_tokens)
-                                dialogue_lines.append(
-                                    f"Dialogue: 0,{_seconds_to_ass_time(w_start)},{_seconds_to_ass_time(w_end)},{style},,0,0,0,,{line_text}"
-                                )
+                            rendered_tokens = []
+                            for j, tok in enumerate(group):
+                                if j == w_idx:
+                                    rendered_tokens.append(f"{{\\c{highlight_color}}}{tok}{{\\c{primary_color}}}")
+                                else:
+                                    rendered_tokens.append(tok)
+
+                            line_text = _join_tokens(rendered_tokens)
+                            dialogue_lines.append(
+                                f"Dialogue: 0,{_seconds_to_ass_time(w_start)},{_seconds_to_ass_time(w_end)},{style},,0,0,0,,{line_text}"
+                            )
 
                     token_cursor += group_len
                     current_group_start = g_end
+
+                speaker_last_end[style] = current_group_start
 
             output_ass_path = Path(output_ass_path)
             output_ass_path.parent.mkdir(parents=True, exist_ok=True)

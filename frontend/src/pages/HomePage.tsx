@@ -5,8 +5,16 @@ import {
   Spin, 
   Empty,
   message,
-  Segmented
+  Segmented,
+  Button,
+  Popconfirm,
+  Space
 } from 'antd'
+import { 
+  CheckSquareOutlined, 
+  DeleteOutlined, 
+  CloseOutlined 
+} from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import ProjectCard from '../components/ProjectCard'
 import FileUpload from '../components/FileUpload'
@@ -21,8 +29,11 @@ const { Title, Text } = Typography
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate()
-  const { projects, setProjects, deleteProject, loading, setLoading } = useProjectStore()
+  const { projects, setProjects, deleteProject, deleteProjects, loading, setLoading } = useProjectStore()
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [isSelectMode, setIsSelectMode] = useState<boolean>(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isBatchDeleting, setIsBatchDeleting] = useState<boolean>(false)
 
   // Use project pollingHook
   const { startPolling: startProjectPolling, stopPolling: stopProjectPolling } = useProjectPolling({
@@ -52,12 +63,7 @@ const HomePage: React.FC = () => {
   }, [projects.map(p => `${p.id}:${p.status}`).join(',')])
 
   useEffect(() => {
-    // Lazy load items to avoid immediately making many requests on startup
-    const timer = setTimeout(() => {
-      loadProjects()
-    }, 1000) // Delay1Seconds loading
-    
-    return () => clearTimeout(timer)
+    loadProjects()
   }, [])
 
   const loadProjects = async () => {
@@ -82,10 +88,67 @@ const HomePage: React.FC = () => {
     try {
       await projectApi.deleteProject(id)
       deleteProject(id)
+      setSelectedIds(prev => {
+        if (!prev.has(id)) return prev
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
       message.success('Project deleted successfully')
     } catch (error) {
       message.error('Failed to delete project')
       console.error('Delete project error:', error)
+    }
+  }
+
+  const handleToggleSelect = (id: string, select: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (select) {
+        next.add(id)
+      } else {
+        next.delete(id)
+      }
+      if (next.size > 0 && !isSelectMode) {
+        setIsSelectMode(true)
+      }
+      return next
+    })
+  }
+
+  const handleSelectAll = (filteredIds: string[]) => {
+    const allSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIds.has(id))
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (allSelected) {
+        filteredIds.forEach(id => next.delete(id))
+      } else {
+        filteredIds.forEach(id => next.add(id))
+      }
+      return next
+    })
+  }
+
+  const handleExitSelectMode = () => {
+    setIsSelectMode(false)
+    setSelectedIds(new Set())
+  }
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return
+    const idsToDelete = Array.from(selectedIds)
+    setIsBatchDeleting(true)
+    try {
+      const res = await projectApi.batchDeleteProjects(idsToDelete)
+      deleteProjects(idsToDelete)
+      message.success(`Successfully deleted ${res.count ?? idsToDelete.length} projects`)
+      setSelectedIds(new Set())
+      setIsSelectMode(false)
+    } catch (error) {
+      message.error('Failed to delete selected projects')
+      console.error('Batch delete error:', error)
+    } finally {
+      setIsBatchDeleting(false)
     }
   }
 
@@ -103,13 +166,13 @@ const HomePage: React.FC = () => {
   }
 
   const handleProjectCardClick = (project: Project) => {
-    // Projects in importing state cannot click to enter detail page
-    if (project.status === 'pending') {
-      message.warning('Project is currently importing, please wait...')
+    // If project is currently importing or processing, navigate to processing stepper
+    if (project.status === 'processing' || project.status === 'pending') {
+      navigate(`/processing/${project.id}`)
       return
     }
     
-    // Other states can normally enter detail page
+    // Completed or review states navigate to project studio detail page
     navigate(`/project/${project.id}`)
   }
 
@@ -128,6 +191,9 @@ const HomePage: React.FC = () => {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     })
 
+  const filteredIds = filteredProjects.map(p => p.id)
+  const allFilteredSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIds.has(id))
+
   return (
     <Layout style={{
       minHeight: '100vh',
@@ -136,22 +202,13 @@ const HomePage: React.FC = () => {
       <Content style={{ padding: '36px 48px 56px', position: 'relative' }}>
         <div style={{ maxWidth: '1240px', margin: '0 auto', position: 'relative' }}>
           {/* Studio Hero Header */}
-          <div style={{ textAlign: 'center', marginBottom: '32px', marginTop: '4px' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '14px', marginBottom: '10px' }}>
-              <img
-                src="/logo.png"
-                alt="ClipFarm Logo"
-                style={{ width: '56px', height: '56px', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)', objectFit: 'contain' }}
-              />
-              <div style={{ textAlign: 'left' }}>
-                <Title level={2} style={{ margin: 0, letterSpacing: '-0.5px', color: 'var(--ac-ink)', fontSize: '24px' }}>
-                  ClipFarm Studio
-                </Title>
-                <Text style={{ fontSize: '13.5px', color: 'var(--ac-sub)', fontWeight: 500 }}>
-                  AI Short-Form Video Studio · High-impact clips from podcasts, interviews & long videos
-                </Text>
-              </div>
-            </div>
+          <div style={{ textAlign: 'center', marginBottom: '28px', marginTop: '12px' }}>
+            <Title level={2} style={{ margin: '0 0 8px 0', letterSpacing: '-0.5px', color: 'var(--ac-ink)', fontSize: '26px', fontWeight: 700 }}>
+              Turn Long Videos into Viral Short Clips
+            </Title>
+            <Text style={{ fontSize: '14px', color: 'var(--ac-sub)', fontWeight: 400, maxWidth: '640px', display: 'inline-block' }}>
+              Automatic AI scene detection, smart 9:16 vertical re-framing, animated captions, and multiplatform hooks.
+            </Text>
 
             {/* Feature Capability Badges */}
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px', marginTop: '10px' }}>
@@ -188,7 +245,7 @@ const HomePage: React.FC = () => {
           }}>
             <div style={{ width: '100%', maxWidth: '820px' }}>
               <div style={{ fontSize: '13px', color: 'var(--ac-muted)', margin: '0 4px 14px', letterSpacing: '0.2px' }}>
-                Paste YouTube video link to extract the sharpest 60-second highlight moments:
+                Upload local videos or paste YouTube video links to extract the sharpest highlight moments:
               </div>
               <div style={{
                 background: 'var(--ac-card)',
@@ -198,10 +255,12 @@ const HomePage: React.FC = () => {
                 boxShadow: 'var(--ac-shadow)'
               }}>
               {/* File Upload */}
-              <FileUpload onUploadSuccess={async () => {
-                // After processing is complete, refresh project list
+              <FileUpload onUploadSuccess={async (newId?: string) => {
                 await loadProjects()
-                message.success('Project created, processing started...')
+                message.success('Project created! Initializing video processing pipeline...')
+                if (newId) {
+                  navigate(`/processing/${newId}`)
+                }
               }} />
               </div>
             </div>
@@ -221,7 +280,7 @@ const HomePage: React.FC = () => {
               flexWrap: 'wrap',
               gap: '14px',
               marginTop: '44px',
-              marginBottom: '20px'
+              marginBottom: '16px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Title
@@ -243,19 +302,108 @@ const HomePage: React.FC = () => {
                 </span>
               </div>
               
-              {/* Status filter Segmented tabs */}
-              <Segmented
-                value={statusFilter}
-                onChange={(val) => setStatusFilter(String(val))}
-                options={[
-                  { label: `All (${totalCount})`, value: 'all' },
-                  { label: `Completed (${completedCount})`, value: 'completed' },
-                  { label: `Processing (${processingCount})`, value: 'processing' },
-                  { label: `Failed (${failedCount})`, value: 'error' },
-                ]}
-                size="middle"
-              />
+              <Space size="middle" align="center" wrap>
+                {/* Status filter Segmented tabs */}
+                <Segmented
+                  value={statusFilter}
+                  onChange={(val) => setStatusFilter(String(val))}
+                  options={[
+                    { label: `All (${totalCount})`, value: 'all' },
+                    { label: `Completed (${completedCount})`, value: 'completed' },
+                    { label: `Processing (${processingCount})`, value: 'processing' },
+                    { label: `Failed (${failedCount})`, value: 'error' },
+                  ]}
+                  size="middle"
+                />
+
+                <Button
+                  icon={<CheckSquareOutlined />}
+                  type={isSelectMode ? 'primary' : 'default'}
+                  onClick={() => {
+                    if (isSelectMode) {
+                      handleExitSelectMode()
+                    } else {
+                      setIsSelectMode(true)
+                    }
+                  }}
+                  disabled={filteredProjects.length === 0}
+                  style={{
+                    borderRadius: '8px',
+                    borderColor: isSelectMode ? undefined : 'var(--ac-line)',
+                    background: isSelectMode ? undefined : 'var(--ac-card)',
+                    color: isSelectMode ? undefined : 'var(--ac-ink)',
+                    fontWeight: 500
+                  }}
+                >
+                  {isSelectMode ? 'Done' : 'Select'}
+                </Button>
+              </Space>
             </div>
+
+            {/* Batch Action Bar */}
+            {isSelectMode && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 18px',
+                marginBottom: '20px',
+                background: 'var(--ac-card)',
+                border: '1px solid var(--ac-accent)',
+                borderRadius: '12px',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Button
+                    size="small"
+                    onClick={() => handleSelectAll(filteredIds)}
+                    style={{
+                      fontSize: '12px',
+                      borderRadius: '6px',
+                      borderColor: 'var(--ac-line)'
+                    }}
+                  >
+                    {allFilteredSelected ? 'Deselect All' : 'Select All'}
+                  </Button>
+                  <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--ac-ink)' }}>
+                    {selectedIds.size} of {filteredProjects.length} selected
+                  </span>
+                </div>
+
+                <Space size="small">
+                  <Popconfirm
+                    title={`Delete ${selectedIds.size} project${selectedIds.size > 1 ? 's' : ''}?`}
+                    description="All associated videos and clips will be permanently removed. This cannot be undone."
+                    onConfirm={handleBatchDelete}
+                    okText="Delete All"
+                    cancelText="Cancel"
+                    okButtonProps={{ danger: true, loading: isBatchDeleting }}
+                    disabled={selectedIds.size === 0}
+                  >
+                    <Button
+                      danger
+                      type="primary"
+                      icon={<DeleteOutlined />}
+                      disabled={selectedIds.size === 0}
+                      loading={isBatchDeleting}
+                      style={{ borderRadius: '8px', fontWeight: 500 }}
+                    >
+                      Delete Selected ({selectedIds.size})
+                    </Button>
+                  </Popconfirm>
+
+                  <Button
+                    onClick={handleExitSelectMode}
+                    icon={<CloseOutlined />}
+                    style={{ borderRadius: '8px' }}
+                  >
+                    Cancel
+                  </Button>
+                </Space>
+              </div>
+            )}
 
             {/* Project list content */}
              <div>
@@ -305,6 +453,9 @@ const HomePage: React.FC = () => {
                          onDelete={handleDeleteProject}
                          onRetry={() => handleRetryProject()}
                          onClick={() => handleProjectCardClick(project)}
+                         selectable={isSelectMode}
+                         selected={selectedIds.has(project.id)}
+                         onSelect={handleToggleSelect}
                        />
                      </div>
                    ))}

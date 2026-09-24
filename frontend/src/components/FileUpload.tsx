@@ -1,8 +1,20 @@
 import React, { useState, useEffect } from 'react'
-import { Button, message, Space, Typography, Input, Progress, Slider } from 'antd'
-import { InboxOutlined, VideoCameraOutlined, FileTextOutlined, SubnodeOutlined } from '@ant-design/icons'
+import { Button, message, Space, Typography, Input, Progress, Slider, Segmented } from 'antd'
+import { 
+  InboxOutlined, 
+  VideoCameraOutlined, 
+  FileTextOutlined, 
+  SubnodeOutlined,
+  YoutubeOutlined,
+  LinkOutlined,
+  CloudDownloadOutlined,
+  CheckCircleFilled,
+  ClockCircleOutlined,
+  UserOutlined,
+  SearchOutlined
+} from '@ant-design/icons'
 import { useDropzone } from 'react-dropzone'
-import { projectApi, watermarkApi, VideoCategory, WatermarkPreset } from '../services/api'
+import { projectApi, watermarkApi, youtubeApi, VideoCategory, WatermarkPreset, BilibiliVideoInfo } from '../services/api'
 import { useProjectStore } from '../store/useProjectStore'
 import { validateApiConfigBeforeProjectCreation } from '../utils/apiConfigCheck'
 
@@ -13,6 +25,11 @@ interface FileUploadProps {
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
+  const [importSource, setImportSource] = useState<'file' | 'url'>('file')
+  const [videoUrl, setVideoUrl] = useState('')
+  const [isParsingUrl, setIsParsingUrl] = useState(false)
+  const [parsedInfo, setParsedInfo] = useState<BilibiliVideoInfo | null>(null)
+  const [submittingUrl, setSubmittingUrl] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [projectName, setProjectName] = useState('')
@@ -115,18 +132,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
     setUploadProgress(0)
     
     try {
-      // Realistic upload progress simulation
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 85) {
-            clearInterval(progressInterval)
-            return prev
-          }
-          const increment = Math.max(1, Math.floor((90 - prev) / 10))
-          return prev + increment
-        })
-      }, 300)
-
       const newProject = await projectApi.uploadFiles({
         video_file: files.video,
         srt_file: files.srt,
@@ -140,9 +145,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         watermark_text: watermarkText.trim() || undefined,
         watermark_text_opacity: watermarkText.trim() ? watermarkTextOpacity / 100 : undefined,
         watermark_text_position: watermarkTextPosition,
+      }, (percent) => {
+        setUploadProgress(percent)
       })
       
-      clearInterval(progressInterval)
       setUploadProgress(100)
       
       addProject(newProject)
@@ -219,6 +225,107 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
     })
   }
 
+  const formatDuration = (seconds?: number) => {
+    if (!seconds || seconds <= 0) return '0:00'
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    const s = Math.floor(seconds % 60)
+    if (h > 0) {
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    }
+    return `${m}:${s.toString().padStart(2, '0')}`
+  }
+
+  const handleParseUrl = async (urlToParse?: string) => {
+    const targetUrl = (urlToParse || videoUrl).trim()
+    if (!targetUrl) {
+      message.warning('Please enter a YouTube URL first')
+      return null
+    }
+    if (!targetUrl.includes('youtube.com') && !targetUrl.includes('youtu.be')) {
+      message.warning('Please enter a valid YouTube video link (youtube.com or youtu.be)')
+      return null
+    }
+
+    setIsParsingUrl(true)
+    try {
+      const res = await youtubeApi.parseVideoInfo(targetUrl)
+      if (res && res.video_info) {
+        setParsedInfo(res.video_info)
+        if (!projectName.trim() || projectName === 'YouTube Video') {
+          setProjectName(res.video_info.title)
+        }
+        message.success('Video information retrieved successfully!')
+        return res.video_info
+      }
+    } catch (error: any) {
+      console.error('Failed to parse URL:', error)
+      const msg = error.response?.data?.detail || error.userMessage || error.message || 'Failed to parse video info'
+      message.error(`Unable to parse link: ${msg}`)
+    } finally {
+      setIsParsingUrl(false)
+    }
+    return null
+  }
+
+  const handleUrlDownload = async () => {
+    const trimmedUrl = videoUrl.trim()
+    if (!trimmedUrl) {
+      message.error('Please enter a YouTube video URL')
+      return
+    }
+
+    let effectiveProjectName = projectName.trim()
+    if (!effectiveProjectName) {
+      const info = await handleParseUrl(trimmedUrl)
+      if (info?.title) {
+        effectiveProjectName = info.title
+        setProjectName(info.title)
+      } else {
+        effectiveProjectName = `YouTube_${Date.now()}`
+        setProjectName(effectiveProjectName)
+      }
+    }
+
+    const hasValidApiConfig = await validateApiConfigBeforeProjectCreation()
+    if (!hasValidApiConfig) {
+      return
+    }
+
+    setSubmittingUrl(true)
+    try {
+      const res = await youtubeApi.createDownloadTask({
+        url: trimmedUrl,
+        project_name: effectiveProjectName,
+        video_category: selectedCategory,
+        caption_style: selectedCaptionStyle,
+        duration_mode: selectedDurationMode,
+        aspect_ratio: selectedAspectRatio,
+        show_hook_banner: showHookBanner,
+        watermark_preset_id: selectedWatermarkPreset,
+      })
+
+      const projId = (res as any).project_id || res.id
+      message.success('YouTube download initiated! Initializing AI clipping pipeline...')
+      setVideoUrl('')
+      setParsedInfo(null)
+      setProjectName('')
+      if (onUploadSuccess && projId) {
+        onUploadSuccess(projId)
+      }
+    } catch (error: any) {
+      console.error('Failed to create YouTube task:', error)
+      const msg = error.response?.data?.detail || error.userMessage || error.message || 'Failed to start download task'
+      message.error(msg)
+    } finally {
+      setSubmittingUrl(false)
+    }
+  }
+
+  const hasMediaSelected = importSource === 'file'
+    ? Boolean(files.video)
+    : Boolean(parsedInfo || (videoUrl.trim().length > 10 && (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be'))))
+
   return (
     <div style={{
       borderRadius: '16px',
@@ -242,58 +349,202 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
       
 
       
-      <div 
-        {...getRootProps()} 
-        className={`upload-area ${isDragActive ? 'dragover' : ''}`}
-        style={{
-          padding: '24px 16px',
-          textAlign: 'center',
-          marginBottom: '16px',
-          background: isDragActive ? 'rgba(79, 172, 254, 0.15)' : 'var(--ac-line-2)',
-          border: `2px dashed ${isDragActive ? '#4facfe' : 'rgba(79, 172, 254, 0.3)'}`,
-          borderRadius: '16px',
-          cursor: 'pointer',
-          transition: 'all 0.3s ease',
-          position: 'relative',
-          backdropFilter: 'blur(10px)'
-        }}
-      >
-        <input {...getInputProps()} />
-        <div style={{
-          width: '48px',
-          height: '48px',
-          margin: '0 auto 12px',
-          background: isDragActive ? 'rgba(79, 172, 254, 0.3)' : 'rgba(79, 172, 254, 0.1)',
-          borderRadius: '50%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'all 0.3s ease',
-          border: '1px solid rgba(79, 172, 254, 0.2)'
-        }}>
-          <InboxOutlined style={{ 
-            fontSize: '20px', 
-            color: isDragActive ? '#4facfe' : '#4facfe'
-          }} />
-        </div>
-        <div>
-          <Text strong style={{ 
-            color: '#ffffff',
-            fontSize: '16px',
-            display: 'block',
-            marginBottom: '8px',
-            fontWeight: 600
-          }}>
-            {isDragActive ? 'Drop files here to import' : 'Click or drag video files to this area'}
-          </Text>
-          <Text style={{ color: 'var(--ac-sub)', fontSize: '14px', lineHeight: '1.5' }}>
-            Supports MP4, AVI, MOV, MKV, WebM. <Text style={{ color: '#52c41a', fontWeight: 600 }}>Optional subtitles (.srt) or auto-generate with AI</Text>
-          </Text>
-        </div>
+      {/* Source Selection Tabs */}
+      <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
+        <Segmented
+          value={importSource}
+          onChange={(val) => setImportSource(val as 'file' | 'url')}
+          size="middle"
+          options={[
+            {
+              value: 'file',
+              label: (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 18px', fontWeight: 600 }}>
+                  <InboxOutlined style={{ fontSize: '15px' }} />
+                  <span>Local Video File</span>
+                </div>
+              ),
+            },
+            {
+              value: 'url',
+              label: (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 18px', fontWeight: 600 }}>
+                  <YoutubeOutlined style={{ fontSize: '15px', color: '#ff4d4f' }} />
+                  <span>YouTube / Web URL</span>
+                </div>
+              ),
+            },
+          ]}
+        />
       </div>
 
-      {/* Project name input - Only display after file selected */}
-      {files.video && (
+      {importSource === 'file' ? (
+        <div 
+          {...getRootProps()} 
+          className={`upload-area ${isDragActive ? 'dragover' : ''}`}
+          style={{
+            padding: '24px 16px',
+            textAlign: 'center',
+            marginBottom: '16px',
+            background: isDragActive ? 'rgba(79, 172, 254, 0.15)' : 'var(--ac-line-2)',
+            border: `2px dashed ${isDragActive ? '#4facfe' : 'rgba(79, 172, 254, 0.3)'}`,
+            borderRadius: '16px',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            backdropFilter: 'blur(10px)'
+          }}
+        >
+          <input {...getInputProps()} />
+          <div style={{
+            width: '48px',
+            height: '48px',
+            margin: '0 auto 12px',
+            background: isDragActive ? 'rgba(79, 172, 254, 0.3)' : 'rgba(79, 172, 254, 0.1)',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.3s ease',
+            border: '1px solid rgba(79, 172, 254, 0.2)'
+          }}>
+            <InboxOutlined style={{ 
+              fontSize: '20px', 
+              color: isDragActive ? '#4facfe' : '#4facfe'
+            }} />
+          </div>
+          <div>
+            <Text strong style={{ 
+              color: '#ffffff',
+              fontSize: '16px',
+              display: 'block',
+              marginBottom: '8px',
+              fontWeight: 600
+            }}>
+              {isDragActive ? 'Drop files here to import' : 'Click or drag video files to this area'}
+            </Text>
+            <Text style={{ color: 'var(--ac-sub)', fontSize: '14px', lineHeight: '1.5' }}>
+              Supports MP4, AVI, MOV, MKV, WebM. <Text style={{ color: '#52c41a', fontWeight: 600 }}>Optional subtitles (.srt) or auto-generate with AI</Text>
+            </Text>
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          padding: '20px',
+          background: 'var(--ac-line-2)',
+          borderRadius: '16px',
+          border: '1px solid rgba(79, 172, 254, 0.25)',
+          marginBottom: '16px',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <YoutubeOutlined style={{ color: '#ff4d4f', fontSize: '20px' }} />
+            <Text strong style={{ color: '#ffffff', fontSize: '14px' }}>
+              Enter YouTube Video URL
+            </Text>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <Input
+              size="large"
+              value={videoUrl}
+              onChange={(e) => {
+                setVideoUrl(e.target.value)
+                if (parsedInfo && e.target.value !== parsedInfo.url) {
+                  setParsedInfo(null)
+                }
+              }}
+              onPressEnter={() => handleParseUrl()}
+              placeholder="Paste YouTube link (e.g. https://www.youtube.com/watch?v=... or https://youtu.be/...)"
+              prefix={<LinkOutlined style={{ color: 'var(--ac-sub)' }} />}
+              style={{
+                flex: '1 1 300px',
+                borderRadius: '10px',
+                background: 'rgba(0, 0, 0, 0.25)',
+                border: '1px solid rgba(79, 172, 254, 0.3)',
+                color: '#ffffff'
+              }}
+            />
+            <Button
+              type="primary"
+              size="large"
+              loading={isParsingUrl}
+              onClick={() => handleParseUrl()}
+              icon={<SearchOutlined />}
+              style={{
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #1890ff 0%, #36cfc9 100%)',
+                fontWeight: 600,
+                padding: '0 20px'
+              }}
+            >
+              {isParsingUrl ? 'Parsing...' : 'Fetch Info'}
+            </Button>
+          </div>
+
+          {/* Parsed Video Preview Card */}
+          {parsedInfo && (
+            <div style={{
+              marginTop: '14px',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              background: 'rgba(79, 172, 254, 0.08)',
+              border: '1px solid rgba(79, 172, 254, 0.3)',
+              display: 'flex',
+              gap: '14px',
+              alignItems: 'center',
+              flexWrap: 'wrap'
+            }}>
+              {parsedInfo.thumbnail && (
+                <div style={{ position: 'relative', width: '110px', height: '62px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 }}>
+                  <img
+                    src={parsedInfo.thumbnail}
+                    alt={parsedInfo.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                  {parsedInfo.duration > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      bottom: '3px',
+                      right: '3px',
+                      background: 'rgba(0,0,0,0.85)',
+                      color: '#fff',
+                      padding: '1px 4px',
+                      borderRadius: '3px',
+                      fontSize: '10px',
+                      fontWeight: 600
+                    }}>
+                      {formatDuration(parsedInfo.duration)}
+                    </span>
+                  )}
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: '180px' }}>
+                <Text strong style={{ color: '#ffffff', fontSize: '13.5px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  {parsedInfo.title}
+                </Text>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '5px', fontSize: '12px', color: 'var(--ac-sub)', flexWrap: 'wrap' }}>
+                  {parsedInfo.uploader && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <UserOutlined /> {parsedInfo.uploader}
+                    </span>
+                  )}
+                  {parsedInfo.duration > 0 && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <ClockCircleOutlined /> {formatDuration(parsedInfo.duration)}
+                    </span>
+                  )}
+                  <span style={{ color: '#52c41a', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <CheckCircleFilled /> Ready to Auto-Clip
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Project name input - Display when media is selected */}
+      {hasMediaSelected && (
         <div style={{ marginBottom: '16px' }}>
           <Text strong style={{ color: '#ffffff', fontSize: '14px', marginBottom: '8px', display: 'block' }}>
             Project Name
@@ -314,8 +565,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         </div>
       )}
 
-      {/* Video category selection - Only display after file selected */}
-      {files.video && (
+      {/* Video category selection - Display when media is selected */}
+      {hasMediaSelected && (
         <div style={{ marginBottom: '16px' }}>
           <Text strong style={{ color: '#ffffff', fontSize: '14px', marginBottom: '8px', display: 'block' }}>
             Video Category
@@ -375,8 +626,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         </div>
       )}
 
-      {/* Dynamic subtitle style selection - Only display after file selected */}
-      {files.video && (
+      {/* Dynamic subtitle style selection - Display when media is selected */}
+      {hasMediaSelected && (
         <div style={{ marginBottom: '16px' }}>
           <Text strong style={{ color: '#ffffff', fontSize: '14px', marginBottom: '8px', display: 'block' }}>
             On-Screen Caption Style (Burned Subtitles)
@@ -429,8 +680,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         </div>
       )}
 
-      {/* Edit duration preset & top banner hook - Only display after file selected */}
-      {files.video && (
+      {/* Edit duration preset & top banner hook - Display when media is selected */}
+      {hasMediaSelected && (
         <div style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <Text strong style={{ color: '#ffffff', fontSize: '14px' }}>
@@ -501,8 +752,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         </div>
       )}
 
-      {/* Video style & aspect ratio selection - Only display after file selected */}
-      {files.video && (
+      {/* Video style & aspect ratio selection - Display when media is selected */}
+      {hasMediaSelected && (
         <div style={{ marginBottom: '16px' }}>
           <Text strong style={{ color: '#ffffff', fontSize: '14px', marginBottom: '8px', display: 'block' }}>
             Video Format & Aspect Ratio
@@ -557,8 +808,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         </div>
       )}
 
-      {/* Watermark & activity brand preset - Only display after file selected */}
-      {files.video && (
+      {/* Watermark & activity brand preset - Display when media is selected */}
+      {hasMediaSelected && (
         <div style={{ marginBottom: '16px' }}>
           <Text strong style={{ color: '#ffffff', fontSize: '14px', marginBottom: '8px', display: 'block' }}>
             Brand Watermark / Logo Preset
@@ -640,8 +891,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         </div>
       )}
 
-      {/* Social Handle / Text Watermark */}
-      {files.video && (
+      {/* Social Handle / Text Watermark - Display when media is selected */}
+      {hasMediaSelected && (
         <div style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <Text strong style={{ color: '#ffffff', fontSize: '14px' }}>
@@ -753,8 +1004,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         </div>
       )}
 
-      {/* File list */}
-      {Object.keys(files).length > 0 && (
+      {/* File list (Local upload mode only) */}
+      {importSource === 'file' && Object.keys(files).length > 0 && (
         <div style={{ marginBottom: '16px' }}>
           <Text strong style={{ color: '#ffffff', fontSize: '14px', marginBottom: '12px', display: 'block' }}>
             Selected Files
@@ -913,31 +1164,56 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         </div>
       )}
 
-      {/* Upload button - Only display after file selected */}
-      {files.video && (
-        <div style={{ textAlign: 'center', marginTop: '8px' }}>
-          <Button 
-            type="primary" 
-            size="large"
-            loading={uploading}
-            disabled={!files.video || !projectName.trim()}
-            onClick={handleUpload}
-            style={{
-              height: '48px',
-              padding: '0 32px',
-              borderRadius: '24px',
-              background: uploading ? '#666666' : 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-              border: 'none',
-              fontSize: '16px',
-              fontWeight: 600,
-              boxShadow: uploading ? 'none' : '0 4px 20px rgba(79, 172, 254, 0.4)',
-              transition: 'all 0.3s ease'
-            }}
-          >
-            {uploading ? 'Uploading...' : 'Start Processing'}
-          </Button>
+      {/* Action / Submit Button */}
+      {hasMediaSelected && (
+        <div style={{ textAlign: 'center', marginTop: '16px' }}>
+          {importSource === 'file' ? (
+            <Button 
+              type="primary" 
+              size="large"
+              loading={uploading}
+              disabled={!files.video || !projectName.trim()}
+              onClick={handleUpload}
+              style={{
+                height: '48px',
+                padding: '0 36px',
+                borderRadius: '24px',
+                background: uploading ? '#666666' : 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                border: 'none',
+                fontSize: '16px',
+                fontWeight: 600,
+                boxShadow: uploading ? 'none' : '0 4px 20px rgba(79, 172, 254, 0.4)',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              {uploading ? 'Uploading...' : 'Start Processing'}
+            </Button>
+          ) : (
+            <Button 
+              type="primary" 
+              size="large"
+              loading={submittingUrl || isParsingUrl}
+              disabled={!videoUrl.trim() || !projectName.trim()}
+              onClick={handleUrlDownload}
+              style={{
+                height: '48px',
+                padding: '0 36px',
+                borderRadius: '24px',
+                background: (submittingUrl || isParsingUrl) ? '#666666' : 'linear-gradient(135deg, #ff4d4f 0%, #f5222d 50%, #fa8c16 100%)',
+                border: 'none',
+                fontSize: '16px',
+                fontWeight: 600,
+                boxShadow: (submittingUrl || isParsingUrl) ? 'none' : '0 4px 20px rgba(255, 77, 79, 0.4)',
+                transition: 'all 0.3s ease'
+              }}
+              icon={<CloudDownloadOutlined />}
+            >
+              {submittingUrl ? 'Starting Download & AI Pipeline...' : 'Import & Auto-Clip'}
+            </Button>
+          )}
         </div>
       )}
+
     </div>
   )
 }

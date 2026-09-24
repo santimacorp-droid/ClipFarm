@@ -26,19 +26,72 @@ logger = logging.getLogger(__name__)
 
 def detect_hw_accel() -> str:
     """
-    Probe /dev/dri/renderD128 for VAAPI support on Linux.
-    Returns: "vaapi" | "none"
+    Probe hardware acceleration encoders across Linux, macOS, and Windows.
+    Probes in priority:
+    1. VideoToolbox (Apple Silicon / macOS)
+    2. NVENC (NVIDIA GPUs on Linux/Windows)
+    3. QSV (Intel Quick Sync on Linux/Windows)
+    4. VAAPI (AMD/Intel on Linux)
+    Returns: "videotoolbox" | "nvenc" | "qsv" | "vaapi" | "none"
     """
     use_hw = os.getenv("USE_HW_ACCEL", "auto").lower().strip()
-    if use_hw == "none":
+    if use_hw in ["none", "cpu"]:
         return "none"
-    if use_hw == "vaapi":
-        return "vaapi"
+    if use_hw in ["videotoolbox", "nvenc", "qsv", "vaapi"]:
+        return use_hw
 
+    ffmpeg_bin = get_ffmpeg_path()
+
+    # 1. Probe Apple Silicon VideoToolbox (macOS)
+    if sys.platform == "darwin" and use_hw in ["auto", "videotoolbox"]:
+        try:
+            cmd = [
+                ffmpeg_bin, "-nostdin", "-y",
+                "-f", "lavfi", "-i", "color=c=black:s=256x256:d=0.1",
+                "-c:v", "h264_videotoolbox",
+                "-f", "null", "-"
+            ]
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=4)
+            if r.returncode == 0:
+                return "videotoolbox"
+        except Exception:
+            pass
+
+    # 2. Probe NVIDIA NVENC (Linux / Windows)
+    if use_hw in ["auto", "nvenc"]:
+        try:
+            cmd = [
+                ffmpeg_bin, "-nostdin", "-y",
+                "-f", "lavfi", "-i", "color=c=black:s=256x256:d=0.1",
+                "-c:v", "h264_nvenc",
+                "-f", "null", "-"
+            ]
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=4)
+            if r.returncode == 0:
+                return "nvenc"
+        except Exception:
+            pass
+
+    # 3. Probe Intel Quick Sync (QSV)
+    if use_hw in ["auto", "qsv"]:
+        try:
+            cmd = [
+                ffmpeg_bin, "-nostdin", "-y",
+                "-f", "lavfi", "-i", "color=c=black:s=256x256:d=0.1",
+                "-c:v", "h264_qsv",
+                "-f", "null", "-"
+            ]
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=4)
+            if r.returncode == 0:
+                return "qsv"
+        except Exception:
+            pass
+
+    # 4. Probe Linux VAAPI
     device = os.getenv("HW_ACCEL_DEVICE", "/dev/dri/renderD128")
-    if Path(device).exists() and sys.platform.startswith("linux"):
+    if Path(device).exists() and sys.platform.startswith("linux") and use_hw in ["auto", "vaapi"]:
         cmd = [
-            get_ffmpeg_path(), "-nostdin", "-y",
+            ffmpeg_bin, "-nostdin", "-y",
             "-init_hw_device", f"vaapi=va:{device}",
             "-filter_hw_device", "va",
             "-f", "lavfi", "-i", "color=c=black:s=256x256:d=0.1",
@@ -47,11 +100,12 @@ def detect_hw_accel() -> str:
             "-f", "null", "-"
         ]
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=4)
             if r.returncode == 0:
                 return "vaapi"
         except Exception:
             pass
+
     return "none"
 
 
@@ -72,10 +126,8 @@ def build_ffmpeg_cut_command(
     """
     Build FFmpeg command for cutting video.
     Supports (start_sec, duration_sec) or (start_time, end_time).
-    When use_hw_accel=True and ACTIVE_HW_ACCEL == "vaapi":
-        uses h264_vaapi with -qp 23
-    Otherwise:
-        uses libx264 with -preset veryfast -crf 22
+    Hardware acceleration supports nvenc, videotoolbox, qsv, and vaapi.
+    Otherwise uses libx264 with -preset veryfast -crf 22.
     """
     if start_sec is None and start_time is not None:
         start_sec = start_time
@@ -89,32 +141,68 @@ def build_ffmpeg_cut_command(
     start_str = f"{start_sec:.3f}"
     dur_str = f"{duration_sec:.3f}"
 
-    if use_hw_accel and (ACTIVE_HW_ACCEL == "vaapi" or os.getenv("USE_HW_ACCEL") == "vaapi") and Path(hw_device).exists():
-        return [
-            ffmpeg_bin, "-nostdin", "-y",
-            "-init_hw_device", f"vaapi=va:{hw_device}",
-            "-filter_hw_device", "va",
-            "-ss", start_str,
-            "-i", str(input_path),
-            "-t", dur_str,
-            "-vf", "format=nv12,hwupload",
-            "-c:v", "h264_vaapi",
-            "-qp", "23",
-            "-c:a", "aac", "-b:a", "128k",
-            str(output_path)
-        ]
-    else:
-        return [
-            ffmpeg_bin, "-nostdin", "-y",
-            "-ss", start_str,
-            "-i", str(input_path),
-            "-t", dur_str,
-            "-c:v", "libx264",
-            "-preset", "veryfast",
-            "-crf", "22",
-            "-c:a", "aac", "-b:a", "128k",
-            str(output_path)
-        ]
+    if use_hw_accel:
+        if ACTIVE_HW_ACCEL == "nvenc":
+            return [
+                ffmpeg_bin, "-nostdin", "-y",
+                "-ss", start_str,
+                "-i", str(input_path),
+                "-t", dur_str,
+                "-c:v", "h264_nvenc",
+                "-preset", "p4",
+                "-cq", "23",
+                "-c:a", "aac", "-b:a", "128k",
+                str(output_path)
+            ]
+        elif ACTIVE_HW_ACCEL == "videotoolbox":
+            return [
+                ffmpeg_bin, "-nostdin", "-y",
+                "-ss", start_str,
+                "-i", str(input_path),
+                "-t", dur_str,
+                "-c:v", "h264_videotoolbox",
+                "-q:v", "65",
+                "-c:a", "aac", "-b:a", "128k",
+                str(output_path)
+            ]
+        elif ACTIVE_HW_ACCEL == "qsv":
+            return [
+                ffmpeg_bin, "-nostdin", "-y",
+                "-ss", start_str,
+                "-i", str(input_path),
+                "-t", dur_str,
+                "-c:v", "h264_qsv",
+                "-global_quality", "23",
+                "-c:a", "aac", "-b:a", "128k",
+                str(output_path)
+            ]
+        elif (ACTIVE_HW_ACCEL == "vaapi" or os.getenv("USE_HW_ACCEL") == "vaapi") and Path(hw_device).exists():
+            return [
+                ffmpeg_bin, "-nostdin", "-y",
+                "-init_hw_device", f"vaapi=va:{hw_device}",
+                "-filter_hw_device", "va",
+                "-ss", start_str,
+                "-i", str(input_path),
+                "-t", dur_str,
+                "-vf", "format=nv12,hwupload",
+                "-c:v", "h264_vaapi",
+                "-qp", "23",
+                "-c:a", "aac", "-b:a", "128k",
+                str(output_path)
+            ]
+
+    # CPU fallback default
+    return [
+        ffmpeg_bin, "-nostdin", "-y",
+        "-ss", start_str,
+        "-i", str(input_path),
+        "-t", dur_str,
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-crf", "22",
+        "-c:a", "aac", "-b:a", "128k",
+        str(output_path)
+    ]
 
 class VideoProcessor:
     """Video processing utility class"""
@@ -152,21 +240,52 @@ class VideoProcessor:
     @staticmethod
     def get_hardware_encoder_config() -> Dict[str, Any]:
         """
-        Detects AMD Ryzen 5 5600G iGPU VAAPI device (/dev/dri/renderD128)
-        and configures hardware acceleration with quality preservation (-qp 23).
+        Detects active hardware acceleration (NVENC, VideoToolbox, QSV, or VAAPI)
+        and configures hardware encoding parameters with fallback to libx264.
         """
         device = os.getenv("HW_ACCEL_DEVICE", "/dev/dri/renderD128")
-        if (ACTIVE_HW_ACCEL == "vaapi" or os.getenv("USE_HW_ACCEL") == "vaapi") and Path(device).exists():
+        if ACTIVE_HW_ACCEL == "nvenc":
+            return {
+                "hw_init": [],
+                "upload_filter": "",
+                "codec_args": ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "23", "-pix_fmt", "yuv420p"],
+                "encoder_type": "nvenc",
+                "use_hw": True,
+                "use_vaapi": False
+            }
+        elif ACTIVE_HW_ACCEL == "videotoolbox":
+            return {
+                "hw_init": [],
+                "upload_filter": "",
+                "codec_args": ["-c:v", "h264_videotoolbox", "-q:v", "65", "-pix_fmt", "yuv420p"],
+                "encoder_type": "videotoolbox",
+                "use_hw": True,
+                "use_vaapi": False
+            }
+        elif ACTIVE_HW_ACCEL == "qsv":
+            return {
+                "hw_init": [],
+                "upload_filter": "",
+                "codec_args": ["-c:v", "h264_qsv", "-global_quality", "23", "-pix_fmt", "nv12"],
+                "encoder_type": "qsv",
+                "use_hw": True,
+                "use_vaapi": False
+            }
+        elif (ACTIVE_HW_ACCEL == "vaapi" or os.getenv("USE_HW_ACCEL") == "vaapi") and Path(device).exists():
             return {
                 "hw_init": ["-init_hw_device", f"vaapi=va:{device}", "-filter_hw_device", "va"],
                 "upload_filter": ",format=nv12,hwupload",
                 "codec_args": ["-c:v", "h264_vaapi", "-qp", "23"],
+                "encoder_type": "vaapi",
+                "use_hw": True,
                 "use_vaapi": True
             }
         return {
             "hw_init": [],
             "upload_filter": "",
             "codec_args": ["-c:v", "libx264", "-preset", "veryfast", "-crf", "22"],
+            "encoder_type": "cpu",
+            "use_hw": False,
             "use_vaapi": False
         }
     
@@ -257,7 +376,8 @@ class VideoProcessor:
                     bgm_volume: float = 0.18,
                     sfx_enabled: bool = False,
                     custom_bgm_path: Optional[str] = None,
-                    max_clip_duration: float = 600.0) -> bool:
+                    max_clip_duration: float = 600.0,
+                    tracker: Optional[Any] = None) -> bool:
         """
         Extract clip from video with auto 9:16 vertical formatting (Reels/Shorts/TikTok), dynamic camera zoom,
         BGM auto-ducking, SFX hooks, ASS subtitle burn-in, color emoji hook banner, and logo/handle overlays
@@ -499,62 +619,67 @@ class VideoProcessor:
                     logger.info(f"Fast stream copy export succeeded: {output_path.name} (near-zero CPU, duration: {duration:.2f}s)")
                     return True
 
-            # Execute with Hardware Acceleration (AMD Ryzen iGPU VAAPI)
+            # Execute with Hardware Acceleration or CPU
             hw_cfg = VideoProcessor.get_hardware_encoder_config()
-            encoded_successfully = False
+            enc_name = hw_cfg.get("encoder_type", "cpu").upper()
 
             if filter_steps or audio_filter_fragment:
-                # Primary Attempt: VAAPI iGPU Hardware Encoding
-                vaapi_steps = list(filter_steps)
-                if hw_cfg["use_vaapi"]:
-                    # CRITICAL FIX: Upload software frame to GPU VAAPI memory surface
-                    vaapi_steps.append(f"[{current_v}]format=nv12,hwupload[outv]")
+                # Primary Attempt: Hardware or configured encoder
+                hw_steps = list(filter_steps)
+                if hw_cfg.get("use_vaapi"):
+                    # VAAPI requires uploading software frame to GPU VAAPI memory surface
+                    hw_steps.append(f"[{current_v}]format=nv12,hwupload[outv]")
                 else:
-                    vaapi_steps.append(f"[{current_v}]null[outv]")
+                    hw_steps.append(f"[{current_v}]null[outv]")
 
                 if audio_filter_fragment:
-                    vaapi_steps.append(audio_filter_fragment)
+                    hw_steps.append(audio_filter_fragment)
                 elif audio_fade_filter:
-                    vaapi_steps.append(audio_fade_filter)
+                    hw_steps.append(audio_fade_filter)
 
-                vaapi_filter_graph = ";".join(vaapi_steps)
-                cmd_vaapi = [ffmpeg_bin, '-nostdin', '-y']
-                if hw_cfg["hw_init"]:
-                    cmd_vaapi.extend(hw_cfg["hw_init"])
-                cmd_vaapi.extend([
+                hw_filter_graph = ";".join(hw_steps)
+                cmd_hw = [ffmpeg_bin, '-nostdin', '-y']
+                if hw_cfg.get("hw_init"):
+                    cmd_hw.extend(hw_cfg["hw_init"])
+                cmd_hw.extend([
                     '-ss', ffmpeg_start_time,
                     '-i', str(input_video)
                 ])
                 if has_watermark:
-                    cmd_vaapi.extend(['-i', str(watermark_path)])
+                    cmd_hw.extend(['-i', str(watermark_path)])
                 if has_text_watermark:
-                    cmd_vaapi.extend(['-i', str(text_watermark_path)])
+                    cmd_hw.extend(['-i', str(text_watermark_path)])
                 if has_hook:
-                    cmd_vaapi.extend(['-loop', '1', '-i', str(hook_banner_path)])
+                    cmd_hw.extend(['-loop', '1', '-i', str(hook_banner_path)])
                 if extra_audio_inputs:
-                    cmd_vaapi.extend(extra_audio_inputs)
+                    cmd_hw.extend(extra_audio_inputs)
 
-                cmd_vaapi.extend([
+                cmd_hw.extend([
                     '-t', str(duration),
-                    '-filter_complex', vaapi_filter_graph,
+                    '-filter_complex', hw_filter_graph,
                     '-map', '[outv]',
                     '-map', audio_out_node if audio_out_node else '0:a?'
                 ])
-                cmd_vaapi.extend(hw_cfg["codec_args"])
-                cmd_vaapi.extend([
+                cmd_hw.extend(hw_cfg["codec_args"])
+                cmd_hw.extend([
                     '-c:a', 'aac',
                     '-b:a', '128k',
                     '-avoid_negative_ts', 'make_zero',
                     str(output_path)
                 ])
 
-                logger.info(f"Executing FFmpeg short-form processing (VAAPI={hw_cfg['use_vaapi']}, 9:16={is_916}, Zoom={dynamic_zoom}, BGM={bgm_track}, SFX={sfx_enabled}): {output_path.name}")
-                res = subprocess.run(cmd_vaapi, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+                logger.info(f"Executing FFmpeg short-form processing (Encoder={enc_name}, 9:16={is_916}, Zoom={dynamic_zoom}, BGM={bgm_track}, SFX={sfx_enabled}): {output_path.name}")
+                if tracker:
+                    tracker.log(f"Rendering clip ({duration:.1f}s) via {enc_name}: {output_path.name}")
+                res = subprocess.run(cmd_hw, capture_output=True, text=True, encoding='utf-8', errors='ignore')
                 if res.returncode == 0 and output_path.exists() and output_path.stat().st_size > 1024:
-                    logger.info(f"Successfully exported 9:16 clip video (iGPU/VAAPI): {output_path.name} (duration: {duration:.2f}s)")
+                    logger.info(f"Successfully exported 9:16 clip video ({enc_name}): {output_path.name} (duration: {duration:.2f}s)")
                     return True
                 else:
-                    logger.warning(f"VAAPI filter processing failed: {res.stderr[:300] if res.stderr else 'Unknown error'}, attempting robust CPU re-encode fallback WITH filters...")
+                    err_hint = res.stderr[-200:].strip() if res.stderr else "Unknown error"
+                    logger.warning(f"{enc_name} filter processing failed ({err_hint}), attempting robust CPU re-encode fallback WITH filters...")
+                    if tracker and hw_cfg.get("use_hw"):
+                        tracker.log(f"HW encoder {enc_name} failed; falling back to CPU (libx264)...", "WARN")
 
                 # Secondary Fallback: CPU Re-encode WITH ALL FILTERS (Never strip subtitles/watermark!)
                 cpu_steps = list(filter_steps)
@@ -598,6 +723,8 @@ class VideoProcessor:
                     return True
                 else:
                     logger.warning(f"CPU filter processing failed: {res_cpu.stderr[:300] if res_cpu.stderr else 'Unknown error'}")
+                    if tracker:
+                        tracker.log(f"CPU filter processing failed: {res_cpu.stderr[-150:] if res_cpu.stderr else 'Unknown error'}", "WARN")
 
             # Last resort fallback: direct stream copy if all filtered methods fail
             cmd_copy = [
@@ -1248,11 +1375,17 @@ class VideoProcessor:
                 bgm_volume=bgm_volume,
                 sfx_enabled=sfx_enabled,
                 custom_bgm_path=custom_bgm_path,
-                max_clip_duration=self.max_clip_duration
+                max_clip_duration=self.max_clip_duration,
+                tracker=tracker
             ):
-                logger.info(f"Clip {clip_id} extracted successfully")
+                logger.info(f"Clip {clip_id} extracted successfully ({clip_idx + 1}/{total_clips})")
                 if tracker:
-                    tracker.log(f"Clip {clip_idx + 1} done: {output_path.name}")
+                    tracker.set_substep(
+                        f"Rendered clip {clip_idx + 1} of {total_clips}: {title[:35]}",
+                        current=clip_idx + 1,
+                        total=total_clips
+                    )
+                    tracker.log(f"Rendered clip {clip_idx + 1}/{total_clips}: {output_path.name}")
                 return output_path
             else:
                 logger.error(f"Clip {clip_id} extraction failed")

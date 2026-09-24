@@ -6,6 +6,7 @@ import logging
 from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from backend.core.database import get_db
 from backend.services.project_service import ProjectService
@@ -98,11 +99,11 @@ async def upload_files(
         from ...core.path_utils import get_project_raw_directory
         raw_dir = get_project_raw_directory(project_id)
         
-        # Save video file
+        # Save video file in chunks to prevent high memory usage
         video_path = raw_dir / "input.mp4"
         with open(video_path, "wb") as f:
-            content = await video_file.read()
-            f.write(content)
+            while chunk := await video_file.read(8 * 1024 * 1024):
+                f.write(chunk)
         
         # Update video path for project
         project.video_path = str(video_path)
@@ -129,8 +130,8 @@ async def upload_files(
             # Subtitle file provided
             srt_path = raw_dir / "input.srt"
             with open(srt_path, "wb") as f:
-                content = await srt_file.read()
-                f.write(content)
+                while chunk := await srt_file.read(1024 * 1024):
+                    f.write(chunk)
             logger.info(f"User-provided subtitle file saved: {srt_path}")
         
         # Launch async processing task
@@ -196,6 +197,118 @@ async def upload_files(
     except Exception as e:
         logger.exception("Failed to create project while uploading file")
         raise HTTPException(status_code=500, detail="Project creation failed. Please try again later")
+
+
+class LocalImportRequest(BaseModel):
+    file_path: str
+    project_name: Optional[str] = None
+    video_category: Optional[str] = "podcast"
+    caption_style: Optional[str] = "hormozi_yellow"
+    duration_mode: Optional[str] = "tiktok_crp"
+    aspect_ratio: Optional[str] = "9:16_blur"
+    show_hook_banner: Optional[bool] = True
+    watermark_preset_id: Optional[str] = "none"
+    watermark_text: Optional[str] = None
+    watermark_text_opacity: Optional[float] = 0.50
+    watermark_text_position: Optional[str] = "lower_center"
+    srt_path: Optional[str] = None
+
+
+@router.post("/import-local", response_model=ProjectResponse)
+async def import_local_file(
+    data: LocalImportRequest,
+    project_service: ProjectService = Depends(get_project_service)
+):
+    """Create project directly from an existing file path on the local filesystem (Native Desktop Mode)."""
+    src_file = Path(data.file_path).resolve()
+    if not src_file.is_file():
+        raise HTTPException(status_code=400, detail=f"Local video file not found: {data.file_path}")
+
+    if not src_file.name.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.webm')):
+        raise HTTPException(status_code=400, detail="Invalid video file format")
+
+    proj_name = data.project_name.strip() if (data.project_name and data.project_name.strip()) else src_file.stem
+    subtitle_info = Path(data.srt_path).name if data.srt_path else "Whisper auto-generated"
+
+    project_data = ProjectCreate(
+        name=proj_name,
+        description=f"Local: {src_file.name}, Subtitle: {subtitle_info}",
+        project_type=ProjectType.KNOWLEDGE,
+        status=ProjectStatus.PENDING,
+        source_url=None,
+        source_file=str(src_file),
+        settings={
+            "video_category": data.video_category or "podcast",
+            "video_file": src_file.name,
+            "srt_file": subtitle_info,
+            "caption_style": data.caption_style or "hormozi_yellow",
+            "duration_mode": data.duration_mode or "tiktok_crp",
+            "aspect_ratio": data.aspect_ratio or "9:16_blur",
+            "show_hook_banner": True if data.show_hook_banner is None else data.show_hook_banner,
+            "watermark_preset_id": data.watermark_preset_id or "none",
+            "watermark_text": data.watermark_text,
+            "watermark_text_opacity": data.watermark_text_opacity,
+            "watermark_text_position": data.watermark_text_position or "lower_center"
+        }
+    )
+
+    project = project_service.create_project(project_data)
+    project_id = str(project.id)
+
+    from ...core.path_utils import get_project_raw_directory
+    raw_dir = get_project_raw_directory(project_id)
+    target_video = raw_dir / "input.mp4"
+
+    try:
+        if target_video.exists():
+            target_video.unlink()
+        try:
+            target_video.symlink_to(src_file)
+        except (OSError, NotImplementedError):
+            import shutil
+            shutil.copy2(src_file, target_video)
+    except Exception as e:
+        logger.warning(f"Could not symlink local file, falling back to copy: {e}")
+        import shutil
+        shutil.copy2(src_file, target_video)
+
+    project.video_path = str(target_video)
+    project_service.db.commit()
+
+    # Generate thumbnail immediately
+    try:
+        from ...utils.thumbnail_generator import generate_project_thumbnail
+        thumbnail_data = generate_project_thumbnail(project_id, target_video)
+        if thumbnail_data:
+            project.thumbnail = thumbnail_data
+            project_service.db.commit()
+    except Exception as e:
+        logger.error(f"Error generating thumbnail: {e}")
+
+    target_srt = None
+    if data.srt_path and Path(data.srt_path).is_file():
+        target_srt = raw_dir / "input.srt"
+        try:
+            if target_srt.exists():
+                target_srt.unlink()
+            target_srt.symlink_to(Path(data.srt_path).resolve())
+        except Exception:
+            import shutil
+            shutil.copy2(Path(data.srt_path).resolve(), target_srt)
+
+    # Launch processing pipeline
+    try:
+        from ...tasks.import_processing import process_import_task
+        process_import_task.apply_async(
+            args=[project_id, str(target_video), str(target_srt) if target_srt else None]
+        )
+    except Exception as e:
+        logger.error(f"Failed to launch import task: {e}")
+
+    res = project_service.get_project_with_stats(project_id)
+    if not res:
+        raise HTTPException(status_code=500, detail="Failed to retrieve newly created project")
+    return res
 
 
 @router.post("/", response_model=ProjectResponse)
@@ -357,6 +470,35 @@ async def update_project(
     except Exception as e:
         logger.exception("Update project failed: %s", project_id)
         raise HTTPException(status_code=500, detail="Project update failed. Please try again later")
+
+
+class BatchDeleteProjectsRequest(BaseModel):
+    project_ids: List[str]
+
+
+@router.post("/batch-delete")
+async def batch_delete_projects(
+    req: BatchDeleteProjectsRequest,
+    project_service: ProjectService = Depends(get_project_service)
+):
+    """Batch delete multiple projects and all their associated files."""
+    deleted = []
+    failed = []
+    for pid in req.project_ids:
+        try:
+            if project_service.delete_project_with_files(pid):
+                deleted.append(pid)
+            else:
+                failed.append(pid)
+        except Exception as e:
+            logger.warning("Failed to delete project %s in batch: %s", pid, e)
+            failed.append(pid)
+    return {
+        "message": f"Successfully deleted {len(deleted)} projects",
+        "deleted": deleted,
+        "failed": failed,
+        "count": len(deleted)
+    }
 
 
 @router.delete("/{project_id}")
@@ -773,38 +915,171 @@ async def get_processing_status(
     project_service: ProjectService = Depends(get_project_service),
     processing_service: ProcessingService = Depends(get_processing_service)
 ):
-    """Get processing status of a project."""
+    """Get real-time, unified processing status and progress for a project."""
     try:
-        # Get project information
+        from backend.core.progress_tracker import get_progress
+        from backend.models.project import ProjectStatus
+
+        # 1. Fetch project
         project = project_service.get(project_id)
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
-        
-        # Get latest task
+
+        # 2. Check live in-memory progress tracker (real-time heartbeat and logs)
+        live_prog = get_progress(project_id)
+
+        # 3. Check latest task in database
         tasks = project.tasks if hasattr(project, 'tasks') else []
         latest_task = None
         if tasks:
             latest_task = max(tasks, key=lambda t: t.created_at) if hasattr(tasks[0], 'created_at') else tasks[0]
-        
-        if not latest_task:
+
+        # 4. Handle completed state
+        if project.status == ProjectStatus.COMPLETED:
             return {
-                "status": "pending",
-                "current_step": 0,
+                "status": "completed",
+                "current_step": 6,
                 "total_steps": 6,
-                "step_name": "Wait to start",
-                "progress": 0,
+                "step_name": "Video Processing Completed",
+                "substep": "All clips rendered and saved successfully",
+                "progress": 100.0,
+                "is_alive": False,
+                "elapsed_seconds": live_prog.get("elapsed_seconds", 0) if live_prog else 0,
+                "recent_logs": live_prog.get("recent_logs", []) if live_prog else [],
                 "error_message": None
             }
-        
-        # Get processing status
-        status = processing_service.get_processing_status(project_id, str(latest_task.id))
-        
-        return status
+
+        # 5. Handle failed state
+        if project.status == ProjectStatus.FAILED:
+            cfg = project.processing_config or {}
+            err_msg = None
+            if live_prog and live_prog.get("error_message"):
+                err_msg = live_prog["error_message"]
+            elif latest_task and latest_task.error_message:
+                err_msg = latest_task.error_message
+            elif cfg.get("error_message"):
+                err_msg = cfg.get("error_message")
+            if not err_msg:
+                err_msg = "Video processing encountered an error"
+
+            return {
+                "status": "error",
+                "current_step": live_prog.get("current_step", 0) if live_prog else 0,
+                "total_steps": 6,
+                "step_name": "Processing Failed",
+                "substep": err_msg,
+                "progress": live_prog.get("overall_percent", 0.0) if live_prog else 0.0,
+                "is_alive": False,
+                "recent_logs": live_prog.get("recent_logs", []) if live_prog else [],
+                "error_message": err_msg
+            }
+
+        # 6. Handle active live progress tracker
+        if live_prog and live_prog.get("status") == "running":
+            overall_pct = float(live_prog.get("overall_percent", 0.0))
+            return {
+                "status": "processing",
+                "current_step": int(live_prog.get("current_step", 0)),
+                "total_steps": int(live_prog.get("total_steps", 6)),
+                "step_name": live_prog.get("step_name", "Processing video..."),
+                "substep": live_prog.get("substep", ""),
+                "progress": max(1.0, min(99.0, overall_pct)),
+                "step_percent": float(live_prog.get("step_percent", 0.0)),
+                "is_alive": bool(live_prog.get("is_alive", True)),
+                "elapsed_seconds": float(live_prog.get("elapsed_seconds", 0)),
+                "recent_logs": live_prog.get("recent_logs", []),
+                "error_message": None
+            }
+
+        # 7. Handle downloading / preparation in pending status
+        cfg = project.processing_config or {}
+        download_status = cfg.get("download_status")
+        if download_status == "downloading":
+            dl_progress = float(cfg.get("download_progress", 0.0) or 0.0)
+            dl_msg = cfg.get("download_message", "Downloading video...")
+            return {
+                "status": "processing",
+                "current_step": 0,
+                "total_steps": 6,
+                "step_name": f"📥 {dl_msg}",
+                "substep": f"Download progress: {dl_progress:.1f}%",
+                "progress": dl_progress,
+                "is_alive": True,
+                "error_message": None
+            }
+
+        # 8. Handle database processing task
+        if project.status == ProjectStatus.PROCESSING:
+            from backend.models.task import TaskStatus
+            if latest_task and latest_task.status in [TaskStatus.FAILED, "failed", "error"]:
+                err_msg = latest_task.error_message or "Video processing task failed"
+                return {
+                    "status": "error",
+                    "current_step": 1,
+                    "total_steps": 6,
+                    "step_name": "Processing Failed",
+                    "substep": err_msg,
+                    "progress": 0.0,
+                    "is_alive": False,
+                    "elapsed_seconds": 0,
+                    "recent_logs": live_prog.get("recent_logs", []) if live_prog else [],
+                    "error_message": err_msg
+                }
+            prog_val = float(latest_task.progress if (latest_task and latest_task.progress) else 10.0)
+            step_str = str(latest_task.current_step if (latest_task and latest_task.current_step) else "Processing pipeline...")
+            return {
+                "status": "processing",
+                "current_step": 1,
+                "total_steps": 6,
+                "step_name": step_str,
+                "substep": "Processing video frames and audio",
+                "progress": max(5.0, min(99.0, prog_val)),
+                "is_alive": True,
+                "elapsed_seconds": 0,
+                "recent_logs": [],
+                "error_message": None
+            }
+
+        # 9. Default pending state
+        return {
+            "status": "pending",
+            "current_step": 0,
+            "total_steps": 6,
+            "step_name": "Queued",
+            "substep": "Waiting to start processing",
+            "progress": 0.0,
+            "is_alive": False,
+            "recent_logs": [],
+            "error_message": None
+        }
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Failed to get processing status: %s", project_id)
         raise HTTPException(status_code=500, detail="Failed to retrieve processing status, please try again later")
+
+
+@router.post("/{project_id}/reveal")
+async def reveal_project_folder(
+    project_id: str,
+    project_service: ProjectService = Depends(get_project_service)
+):
+    """Reveal the project folder or output directory in native OS file manager (Finder / Explorer / Nautilus)."""
+    from ...core.path_utils import get_project_directory, get_project_output_directory, reveal_in_file_manager
+
+    project = project_service.get(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    proj_dir = get_project_directory(project_id)
+    out_dir = get_project_output_directory(project_id)
+
+    # Prefer output folder if it exists, otherwise project directory
+    target = out_dir if (out_dir.exists() and any(out_dir.iterdir())) else proj_dir
+    success = reveal_in_file_manager(target)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to open system file explorer")
+    return {"success": True, "path": str(target)}
 
 
 @router.get("/{project_id}/logs")
@@ -813,40 +1088,98 @@ async def get_project_logs(
     lines: int = Query(50, ge=1, le=1000, description="Number of log lines to return"),
     project_service: ProjectService = Depends(get_project_service)
 ):
-    """Get project logs."""
+    """Get real, structured execution logs for a project."""
     try:
-        # Simulate log data, actual should be fetched from log service
-        return {
-            "logs": [
-                {
-                    "timestamp": "2025-08-01T13:30:00.000Z",
-                    "module": "processing",
+        from backend.core.path_utils import get_project_directory, get_log_file_path
+        from backend.core.progress_tracker import get_progress
+        import re
+
+        log_entries = []
+
+        # 1. Read from project's dedicated processing.log if available
+        proj_dir = get_project_directory(project_id)
+        proj_log = proj_dir / "processing.log"
+        if proj_log.exists():
+            try:
+                raw_lines = proj_log.read_text(encoding="utf-8", errors="ignore").splitlines()
+                for line in raw_lines[-lines:]:
+                    parts = line.split(" - ", 3)
+                    if len(parts) == 4:
+                        log_entries.append({
+                            "timestamp": parts[0].strip(),
+                            "module": parts[1].strip(),
+                            "level": parts[2].strip(),
+                            "message": parts[3].strip()
+                        })
+                    else:
+                        log_entries.append({
+                            "timestamp": "",
+                            "module": "pipeline",
+                            "level": "INFO",
+                            "message": line.strip()
+                        })
+            except Exception as e:
+                logger.warning(f"Failed to read project log file: {e}")
+
+        # 2. Check live progress recent_logs buffer
+        live_prog = get_progress(project_id)
+        if live_prog and live_prog.get("recent_logs"):
+            for entry in live_prog["recent_logs"]:
+                m = re.match(r"^\[(.*?)\]\s*(.*)$", entry)
+                ts = m.group(1) if m else ""
+                msg = m.group(2) if m else entry
+                if not any(e["message"] == msg for e in log_entries):
+                    log_entries.append({
+                        "timestamp": ts,
+                        "module": "pipeline",
+                        "level": "INFO",
+                        "message": msg
+                    })
+
+        # 3. If still empty, scan global backend.log for this project_id
+        if not log_entries:
+            global_log = get_log_file_path()
+            if global_log.exists():
+                try:
+                    with open(global_log, "r", encoding="utf-8", errors="ignore") as f:
+                        file_lines = f.readlines()
+                    matched = [l.strip() for l in file_lines if project_id in l]
+                    for l in matched[-lines:]:
+                        parts = l.split(" - ", 3)
+                        if len(parts) == 4:
+                            log_entries.append({
+                                "timestamp": parts[0].strip(),
+                                "module": parts[1].strip(),
+                                "level": parts[2].strip(),
+                                "message": parts[3].strip()
+                            })
+                        else:
+                            log_entries.append({
+                                "timestamp": "",
+                                "module": "backend",
+                                "level": "INFO",
+                                "message": l
+                            })
+                except Exception:
+                    pass
+
+        # 4. If still no logs, create clear initial lifecycle status
+        if not log_entries:
+            proj = project_service.get(project_id)
+            if proj:
+                created_iso = proj.created_at.isoformat() if proj.created_at else ""
+                log_entries.append({
+                    "timestamp": created_iso,
+                    "module": "project",
                     "level": "INFO",
-                    "message": "Start processing project"
-                },
-                {
-                    "timestamp": "2025-08-01T13:30:05.000Z",
-                    "module": "processing",
-                    "level": "INFO",
-                    "message": "Step 1: Outline extraction complete"
-                },
-                {
-                    "timestamp": "2025-08-01T13:30:10.000Z",
-                    "module": "processing",
-                    "level": "INFO",
-                    "message": "Step 2: Time synchronization complete"
-                },
-                {
-                    "timestamp": "2025-08-01T13:30:15.000Z",
-                    "module": "processing",
-                    "level": "INFO",
-                    "message": "Step 3: Content rating in progress..."
-                }
-            ]
-        }
+                    "message": f"Project '{proj.name}' initialized in database (Status: {proj.status.value})"
+                })
+
+        return {"logs": log_entries[-lines:]}
     except Exception as e:
         logger.exception("Failed to get project logs: %s", project_id)
         raise HTTPException(status_code=500, detail="Failed to retrieve project logs, please try again later")
+
 
 
 @router.get("/{project_id}/import-status")

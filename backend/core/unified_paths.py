@@ -122,7 +122,11 @@ class UnifiedPathManager:
     
     def get_database_path(self) -> Path:
         """Get database path"""
-        return self.data_directory / "autoclip.db"
+        clipfarm_db = self.data_directory / "clipfarm.db"
+        legacy_db = self.data_directory / "autoclip.db"
+        if not clipfarm_db.exists() and legacy_db.exists():
+            return legacy_db
+        return clipfarm_db
     
     def get_settings_file_path(self) -> Path:
         """Get settings file path"""

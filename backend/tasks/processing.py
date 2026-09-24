@@ -134,7 +134,7 @@ def process_video_pipeline(
             # Check processing result
             if result.get("status") == "failed":
                 # Processing failed
-                error_msg = result.get("message", "Processing failed")
+                error_msg = result.get("error") or result.get("message") or "Processing failed"
                 task.status = TaskStatus.FAILED
                 task.error_message = error_msg
                 task.result_data = result

@@ -34,7 +34,9 @@ import {
   DeleteOutlined,
   ThunderboltOutlined,
   PictureOutlined,
-  CoffeeOutlined
+  CoffeeOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined
 } from '@ant-design/icons'
 import { settingsApi } from '../services/api'
 import SpeechRecognitionConfig from '../components/SpeechRecognitionConfig'
@@ -60,6 +62,11 @@ const SettingsPage: React.FC = () => {
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([])
   const [fetchingModels, setFetchingModels] = useState(false)
   const [customSearchModel, setCustomSearchModel] = useState('')
+  const [localAIStatus, setLocalAIStatus] = useState<{
+    ollama?: { available: boolean; base_url: string; models: string[]; message: string }
+    lmstudio?: { available: boolean; base_url: string; models: string[]; message: string }
+  }>({})
+  const [checkingLocalAI, setCheckingLocalAI] = useState(false)
 
   // Provider configuration
   const providerConfig = {
@@ -197,6 +204,37 @@ const SettingsPage: React.FC = () => {
     }
   }
 
+  // Auto-probe local AI engines (Ollama & LM Studio)
+  const checkLocalAI = async (autoSelect = false, targetProvider?: string) => {
+    try {
+      setCheckingLocalAI(true)
+      const res = await settingsApi.getLocalAIStatus()
+      if (res && res.success && res.data) {
+        setLocalAIStatus(res.data)
+        const prov = targetProvider || selectedProvider
+        if (prov === 'ollama' && res.data.ollama?.available && res.data.ollama.models?.length > 0) {
+          setDiscoveredModels(res.data.ollama.models)
+          const curModel = form.getFieldValue('model_name')
+          if (autoSelect || !curModel || curModel === 'llama3.2' || curModel.startsWith('qwen')) {
+            form.setFieldsValue({ model_name: res.data.ollama.models[0] })
+            setActiveModelName(res.data.ollama.models[0])
+          }
+        } else if (prov === 'lmstudio' && res.data.lmstudio?.available && res.data.lmstudio.models?.length > 0) {
+          setDiscoveredModels(res.data.lmstudio.models)
+          const curModel = form.getFieldValue('model_name')
+          if (autoSelect || !curModel || curModel === 'local-model' || curModel.startsWith('qwen')) {
+            form.setFieldsValue({ model_name: res.data.lmstudio.models[0] })
+            setActiveModelName(res.data.lmstudio.models[0])
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to query local AI status:', err)
+    } finally {
+      setCheckingLocalAI(false)
+    }
+  }
+
   // Load data
   useEffect(() => {
     loadData()
@@ -251,6 +289,7 @@ const SettingsPage: React.FC = () => {
       
       setSelectedProvider(providerName)
       form.setFieldsValue(flatSettings)
+      checkLocalAI(false, providerName)
     } catch (error) {
       console.error('Failed to load settings data:', error)
     }
@@ -424,17 +463,51 @@ const SettingsPage: React.FC = () => {
     const handleProviderChange = (provider: string) => {
       setSelectedProvider(provider)
       const conf = providerConfig[provider as keyof typeof providerConfig]
-      const currentBaseUrl = form.getFieldValue('custom_base_url')
+      const currentBaseUrl = (form.getFieldValue('custom_base_url') || '').trim()
       
       const patch: any = { llm_provider: provider }
-      if (conf?.hasBaseUrl && (!currentBaseUrl || currentBaseUrl === '')) {
-        patch.custom_base_url = conf.defaultBaseUrl
+      const knownDefaults = [
+        'http://localhost:11434/v1',
+        'http://localhost:11434',
+        'http://localhost:1234/v1',
+        'http://localhost:1234',
+        'https://api.deepseek.com/v1',
+        'https://openrouter.ai/api/v1',
+        'https://api.groq.com/openai/v1',
+        'https://api.openai.com/v1'
+      ]
+
+      if (conf?.hasBaseUrl) {
+        if (!currentBaseUrl || knownDefaults.includes(currentBaseUrl)) {
+          patch.custom_base_url = conf.defaultBaseUrl
+        }
       }
-      if (conf?.defaultModel && (!form.getFieldValue('model_name') || form.getFieldValue('model_name').startsWith('qwen') || form.getFieldValue('model_name') === 'custom-model')) {
+
+      const curModel = form.getFieldValue('model_name')
+      const knownDefaultModels = [
+        'qwen-plus-character',
+        'qwen-plus',
+        'qwen-turbo',
+        'qwen-max',
+        'llama3.2',
+        'local-model',
+        'custom-model',
+        'deepseek-chat',
+        'anthropic/claude-3.5-sonnet',
+        'llama-3.3-70b-versatile',
+        'gpt-4o'
+      ]
+
+      if (conf?.defaultModel && (!curModel || knownDefaultModels.includes(curModel) || curModel.startsWith('qwen'))) {
         patch.model_name = conf.defaultModel
         setActiveModelName(conf.defaultModel)
       }
       form.setFieldsValue(patch)
+
+      // Auto-detect available models if switching to Ollama or LM Studio
+      if (provider === 'ollama' || provider === 'lmstudio') {
+        checkLocalAI(true, provider)
+      }
     }
 
   return (
@@ -445,7 +518,15 @@ const SettingsPage: React.FC = () => {
         </Title>
         
         <Tabs defaultActiveKey="api" className="settings-tabs">
-          <TabPane tab="AI Model Configuration" key="api">
+          <TabPane 
+            tab={
+              <span>
+                <RobotOutlined />
+                AI Models
+              </span>
+            } 
+            key="api"
+          >
             <Card title="AI Model Configuration" className="settings-card">
               <Alert
                 message="ClipFarm Multi-Model Engine"
@@ -479,8 +560,182 @@ const SettingsPage: React.FC = () => {
                     message={`Active: ${currentProvider.display_name || 'Alibaba Qwen'} — Model: ${currentProvider.model || activeModelName}`}
                     type="success"
                     showIcon
-                    style={{ marginBottom: 24 }}
+                    style={{ marginBottom: 16 }}
                   />
+                )}
+
+                {/* Local AI Engines Quick Status Toolbar */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: 8,
+                  padding: '10px 16px',
+                  marginBottom: 20,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 12
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <Text strong style={{ fontSize: 13, color: '#e6f7ff' }}>
+                      <ThunderboltOutlined style={{ marginRight: 6, color: '#13c2c2' }} />
+                      Local AI Runtimes:
+                    </Text>
+
+                    <Space size={6}>
+                      <Tag
+                        color={localAIStatus.ollama?.available ? 'success' : 'default'}
+                        style={{ cursor: 'pointer', padding: '2px 8px', borderRadius: 4 }}
+                        onClick={() => handleProviderChange('ollama')}
+                      >
+                        Ollama: {localAIStatus.ollama?.available ? `🟢 Online (${localAIStatus.ollama.models?.length || 0})` : '⚪ Offline'}
+                      </Tag>
+                      {localAIStatus.ollama?.available && selectedProvider !== 'ollama' && (
+                        <Button size="small" type="link" style={{ padding: 0 }} onClick={() => handleProviderChange('ollama')}>
+                          Select Ollama
+                        </Button>
+                      )}
+                    </Space>
+
+                    <Space size={6}>
+                      <Tag
+                        color={localAIStatus.lmstudio?.available ? 'success' : 'default'}
+                        style={{ cursor: 'pointer', padding: '2px 8px', borderRadius: 4 }}
+                        onClick={() => handleProviderChange('lmstudio')}
+                      >
+                        LM Studio: {localAIStatus.lmstudio?.available ? `🟢 Online (${localAIStatus.lmstudio.models?.length || 0})` : '⚪ Offline'}
+                      </Tag>
+                      {localAIStatus.lmstudio?.available && selectedProvider !== 'lmstudio' && (
+                        <Button size="small" type="link" style={{ padding: 0 }} onClick={() => handleProviderChange('lmstudio')}>
+                          Select LM Studio
+                        </Button>
+                      )}
+                    </Space>
+                  </div>
+
+                  <Button
+                    size="small"
+                    icon={<ReloadOutlined spin={checkingLocalAI} />}
+                    onClick={() => checkLocalAI(false)}
+                    loading={checkingLocalAI}
+                  >
+                    Probe Local AI
+                  </Button>
+                </div>
+
+                {/* Local Ollama Live Detection Alert */}
+                {selectedProvider === 'ollama' && (
+                  <div style={{ marginBottom: 16 }}>
+                    {localAIStatus.ollama?.available ? (
+                      <Alert
+                        type="success"
+                        showIcon
+                        icon={<CheckCircleOutlined />}
+                        message="Ollama Local Engine Online"
+                        description={
+                          <div>
+                            <div>Found <strong>{localAIStatus.ollama.models?.length || 0}</strong> model(s) installed on this machine. Processing runs 100% private with $0 API costs.</div>
+                            {localAIStatus.ollama.models && localAIStatus.ollama.models.length > 0 && (
+                              <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                                <Text type="secondary" style={{ fontSize: 12 }}>Detected models:</Text>
+                                {localAIStatus.ollama.models.map(m => (
+                                  <Tag
+                                    key={m}
+                                    color={activeModelName === m ? 'processing' : undefined}
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={() => {
+                                      form.setFieldsValue({ model_name: m })
+                                      setActiveModelName(m)
+                                    }}
+                                  >
+                                    {m}
+                                  </Tag>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        }
+                      />
+                    ) : (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        icon={<CloseCircleOutlined />}
+                        message="Ollama Service Not Detected at http://localhost:11434"
+                        description={
+                          <div>
+                            <div>Ollama is not running. To process videos 100% locally with $0 API costs:</div>
+                            <div style={{
+                              marginTop: 8,
+                              marginBottom: 8,
+                              fontFamily: 'monospace',
+                              background: 'rgba(0, 0, 0, 0.35)',
+                              border: '1px solid rgba(255, 255, 255, 0.08)',
+                              padding: '8px 12px',
+                              borderRadius: 6,
+                              fontSize: 12,
+                              userSelect: 'all'
+                            }}>
+                              curl -fsSL https://ollama.com/install.sh | sh<br />
+                              ollama run llama3.2
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
+                              <Text type="secondary" style={{ fontSize: 12 }}>Once started:</Text>
+                              <Button size="small" type="primary" ghost icon={<ReloadOutlined spin={checkingLocalAI} />} onClick={() => checkLocalAI(false)}>
+                                Probe Local AI
+                              </Button>
+                            </div>
+                          </div>
+                        }
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Local LM Studio Live Detection Alert */}
+                {selectedProvider === 'lmstudio' && (
+                  <div style={{ marginBottom: 16 }}>
+                    {localAIStatus.lmstudio?.available ? (
+                      <Alert
+                        type="success"
+                        showIcon
+                        icon={<CheckCircleOutlined />}
+                        message="LM Studio Local Engine Online"
+                        description={
+                          <div>
+                            <div>Found <strong>{localAIStatus.lmstudio.models?.length || 0}</strong> active model(s) loaded. Processing runs 100% private with $0 API costs.</div>
+                            {localAIStatus.lmstudio.models && localAIStatus.lmstudio.models.length > 0 && (
+                              <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                                <Text type="secondary" style={{ fontSize: 12 }}>Loaded models:</Text>
+                                {localAIStatus.lmstudio.models.map(m => (
+                                  <Tag
+                                    key={m}
+                                    color={activeModelName === m ? 'processing' : undefined}
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={() => {
+                                      form.setFieldsValue({ model_name: m })
+                                      setActiveModelName(m)
+                                    }}
+                                  >
+                                    {m}
+                                  </Tag>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        }
+                      />
+                    ) : (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        icon={<CloseCircleOutlined />}
+                        message="LM Studio Local Server Not Detected at http://localhost:1234"
+                        description="LM Studio is not responding. Launch LM Studio desktop app, download a model, and click 'Start Server' on the Local Server tab (port 1234) to process videos offline."
+                      />
+                    )}
+                  </div>
                 )}
 
                 {/* Provider Selection */}
@@ -510,20 +765,42 @@ const SettingsPage: React.FC = () => {
 
                 {/* Base URL (for Local Ollama / LM Studio or Custom OpenAI-compatible endpoints) */}
                 {providerConfig[selectedProvider as keyof typeof providerConfig]?.hasBaseUrl && (
-                  <Form.Item
-                    label="API Base URL"
-                    name="custom_base_url"
-                    className="form-item"
-                    extra="OpenAI-compatible /v1 endpoint (e.g. http://localhost:11434/v1 for Ollama, http://localhost:1234/v1 for LM Studio)"
-                    rules={[
-                      { required: selectedProvider === 'custom', message: 'Please enter the API Base URL' }
-                    ]}
-                  >
-                    <Input
-                      placeholder={providerConfig[selectedProvider as keyof typeof providerConfig].baseUrlPlaceholder}
-                      className="settings-input"
-                    />
-                  </Form.Item>
+                  <div style={{ marginBottom: 16 }}>
+                    <Form.Item
+                      label="API Base URL"
+                      name="custom_base_url"
+                      className="form-item"
+                      style={{ marginBottom: 6 }}
+                      extra="OpenAI-compatible /v1 endpoint (e.g. http://localhost:11434/v1 for Ollama, http://localhost:1234/v1 for LM Studio)"
+                      rules={[
+                        { required: selectedProvider === 'custom', message: 'Please enter the API Base URL' }
+                      ]}
+                    >
+                      <Input
+                        placeholder={providerConfig[selectedProvider as keyof typeof providerConfig].baseUrlPlaceholder}
+                        className="settings-input"
+                      />
+                    </Form.Item>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      <Text type="secondary" style={{ fontSize: 11 }}>Quick Presets:</Text>
+                      <Button
+                        size="small"
+                        type="dashed"
+                        style={{ fontSize: 11, height: 22, padding: '0 6px' }}
+                        onClick={() => form.setFieldsValue({ custom_base_url: 'http://localhost:11434/v1' })}
+                      >
+                        Ollama (11434)
+                      </Button>
+                      <Button
+                        size="small"
+                        type="dashed"
+                        style={{ fontSize: 11, height: 22, padding: '0 6px' }}
+                        onClick={() => form.setFieldsValue({ custom_base_url: 'http://localhost:1234/v1' })}
+                      >
+                        LM Studio (1234)
+                      </Button>
+                    </div>
+                  </div>
                 )}
 
                 {/* Dynamic API Key Input */}

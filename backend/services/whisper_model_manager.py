@@ -46,21 +46,25 @@ _MODELS = {
         "repo_id": "Systran/faster-whisper-tiny",
         "size": "~75 MB", "size_bytes": 75 * 1024 * 1024,
         "description": "Fastest, lower accuracy, ideal for quick previews",
+        "accuracy": "Low", "speed": "Fastest",
     },
     "base": {
         "repo_id": "Systran/faster-whisper-base",
         "size": "~145 MB", "size_bytes": 145 * 1024 * 1024,
         "description": "Balanced choice, recommended for everyday use",
+        "accuracy": "Medium", "speed": "Fast",
     },
     "small": {
         "repo_id": "Systran/faster-whisper-small",
         "size": "~488 MB", "size_bytes": 488 * 1024 * 1024,
         "description": "Better accuracy, suitable for important content",
+        "accuracy": "Good", "speed": "Medium",
     },
     "medium": {
         "repo_id": "Systran/faster-whisper-medium",
         "size": "~1.5 GB", "size_bytes": 1500 * 1024 * 1024,
         "description": "High accuracy, suitable for professional use",
+        "accuracy": "High", "speed": "Slow",
     },
     "large-v3": {
         "repo_id": "Systran/faster-whisper-large-v3",
@@ -113,9 +117,9 @@ class WhisperModelManager:
             st = self._download_state.get(model_name, {})
         return ModelInfo(
             name=model_name,
-            size=cfg["size"], size_bytes=cfg["size_bytes"],
-            description=cfg["description"], accuracy=cfg["accuracy"], speed=cfg["speed"],
-            status=status, repo_id=cfg["repo_id"],
+            size=cfg.get("size", "Unknown"), size_bytes=cfg.get("size_bytes", 0),
+            description=cfg.get("description", ""), accuracy=cfg.get("accuracy", "Good"), speed=cfg.get("speed", "Medium"),
+            status=status, repo_id=cfg.get("repo_id", ""),
             download_progress=st.get("progress"),
             local_path=str(self._model_cache_dir(model_name)) if status == ModelStatus.DOWNLOADED else None,
             error_message=st.get("error"),

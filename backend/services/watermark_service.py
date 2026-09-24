@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 class WatermarkService:
     def __init__(self, data_dir: Optional[Path] = None):
         if data_dir is None:
-            project_root = Path(__file__).resolve().parent.parent.parent
-            data_dir = project_root / "data" / "watermarks"
+            from ..core.path_utils import get_data_directory
+            data_dir = get_data_directory() / "watermarks"
         
         self.data_dir = Path(data_dir)
         self.logos_dir = self.data_dir / "logos"

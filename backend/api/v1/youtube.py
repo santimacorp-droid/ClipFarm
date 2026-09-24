@@ -208,6 +208,8 @@ async def parse_youtube_video(
             }
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"parsingYouTubevideo failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"parsing failed: {str(e)}")
@@ -339,6 +341,8 @@ async def create_youtube_download_task(request: YouTubeDownloadRequest):
         finally:
             db.close()
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"CreateYouTubeDownload task failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Task creation failed: {str(e)}")
@@ -394,6 +398,7 @@ async def update_project_download_progress(project_id: str, progress: float, mes
 
 async def process_youtube_download_task(task_id: str, request: YouTubeDownloadRequest, project_id: str):
     """processingYouTubeDownload task"""
+    download_dir = None
     try:
         # Ensure task exists in memory dictionary
         if task_id not in download_tasks:
@@ -870,6 +875,13 @@ async def process_youtube_download_task(task_id: str, request: YouTubeDownloadRe
             download_tasks[task_id].error_message = str(e)
             download_tasks[task_id].progress = 0.0
             download_tasks[task_id].updated_at = datetime.now().isoformat()
+    finally:
+        if download_dir and download_dir.exists():
+            import shutil
+            try:
+                shutil.rmtree(str(download_dir), ignore_errors=True)
+            except Exception:
+                pass
 
 
 async def _try_youtube_subtitle_strategies(url: str, download_dir: Path, browser: Optional[str] = None) -> str:

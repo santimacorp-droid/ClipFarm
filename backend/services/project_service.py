@@ -202,20 +202,13 @@ class ProjectService(BaseService[Project, ProjectCreate, ProjectUpdate, ProjectR
         return True
     
     def _convert_utc_to_local(self, dt):
-        """Convert UTC time to local time (time zone information lost during SQLite storage))"""
+        """Ensure datetime has UTC timezone so JSON responses emit ISO 8601 with Z / UTC offset."""
         if dt is None:
             return None
-        
-        from datetime import datetime, timezone
-        import pytz
-        
-        # Since SQLite loses timezone information during storage, we assume these times are UTC
-        # Convert to local time
-        local_tz = pytz.timezone('Asia/Shanghai')
-        utc_time = dt.replace(tzinfo=timezone.utc)
-        local_time = utc_time.astimezone(local_tz)
-        
-        return local_time
+        from datetime import timezone
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
     
     def delete_project_with_files(self, project_id: str) -> bool:
         """

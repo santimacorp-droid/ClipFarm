@@ -247,3 +247,16 @@ def test_settings_fetch_models(mock_openai_cls):
     assert data["success"] is True
     assert "llama3.2:3b" in data["models"]
     assert "deepseek-r1:8b" in data["models"]
+
+
+def test_settings_local_status():
+    """Verify /settings/local-status returns status schema for Ollama and LM Studio."""
+    response = client.get("/api/v1/settings/local-status")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert "ollama" in data["data"]
+    assert "lmstudio" in data["data"]
+    assert isinstance(data["data"]["ollama"]["models"], list)
+    assert isinstance(data["data"]["lmstudio"]["models"], list)
+

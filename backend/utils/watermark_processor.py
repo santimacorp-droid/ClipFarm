@@ -7,7 +7,7 @@ import logging
 import os
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Tuple
 from .caption_styles import ViralCaptionGenerator, CAPTION_STYLES
 from .ffmpeg_utils import get_ffmpeg_path
 
@@ -16,28 +16,49 @@ logger = logging.getLogger(__name__)
 
 def get_watermark_overlay_expr(position: str = "bottom_right", margin: int = 24) -> str:
     """
-    Calculate the FFmpeg overlay coordinates expression for the specified corner.
+    Calculate the FFmpeg overlay coordinates expression for standard anchors or custom draggable coordinates.
     
     Args:
-        position: bottom_right, bottom_left, top_right, or top_left
-        margin: Margin in pixels from frame edge
+        position: Anchor name (bottom_right, bottom_left, top_right, top_left, top_center,
+                  center_left, center, center_right, bottom_center) or custom percentage
+                  coordinates like "custom:80:85" (X%, Y% from 0 to 100)
+        margin: Margin in pixels from frame edge for anchor positions
         
     Returns:
         FFmpeg overlay expression (e.g. main_w-overlay_w-24:main_h-overlay_h-24)
     """
-    pos = (position or "bottom_right").lower().replace("-", "_")
+    raw_pos = (position or "bottom_right").lower().strip()
     m = max(0, int(margin))
-    
-    if pos in ["bottom_left", "bl"]:
-        return f"{m}:main_h-overlay_h-{m}"
+
+    # Check for custom draggable percentage coordinates: e.g. "custom:80:85" or "custom_80_85"
+    if raw_pos.startswith("custom:") or raw_pos.startswith("custom_"):
+        parts = raw_pos.replace(":", "_").split("_")
+        if len(parts) >= 3:
+            try:
+                pct_x = max(0.0, min(100.0, float(parts[1]))) / 100.0
+                pct_y = max(0.0, min(100.0, float(parts[2]))) / 100.0
+                return f"(main_w-overlay_w)*{pct_x:.4f}:(main_h-overlay_h)*{pct_y:.4f}"
+            except Exception:
+                pass
+
+    pos = raw_pos.replace("-", "_")
+
+    if pos in ["top_left", "tl"]:
+        return f"{m}:{m}"
+    elif pos in ["top_center", "tc", "top_middle"]:
+        return f"(main_w-overlay_w)/2:{m}"
     elif pos in ["top_right", "tr"]:
         return f"main_w-overlay_w-{m}:{m}"
-    elif pos in ["top_left", "tl"]:
-        return f"{m}:{m}"
+    elif pos in ["center_left", "middle_left", "ml"]:
+        return f"{m}:(main_h-overlay_h)/2"
+    elif pos in ["center", "middle", "center_center"]:
+        return f"(main_w-overlay_w)/2:(main_h-overlay_h)/2"
+    elif pos in ["center_right", "middle_right", "mr"]:
+        return f"main_w-overlay_w-{m}:(main_h-overlay_h)/2"
+    elif pos in ["bottom_left", "bl"]:
+        return f"{m}:main_h-overlay_h-{m}"
     elif pos in ["bottom_center", "bc", "lower_center", "lc", "center_bottom"]:
         return f"(main_w-overlay_w)/2:main_h-overlay_h-{m}"
-    elif pos in ["center", "middle"]:
-        return f"(main_w-overlay_w)/2:(main_h-overlay_h)/2"
     else:  # default bottom_right
         return f"main_w-overlay_w-{m}:main_h-overlay_h-{m}"
 
@@ -69,13 +90,13 @@ def transcribe_clip_subtitles(
     model = WhisperModel(model_name, device="auto", compute_type="int8")
     
     lang_param = None if (not language or language.lower() in ["auto", "none"]) else language.split("-")[0]
-    seg_iter, info = model.transcribe(str(clip_path), language=lang_param, vad_filter=True, word_timestamps=True)
+    seg_iter, info = model.transcribe(str(clip_path), language=lang_param, vad_filter=True, word_timestamps=True, condition_on_previous_text=False)
     segments = list(seg_iter)
     
     if not segments:
         # Retry with vad_filter=False if no segments found
         logger.info("VAD filtered all speech, retrying without VAD filter...")
-        seg_iter, _ = model.transcribe(str(clip_path), language=lang_param, vad_filter=False, word_timestamps=True)
+        seg_iter, _ = model.transcribe(str(clip_path), language=lang_param, vad_filter=False, word_timestamps=True, condition_on_previous_text=False)
         segments = list(seg_iter)
 
     from .speech_recognizer import SpeechRecognizer

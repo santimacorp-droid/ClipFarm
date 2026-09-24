@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Card, Tag, Button, Space, Typography, Popconfirm, message, Tooltip } from 'antd'
-import { PlayCircleOutlined, DeleteOutlined, DownloadOutlined, ReloadOutlined, LoadingOutlined } from '@ant-design/icons'
+import { PlayCircleOutlined, DeleteOutlined, DownloadOutlined, ReloadOutlined, LoadingOutlined, CheckOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { Project } from '../store/useProjectStore'
 import { projectApi } from '../services/api'
@@ -38,6 +38,9 @@ const pulseAnimation = `
       transform: scale(1);
     }
   }
+  .project-card:hover .project-card-select-btn {
+    opacity: 1 !important;
+  }
 `
 
 // Inject styles into the page
@@ -61,9 +64,20 @@ interface ProjectCardProps {
   onDelete: (id: string) => void
   onRetry?: (id: string) => void
   onClick?: () => void
+  selectable?: boolean
+  selected?: boolean
+  onSelect?: (id: string, selected: boolean) => void
 }
 
-const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onRetry, onClick }) => {
+const ProjectCard: React.FC<ProjectCardProps> = ({ 
+  project, 
+  onDelete, 
+  onRetry, 
+  onClick,
+  selectable = false,
+  selected = false,
+  onSelect
+}) => {
   const navigate = useNavigate()
   const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null)
   const [thumbnailLoading, setThumbnailLoading] = useState(false)
@@ -304,25 +318,34 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onRetry, o
   return (
     <Card
       hoverable
-      className="project-card"
+      className={`project-card ${selected ? 'project-card-selected' : ''}`}
       style={{
         width: '100%',
         borderRadius: '16px',
         overflow: 'hidden',
-        background: 'var(--ac-card)',
-        border: '1px solid var(--ac-line)',
-        boxShadow: 'none',
+        background: selected ? 'rgba(90, 139, 255, 0.05)' : 'var(--ac-card)',
+        border: selected ? '2px solid var(--ac-accent, #5a8bff)' : '1px solid var(--ac-line)',
+        boxShadow: selected ? '0 0 0 2px rgba(90, 139, 255, 0.25), var(--ac-shadow)' : 'none',
         transition: 'all 0.2s ease',
         cursor: 'pointer',
         marginBottom: '0px'
       }}
+      onClick={() => {
+        if (selectable) {
+          onSelect?.(project.id, !selected)
+        }
+      }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-2px)'
-        e.currentTarget.style.boxShadow = 'var(--ac-shadow)'
+        e.currentTarget.style.boxShadow = selected 
+          ? '0 0 0 2px rgba(90, 139, 255, 0.35), var(--ac-shadow)' 
+          : 'var(--ac-shadow)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)'
-        e.currentTarget.style.boxShadow = 'none'
+        e.currentTarget.style.boxShadow = selected 
+          ? '0 0 0 2px rgba(90, 139, 255, 0.25), var(--ac-shadow)' 
+          : 'none'
       }}
       styles={{
         body: {
@@ -345,7 +368,13 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onRetry, o
             justifyContent: 'center',
             overflow: 'hidden'
           }}
-          onClick={() => {
+          onClick={(e) => {
+            if (selectable) {
+              e.stopPropagation()
+              onSelect?.(project.id, !selected)
+              return
+            }
+
             // Projects in Importing state cannot be clicked to enter the details page
             if (project.status === 'pending') {
               message.warning('Project is importing, please wait...')
@@ -365,6 +394,42 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onRetry, o
             }
           }}
         >
+          {/* Selection Checkbox */}
+          <div
+            className="project-card-select-btn"
+            style={{
+              position: 'absolute',
+              top: '8px',
+              left: '8px',
+              zIndex: 10,
+              opacity: selectable || selected ? 1 : 0,
+              transition: 'opacity 0.2s ease, transform 0.15s ease'
+            }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onSelect?.(project.id, !selected)
+            }}
+          >
+            <div
+              style={{
+                width: '22px',
+                height: '22px',
+                borderRadius: '6px',
+                border: selected ? '2px solid var(--ac-accent, #5a8bff)' : '2px solid rgba(255, 255, 255, 0.85)',
+                background: selected ? 'var(--ac-accent, #5a8bff)' : 'rgba(0, 0, 0, 0.55)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                backdropFilter: 'blur(6px)',
+                boxShadow: selected ? '0 2px 8px rgba(90, 139, 255, 0.5)' : '0 2px 6px rgba(0,0,0,0.3)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {selected && <CheckOutlined style={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }} />}
+            </div>
+          </div>
+
           {/* Thumbnail loading status */}
           {thumbnailLoading && (
             <div style={{ textAlign: 'center', color: 'var(--ac-muted)' }}>
@@ -378,12 +443,14 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onRetry, o
             <PlayCircleOutlined style={{ fontSize: '32px', color: 'var(--ac-muted)' }} />
           )}
           
-          {/* Category label - Top left corner */}
+          {/* Category label - Top left corner (shifted if select button is visible) */}
           {project.video_category && project.video_category !== 'default' && (
             <div style={{
               position: 'absolute',
               top: '8px',
-              left: '8px'
+              left: selectable || selected ? '38px' : '8px',
+              transition: 'left 0.2s ease',
+              zIndex: 5
             }}>
               <Tag
                 style={{
@@ -422,7 +489,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onRetry, o
             height: '52px'
           }}>
             <Text style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.92)' }}>
-              {dayjs(project.created_at).tz('Asia/Shanghai').fromNow()}
+              {dayjs(project.created_at).fromNow()}
             </Text>
             
             {/* operation buttons */}

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Layout, Button } from 'antd'
-import { SettingOutlined, ArrowLeftOutlined, BulbOutlined, MoonOutlined, ThunderboltOutlined, FireOutlined, ShopOutlined, CoffeeOutlined } from '@ant-design/icons'
+import { SettingOutlined, ArrowLeftOutlined, BulbOutlined, MoonOutlined, FireOutlined, CoffeeOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTheme } from '../context/ThemeContext'
 
@@ -15,23 +15,25 @@ const Header: React.FC = () => {
 
   return (
     <AntHeader
+      className="app-header"
       style={{
-        padding: '0 56px',
+        padding: '0 32px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        height: '64px',
+        height: '60px',
+        lineHeight: 'normal',
         position: 'sticky',
         top: 0,
         zIndex: 1000,
-        backdropFilter: 'blur(10px)',
-        background: 'color-mix(in srgb, var(--ac-bg) 78%, transparent)',
-        borderBottom: '1px solid var(--ac-line-2)',
+        backgroundColor: 'var(--ac-card)',
+        borderBottom: '1px solid var(--ac-line)',
+        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
       }}
     >
       {/* Wordmark — ClipFarm */}
       <div
-        style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+        style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', height: '40px' }}
         onClick={() => navigate('/')}
       >
         <img
@@ -39,20 +41,20 @@ const Header: React.FC = () => {
           alt="ClipFarm"
           style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'contain' }}
         />
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <span
             style={{
               fontFamily: 'var(--ac-font-serif)',
-              fontSize: '20px',
+              fontSize: '19px',
               fontWeight: 700,
               color: 'var(--ac-ink)',
               letterSpacing: '0.5px',
-              lineHeight: 1.2
+              lineHeight: '22px'
             }}
           >
             ClipFarm
           </span>
-          <span style={{ fontSize: '11px', color: 'var(--ac-sub)', letterSpacing: '0.2px' }}>
+          <span style={{ fontSize: '11px', color: 'var(--ac-sub)', letterSpacing: '0.2px', lineHeight: '14px' }}>
             AI Short-Form Video Studio
           </span>
         </div>
@@ -72,23 +74,6 @@ const Header: React.FC = () => {
         )}
         <Button
           type="text"
-          icon={<ShopOutlined style={{ color: '#1877F2' }} />}
-          onClick={() => navigate('/affiliate')}
-          style={{
-            color: location.pathname.startsWith('/affiliate') ? '#1877F2' : 'var(--ac-sub)',
-            border: '1px solid var(--ac-line)',
-            borderRadius: '999px',
-            height: '36px',
-            padding: '0 14px',
-            background: 'var(--ac-card)',
-            fontSize: '13px',
-            fontWeight: location.pathname.startsWith('/affiliate') ? 600 : 400
-          }}
-        >
-          Affiliate
-        </Button>
-        <Button
-          type="text"
           icon={<FireOutlined style={{ color: '#ff4d4f' }} />}
           onClick={() => navigate('/campaigns')}
           style={{
@@ -98,10 +83,28 @@ const Header: React.FC = () => {
             height: '36px',
             padding: '0 14px',
             background: 'var(--ac-card)',
-            fontSize: '13px'
+            fontSize: '13px',
+            fontWeight: location.pathname.startsWith('/campaigns') ? 600 : 400
           }}
         >
           Campaigns
+        </Button>
+        <Button
+          type="text"
+          icon={<SettingOutlined style={{ color: location.pathname === '/settings' ? '#1890ff' : 'var(--ac-sub)' }} />}
+          onClick={() => navigate('/settings')}
+          style={{
+            color: location.pathname === '/settings' ? '#1890ff' : 'var(--ac-sub)',
+            border: '1px solid var(--ac-line)',
+            borderRadius: '999px',
+            height: '36px',
+            padding: '0 16px',
+            background: 'var(--ac-card)',
+            fontSize: '13px',
+            fontWeight: location.pathname === '/settings' ? 600 : 400
+          }}
+        >
+          Settings
         </Button>
         <Button
           type="text"
@@ -119,22 +122,6 @@ const Header: React.FC = () => {
             background: 'var(--ac-card)',
           }}
         />
-        <Button
-          type="text"
-          icon={<ThunderboltOutlined style={{ color: '#faad14' }} />}
-          onClick={() => navigate('/settings')}
-          style={{
-            color: 'var(--ac-sub)',
-            border: '1px solid var(--ac-line)',
-            borderRadius: '999px',
-            height: '36px',
-            padding: '0 14px',
-            background: 'var(--ac-card)',
-            fontSize: '13px'
-          }}
-        >
-          Tokens & Rates
-        </Button>
         <Button
           type="primary"
           icon={<CoffeeOutlined style={{ fontSize: '15px' }} />}
@@ -158,21 +145,6 @@ const Header: React.FC = () => {
           }}
         >
           Support on Ko-fi
-        </Button>
-        <Button
-          type="text"
-          icon={<SettingOutlined />}
-          onClick={() => navigate('/settings')}
-          style={{
-            color: 'var(--ac-sub)',
-            border: '1px solid var(--ac-line)',
-            borderRadius: '999px',
-            height: '36px',
-            padding: '0 16px',
-            background: 'var(--ac-card)',
-          }}
-        >
-          Settings
         </Button>
       </div>
     </AntHeader>

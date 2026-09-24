@@ -61,9 +61,9 @@ const getNotificationColor = (level: Notification['level']) => {
 };
 
 const formatTime = (timestamp: string) => {
-  // Correctly handle time zone conversion to ensure accurate local time display
-  const now = dayjs().tz('Asia/Shanghai');
-  const notificationTime = dayjs(timestamp).tz('Asia/Shanghai');
+  // Correctly handle local time display
+  const now = dayjs();
+  const notificationTime = dayjs(timestamp);
   const diff = now.diff(notificationTime, 'millisecond');
   
   if (diff < 60000) { // 1Within minutes

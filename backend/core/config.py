@@ -97,7 +97,14 @@ def get_output_directory() -> Path:
 
 def get_database_url() -> str:
     """Get databaseURL"""
-    return settings.database_url
+    if os.getenv("DATABASE_URL"):
+        return os.getenv("DATABASE_URL")
+    try:
+        from .path_utils import get_data_directory
+        db_file = get_data_directory() / "clipfarm.db"
+        return f"sqlite:///{db_file}"
+    except Exception:
+        return settings.database_url
 
 def get_redis_url() -> str:
     """GettingRedis URL"""
@@ -126,13 +133,14 @@ def get_processing_config() -> Dict[str, Any]:
 
 def get_logging_config() -> Dict[str, Any]:
     """Get logging configuration"""
+    from .path_utils import get_log_file_path
     log_format = settings.log_format
     if log_format.lower() == "json":
         log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     return {
         "level": settings.log_level,
         "format": log_format,
-        "file": settings.log_file
+        "file": str(get_log_file_path())
     }
 
 # Initialize path configuration

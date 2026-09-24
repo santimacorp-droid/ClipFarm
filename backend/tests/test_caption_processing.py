@@ -20,7 +20,6 @@ from backend.utils.speech_recognizer import (
 )
 from backend.pipeline.step6_video import _parse_timestamp_to_seconds
 from backend.utils.video_processor import VideoProcessor
-from backend.utils.bilibili_downloader import BilibiliDownloader
 
 
 def test_time_conversions():
@@ -160,31 +159,6 @@ def test_speech_recognizer_tight_srt_cjk():
     assert "\u6211\u4eec\u4eca\u5929\u6765\u6d4b\u8bd5\u3002" in srt_output
     assert "\u6211 \u4eec" not in srt_output
 
-
-def test_bilibili_vtt_to_srt_conversion():
-    """Verify VTT to SRT conversion with cue settings and 2-part timestamps."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        vtt_path = Path(tmpdir) / "sample.vtt"
-        srt_path = Path(tmpdir) / "sample.srt"
-
-        vtt_path.write_text(
-            "WEBVTT\n\n"
-            "00:01.000 --> 00:04.500 align:start position:50%\n"
-            "<v Speaker>Hello <b>world</b></v>\n\n"
-            "01:02:03.123 --> 01:02:06.789\n"
-            "Second subtitle line\n",
-            encoding="utf-8"
-        )
-
-        downloader = BilibiliDownloader(download_dir=Path(tmpdir))
-        downloader._convert_vtt_to_srt(vtt_path, srt_path)
-
-        srt_content = srt_path.read_text(encoding="utf-8")
-        assert "00:00:01,000 --> 00:00:04,500" in srt_content
-        assert "01:02:03,123 --> 01:02:06,789" in srt_content
-        assert "Hello world" in srt_content
-        assert "align:start" not in srt_content
-        assert "<b>" not in srt_content
 
 
 def test_ffmpeg_filter_path_escaping():
@@ -419,4 +393,108 @@ def test_companion_words_saving():
         data = json.loads(stem_words.read_text(encoding="utf-8"))
         assert len(data) == 1
         assert data[0]["text"] == "Hello world"
+
+
+def test_no_caption_spam_at_first_millisecond():
+    """Verify that multiple segments or pre-clip words do NOT generate multiple 00:00:00.00 cues stacking on screen."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ass_path = Path(tmpdir) / "no_spam.ass"
+
+        # Clip starts at second 10.0 and ends at 15.0.
+        # Suppose transcription has words spoken before second 10.0 (e.g. 5.0 to 9.8) and inside clip (10.1 to 14.0)
+        words_data = [
+            {
+                "start": 5.0,
+                "end": 12.0,
+                "text": "old words from previous sentence before clip start then actual clip speech",
+                "words": [
+                    {"word": "old", "start": 5.0, "end": 5.5},
+                    {"word": "words", "start": 5.5, "end": 6.0},
+                    {"word": "from", "start": 6.0, "end": 6.5},
+                    {"word": "previous", "start": 6.5, "end": 7.5},
+                    {"word": "sentence", "start": 7.5, "end": 8.5},
+                    {"word": "before", "start": 8.5, "end": 9.2},
+                    {"word": "clip", "start": 9.2, "end": 9.8},
+                    {"word": "start", "start": 9.8, "end": 10.2},  # crosses 10.0
+                    {"word": "then", "start": 10.2, "end": 10.6},
+                    {"word": "actual", "start": 10.6, "end": 11.2},
+                    {"word": "clip", "start": 11.2, "end": 11.8},
+                    {"word": "speech", "start": 11.8, "end": 12.0},
+                ]
+            }
+        ]
+
+        success = ViralCaptionGenerator.generate_clip_ass(
+            source_srt_path=None,
+            clip_start=10.0,
+            clip_end=15.0,
+            output_ass_path=ass_path,
+            style_key="hormozi_yellow",
+            show_hook_banner=False,
+            words_data=words_data
+        )
+        assert success
+        content = ass_path.read_text(encoding="utf-8")
+
+        # Discarded words from 5.0 to 9.8 should NOT appear
+        assert "OLD" not in content
+        assert "PREVIOUS" not in content
+        assert "SENTENCE" not in content
+
+        # Check dialogue lines: ONLY ONE line can start at 0:00:00.00
+        zero_starts = [
+            line for line in content.splitlines()
+            if line.startswith("Dialogue:") and ",0:00:00.00," in line and "HookTitle" not in line
+        ]
+        assert len(zero_starts) <= 1, f"Spammed {len(zero_starts)} dialogue lines at 0:00:00.00!"
+
+
+def test_overlapping_whisper_words_strictly_non_overlapping():
+    """Verify that even when faster-whisper produces overlapping raw word timestamps, dialogue lines never overlap."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ass_path = Path(tmpdir) / "overlapping.ass"
+
+        # Raw Whisper timestamps where words heavily overlap
+        words_data = [
+            {
+                "start": 0.0,
+                "end": 2.5,
+                "text": "One two three four",
+                "words": [
+                    {"word": "One", "start": 0.0, "end": 0.8},    # ends at 0.8
+                    {"word": "two", "start": 0.2, "end": 1.2},    # starts at 0.2 (overlaps with One!)
+                    {"word": "three", "start": 0.6, "end": 1.8},  # starts at 0.6 (overlaps with One and two!)
+                    {"word": "four", "start": 1.0, "end": 2.2},   # starts at 1.0 (overlaps with two and three!)
+                ]
+            }
+        ]
+
+        success = ViralCaptionGenerator.generate_clip_ass(
+            source_srt_path=None,
+            clip_start=0.0,
+            clip_end=3.0,
+            output_ass_path=ass_path,
+            style_key="hormozi_yellow",
+            show_hook_banner=False,
+            words_data=words_data
+        )
+        assert success
+        content = ass_path.read_text(encoding="utf-8")
+
+        # Parse start and end times of all dialogue cues
+        cues = []
+        for line in content.splitlines():
+            if line.startswith("Dialogue:") and "HookTitle" not in line:
+                parts = line.split(",")
+                start_str, end_str = parts[1], parts[2]
+                from backend.utils.caption_styles import _parse_time_to_seconds
+                cues.append((_parse_time_to_seconds(start_str), _parse_time_to_seconds(end_str)))
+
+        assert len(cues) == 4
+        # Verify that for any consecutive cues, cue[i].end <= cue[i+1].start (NO OVERLAP)
+        for i in range(len(cues) - 1):
+            assert cues[i][1] <= cues[i + 1][0] + 0.001, (
+                f"Overlap detected: cue {i} ends at {cues[i][1]}, but cue {i+1} starts at {cues[i+1][0]}"
+            )
+
 

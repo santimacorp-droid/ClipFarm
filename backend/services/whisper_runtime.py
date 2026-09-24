@@ -37,7 +37,8 @@ def _data_dir() -> Path:
         from backend.core.desktop_config import get_desktop_data_dir
         return Path(get_desktop_data_dir())
     except Exception:
-        return Path(os.getenv("AUTOCLIP_DATA_DIR", str(Path.home() / "Library/Application Support/AutoClip")))
+        from backend.core.path_utils import get_default_app_data_dir
+        return get_default_app_data_dir()
 
 
 def get_install_dir() -> Path:

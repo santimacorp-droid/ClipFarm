@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=ClipFarm Studio
+GenericName=AI Video Clipping Studio
+Comment=AI Short-Form Video Clipping & Studio
+Exec=/media/santima/Storage/Projects/ClipFarm/launch_clipfarm.sh
+Icon=clipfarm
+Path=/media/santima/Storage/Projects/ClipFarm
+Terminal=false
+StartupNotify=true
+StartupWMClass=ClipFarm
+Categories=AudioVideo;Video;AudioVideoEditing;
+Keywords=video;clips;ai;shortform;tiktok;reels;youtube;

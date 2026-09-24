@@ -61,19 +61,30 @@ impl BackendManager {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .env("AUTOCLIP_DESKTOP_MODE", "true")
-            .env("AUTOCLIP_MODE", "desktop");
+            .env("AUTOCLIP_MODE", "desktop")
+            .env("CLIPFARM_DESKTOP_MODE", "true")
+            .env("CLIPFARM_MODE", "desktop")
+            .env("CLIPFARM_STANDALONE", "true")
+            .env("USE_CELERY", "false");
 
         // Point the backend at the bundled ffmpeg/ffprobe when present.
         // The backend's ffmpeg_utils reads these env vars before falling back
         // to PATH, so this is what makes video processing work on machines
         // without a system ffmpeg installed.
-        let ffmpeg_bin = launch.working_dir.join("ffmpeg").join("ffmpeg");
-        if ffmpeg_bin.is_file() {
+        if let Some(ffmpeg_bin) = Self::find_bundled_binary(&launch.working_dir, "ffmpeg") {
+            cmd.env("CLIPFARM_FFMPEG_PATH", &ffmpeg_bin);
             cmd.env("AUTOCLIP_FFMPEG_PATH", &ffmpeg_bin);
         }
-        let ffprobe_bin = launch.working_dir.join("ffmpeg").join("ffprobe");
-        if ffprobe_bin.is_file() {
+        if let Some(ffprobe_bin) = Self::find_bundled_binary(&launch.working_dir, "ffprobe") {
+            cmd.env("CLIPFARM_FFPROBE_PATH", &ffprobe_bin);
             cmd.env("AUTOCLIP_FFPROBE_PATH", &ffprobe_bin);
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
         }
 
         match cmd.spawn() {
@@ -145,25 +156,80 @@ impl BackendManager {
         self.status.lock().unwrap().clone()
     }
 
+    fn find_bundled_binary(base_dir: &PathBuf, bin_name: &str) -> Option<PathBuf> {
+        let candidates = if cfg!(target_os = "windows") {
+            let exe_name = format!("{}.exe", bin_name);
+            vec![
+                base_dir.join("ffmpeg").join(&exe_name),
+                base_dir.join("ffmpeg").join("bin").join(&exe_name),
+                base_dir.join(&exe_name),
+            ]
+        } else {
+            vec![
+                base_dir.join("ffmpeg").join(bin_name),
+                base_dir.join("ffmpeg").join("bin").join(bin_name),
+                base_dir.join(bin_name),
+            ]
+        };
+
+        for candidate in candidates {
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+        None
+    }
+
+    fn find_python_in_dir(dir: &PathBuf) -> Option<PathBuf> {
+        let candidates = if cfg!(target_os = "windows") {
+            vec![
+                dir.join("venv").join("Scripts").join("python.exe"),
+                dir.join("python").join("python.exe"),
+                dir.join("python").join("Scripts").join("python.exe"),
+                dir.join("python.exe"),
+            ]
+        } else {
+            vec![
+                dir.join("venv").join("bin").join("python"),
+                dir.join("venv").join("bin").join("python3"),
+                dir.join("python").join("bin").join("python3"),
+                dir.join("python").join("bin").join("python"),
+                dir.join("bin").join("python3"),
+            ]
+        };
+
+        for candidate in candidates {
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+        None
+    }
+
     fn get_backend_launch(&self, app_handle: &AppHandle) -> Result<BackendLaunch, String> {
         if let Ok(resource_path) = app_handle.path().resource_dir() {
             for backend_work_dir in [resource_path.clone(), resource_path.join("resources")] {
-                for backend_binary in [
-                    backend_work_dir.join(Self::backend_binary_name()),
-                    backend_work_dir
-                        .join("autoclip-backend")
-                        .join(Self::backend_binary_name()),
-                ] {
-                    if backend_binary.is_file() {
-                        let working_dir = backend_binary
-                            .parent()
-                            .map(|path| path.to_path_buf())
-                            .unwrap_or_else(|| backend_work_dir.clone());
-                        return Ok(BackendLaunch {
-                            program: backend_binary.to_string_lossy().to_string(),
-                            args: Vec::new(),
-                            working_dir,
-                        });
+                for bin_name in ["clipfarm-backend", "autoclip-backend"] {
+                    let exe_name = if cfg!(target_os = "windows") {
+                        format!("{}.exe", bin_name)
+                    } else {
+                        bin_name.to_string()
+                    };
+                    for backend_binary in [
+                        backend_work_dir.join(&exe_name),
+                        backend_work_dir.join(bin_name).join(&exe_name),
+                    ] {
+                        if backend_binary.is_file() {
+                            let working_dir = backend_binary
+                                .parent()
+                                .map(|path| path.to_path_buf())
+                                .unwrap_or_else(|| backend_work_dir.clone());
+                            return Ok(BackendLaunch {
+                                program: backend_binary.to_string_lossy().to_string(),
+                                args: Vec::new(),
+                                working_dir,
+                            });
+                        }
                     }
                 }
 
@@ -172,19 +238,9 @@ impl BackendManager {
                     continue;
                 }
 
-                let venv_python = backend_work_dir.join("venv").join("bin").join("python");
-                if venv_python.exists() {
+                if let Some(py) = Self::find_python_in_dir(&backend_work_dir) {
                     return Ok(Self::python_launch(
-                        venv_python.to_string_lossy().to_string(),
-                        backend_work_dir,
-                    ));
-                }
-
-                // python-build-standalone bundle: resources/python/bin/python3
-                let pbs_python = backend_work_dir.join("python").join("bin").join("python3");
-                if pbs_python.exists() {
-                    return Ok(Self::python_launch(
-                        pbs_python.to_string_lossy().to_string(),
+                        py.to_string_lossy().to_string(),
                         backend_work_dir,
                     ));
                 }
@@ -202,10 +258,9 @@ impl BackendManager {
             if let Some(project_root) = current_dir.parent() {
                 let backend_dir = project_root.join("backend");
                 if backend_dir.exists() {
-                    let venv_python = project_root.join("venv").join("bin").join("python");
-                    if venv_python.exists() {
+                    if let Some(py) = Self::find_python_in_dir(&project_root.to_path_buf()) {
                         return Ok(Self::python_launch(
-                            venv_python.to_string_lossy().to_string(),
+                            py.to_string_lossy().to_string(),
                             project_root.to_path_buf(),
                         ));
                     }
@@ -227,10 +282,9 @@ impl BackendManager {
         if let Ok(current_dir) = std::env::current_dir() {
             let backend_dir = current_dir.join("backend");
             if backend_dir.exists() {
-                let venv_python = current_dir.join("venv").join("bin").join("python");
-                if venv_python.exists() {
+                if let Some(py) = Self::find_python_in_dir(&current_dir) {
                     return Ok(Self::python_launch(
-                        venv_python.to_string_lossy().to_string(),
+                        py.to_string_lossy().to_string(),
                         current_dir,
                     ));
                 }
@@ -255,9 +309,9 @@ impl BackendManager {
 
     fn backend_binary_name() -> &'static str {
         if cfg!(target_os = "windows") {
-            "autoclip-backend.exe"
+            "clipfarm-backend.exe"
         } else {
-            "autoclip-backend"
+            "clipfarm-backend"
         }
     }
 

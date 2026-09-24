@@ -98,14 +98,18 @@ class LLMProvider(ABC):
         return prompt
 
 class DashScopeProvider(LLMProvider):
-    """Alibaba DashScope Provider"""
+    """Alibaba DashScope / Model Studio Provider"""
     
     def __init__(self, api_key: str, model_name: str = "qwen-plus", **kwargs):
         super().__init__(api_key, model_name, **kwargs)
         # Mode: native (SDK Generation.call) | compatible (OpenAI compatible)
-        self.mode = (kwargs.get("mode") or os.getenv("DASHSCOPE_MODE") or "native").lower()
-        # Compatible mode base_url
-        self.base_url = kwargs.get("base_url") or os.getenv("DASHSCOPE_BASE_URL") or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        # If API key starts with sk-ws- (Alibaba Cloud Model Studio / Workspace / International key), use compatible + intl endpoint
+        is_intl_key = bool(self.api_key and self.api_key.startswith("sk-ws-"))
+        default_mode = "compatible" if is_intl_key else "compatible"
+        default_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1" if is_intl_key else "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+        
+        self.mode = (kwargs.get("mode") or os.getenv("DASHSCOPE_MODE") or default_mode).lower()
+        self.base_url = kwargs.get("base_url") or os.getenv("DASHSCOPE_BASE_URL") or default_url
         # Native mode SDK
         self._ds_generation = None
         if self.mode == "native":
@@ -215,12 +219,26 @@ class DashScopeProvider(LLMProvider):
                     return True
                 else:
                     logger.error("DashScope API test returned empty response")
-                    return False
-                    
             except Exception as e:
-                logger.error(f"DashScope API test failed: {str(e)}")
-                return False
-                
+                logger.warning(f"Initial DashScope connection attempt failed ({self.mode}, {self.base_url}): {e}")
+
+            # Fallback: Try compatible mode with international endpoint
+            intl_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+            if self.base_url != intl_url or self.mode != "compatible":
+                try:
+                    logger.info("Retrying DashScope with International Compatible endpoint...")
+                    old_mode, old_url = self.mode, self.base_url
+                    self.mode = "compatible"
+                    self.base_url = intl_url
+                    response = self.call("test", max_tokens=1)
+                    if response and response.content:
+                        logger.info("DashScope International connection successful! Retaining compatible mode.")
+                        return True
+                    self.mode, self.base_url = old_mode, old_url
+                except Exception as fb_err:
+                    logger.error(f"Fallback connection attempt to international endpoint failed: {fb_err}")
+
+            return False
         except Exception as e:
             logger.error(f"DashScope connection test failed: {e}")
             return False
@@ -432,6 +450,32 @@ class OllamaProvider(OpenAIProvider):
             ]
         return models
 
+    def test_connection(self) -> bool:
+        """Test connection to local Ollama service."""
+        try:
+            remote_models = self.client.models.list()
+            available = [getattr(m, "id", None) or str(m) for m in getattr(remote_models, "data", [])]
+            if not available:
+                logger.info("Ollama is reachable, but no models are downloaded yet.")
+                return True
+            
+            # If the configured model is installed, test with it; otherwise test with any installed model
+            target_model = self.model_name if self.model_name in available else available[0]
+            try:
+                res = self.client.chat.completions.create(
+                    model=target_model,
+                    messages=[{"role": "user", "content": "hi"}],
+                    max_tokens=2,
+                    timeout=10.0
+                )
+                return res is not None and len(res.choices) > 0
+            except Exception as e:
+                logger.warning(f"Ollama server is reachable, chat test warning: {e}")
+                return True
+        except Exception as e:
+            logger.error(f"Ollama connection test failed: {e}")
+            return False
+
 
 class LMStudioProvider(OpenAIProvider):
     """Local LM Studio Provider"""
@@ -439,6 +483,15 @@ class LMStudioProvider(OpenAIProvider):
     def __init__(self, api_key: str = "", model_name: str = "local-model", base_url: Optional[str] = None, **kwargs):
         default_url = base_url or kwargs.get("base_url") or os.getenv("LMSTUDIO_BASE_URL") or "http://localhost:1234/v1"
         super().__init__(api_key or "local", model_name or "local-model", base_url=default_url, **kwargs)
+
+    def test_connection(self) -> bool:
+        """Test connection to local LM Studio service."""
+        try:
+            self.client.models.list()
+            return True
+        except Exception as e:
+            logger.error(f"LM Studio connection test failed: {e}")
+            return False
 
     def get_available_models(self) -> List[ModelInfo]:
         """Query local LM Studio instance for currently loaded models."""

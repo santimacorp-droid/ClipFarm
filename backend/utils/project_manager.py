@@ -4,9 +4,13 @@ Project management tool
 import json
 import logging
 import os
+import uuid
+import shutil
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 from datetime import datetime
+
+from .error_handler import FileIOError, ValidationError
 
 # Fix import issues
 try:

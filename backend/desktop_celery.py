@@ -3,14 +3,13 @@ Desktop modeCeleryConfiguration UseSQLiteasBrokerandBackend, Suitable for standa
 """
 import os
 
-if os.getenv("AUTOCLIP_DESKTOP_MODE", "").lower() not in {"1", "true", "yes"}:
-    raise RuntimeError("This module is available only in desktop mode")
+from pathlib import Path
+from backend.core.path_utils import is_desktop_mode, get_default_app_data_dir
 
 from celery import Celery
-from pathlib import Path
 
-# File system broker + sqlite backend(Example)
-app_dir = Path(os.getenv("AUTOCLIP_APP_DIR", "~/Library/Application Support/AutoClip")).expanduser()
+# File system broker + sqlite backend
+app_dir = get_default_app_data_dir()
 app_dir.mkdir(parents=True, exist_ok=True)
 
 # CreateCeleryDirectory

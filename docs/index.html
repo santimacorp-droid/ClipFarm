@@ -1,0 +1,2333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClipFarm Studio — AI Short-Form Video Clipping & Studio Desktop</title>
+  <meta name="description" content="Turn 1-hour videos into viral short clips in seconds. 100% Free, Local & Private on your machine. AI scene detection, smart 9:16 re-framing, kinetic captions, and multiplatform hooks. Available for Windows, macOS, and Linux.">
+  <meta name="keywords" content="video clipper, ai video editing, viral clips, shorts generator, tiktok clips, reels generator, hormozi captions, open source video editor">
+  
+  <!-- OpenGraph / Social -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ClipFarm Studio — AI Short-Form Video Clipping">
+  <meta property="og:description" content="Turn 1-hour videos into viral short clips in seconds. Local AI, kinetic animated captions, 9:16 smart framing, and multiplatform CTAs.">
+  <meta property="og:image" content="assets/clipfarm_cover.jpg">
+  
+  <link rel="icon" type="image/png" href="assets/app_icon.png">
+
+  <style>
+    :root {
+      --bg: #080B11;
+      --bg-surface: #0E131F;
+      --bg-card: rgba(18, 24, 38, 0.7);
+      --bg-card-hover: rgba(24, 32, 52, 0.85);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(59, 130, 246, 0.4);
+      --text: #F1F5F9;
+      --text-muted: #94A3B8;
+      --text-dim: #64748B;
+      --primary: #3B82F6;
+      --primary-hover: #2563EB;
+      --primary-glow: rgba(59, 130, 246, 0.25);
+      --accent: #8B5CF6;
+      --accent-glow: rgba(139, 92, 246, 0.25);
+      --green: #10B981;
+      --yellow: #F59E0B;
+      --red: #EF4444;
+      --cyan: #06B6D4;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-full: 9999px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+    }
+
+    body {
+      overflow-x: hidden;
+      line-height: 1.6;
+      background: radial-gradient(circle at 50% 0%, #151E32 0%, var(--bg) 60%);
+      min-height: 100vh;
+    }
+
+    /* Ambient background glows */
+    .ambient-glow {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1000px;
+      height: 600px;
+      background: radial-gradient(ellipse at 50% 20%, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.08) 40%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Container */
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Top Navigation */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(8, 11, 17, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      height: 72px;
+      display: flex;
+      align-items: center;
+    }
+
+    .nav-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+
+    .brand-name {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      background: rgba(59, 130, 246, 0.15);
+      color: #60A5FA;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      border: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #3B82F6, #2563EB);
+      color: #FFFFFF;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #60A5FA, #3B82F6);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-outline:hover {
+      color: var(--text);
+      border-color: var(--border-accent);
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    .btn-lg {
+      padding: 14px 28px;
+      font-size: 16px;
+      border-radius: 12px;
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 80px 0 60px;
+      text-align: center;
+      position: relative;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      border-radius: var(--radius-full);
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #93C5FD;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+
+    .hero-badge .dot {
+      width: 8px;
+      height: 8px;
+      background: #10B981;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #10B981;
+    }
+
+    .hero-title {
+      font-size: 58px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      line-height: 1.15;
+      margin-bottom: 20px;
+      max-width: 960px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero-title span.gradient {
+      background: linear-gradient(135deg, #60A5FA 0%, #A78BFA 50%, #F472B6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      font-size: 19px;
+      color: var(--text-muted);
+      max-width: 760px;
+      margin: 0 auto 36px;
+      line-height: 1.6;
+    }
+
+    .hero-cta-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+
+    .hero-cta-buttons {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .hero-terminal {
+      background: rgba(14, 19, 31, 0.9);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 16px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: #93C5FD;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      max-width: 600px;
+    }
+
+    .hero-terminal button {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      transition: color 0.2s;
+    }
+
+    .hero-terminal button:hover {
+      color: #FFFFFF;
+    }
+
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 48px;
+      padding-top: 32px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      flex-wrap: wrap;
+    }
+
+    .hero-stat-item h4 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #FFFFFF;
+    }
+
+    .hero-stat-item p {
+      font-size: 13px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    /* Section Headers */
+    .section-header {
+      text-align: center;
+      max-width: 720px;
+      margin: 0 auto 56px;
+    }
+
+    .section-tag {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--primary);
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .section-title {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 16px;
+    }
+
+    .section-subtitle {
+      font-size: 16px;
+      color: var(--text-muted);
+    }
+
+    /* Interactive Studio Simulator */
+    .simulator-section {
+      padding: 80px 0;
+      position: relative;
+    }
+
+    .simulator-wrapper {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 36px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
+    }
+
+    /* 9:16 Phone Device */
+    .phone-container {
+      display: flex;
+      justify-content: center;
+    }
+
+    .phone-mockup {
+      width: 290px;
+      height: 520px;
+      background: #000000;
+      border-radius: 40px;
+      border: 6px solid #232D3F;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px var(--primary-glow);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .phone-notch {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100px;
+      height: 18px;
+      background: #232D3F;
+      border-radius: 12px;
+      z-index: 20;
+    }
+
+    .phone-screen {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 40px 16px 24px;
+      overflow: hidden;
+    }
+
+    /* Simulated Video Backdrop */
+    .simulated-video-bg {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      filter: brightness(0.7);
+      transition: filter 0.3s;
+      z-index: 1;
+    }
+
+    /* Hook Banner */
+    .simulated-hook-banner {
+      position: relative;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.75);
+      border-left: 4px solid #EF4444;
+      border-radius: 6px;
+      padding: 6px 10px;
+      backdrop-filter: blur(8px);
+      transition: all 0.3s;
+    }
+
+    .simulated-hook-tag {
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #F87171;
+      letter-spacing: 0.5px;
+    }
+
+    .simulated-hook-text {
+      font-size: 11px;
+      font-weight: 700;
+      color: #FFFFFF;
+      line-height: 1.3;
+    }
+
+    /* Center Speaker Avatar Simulation */
+    .simulated-speaker {
+      position: relative;
+      z-index: 5;
+      margin: auto 0;
+      text-align: center;
+    }
+
+    .speaker-glow-avatar {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      margin: 0 auto;
+      background: url('assets/clipfarm_avatar.jpg') center/cover;
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 0 25px rgba(59, 130, 246, 0.3);
+      animation: speakerPulse 2.5s infinite ease-in-out;
+    }
+
+    @keyframes speakerPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+      50% { transform: scale(1.03); box-shadow: 0 0 35px rgba(139, 92, 246, 0.5); }
+    }
+
+    /* Kinetic Caption Display */
+    .simulated-captions {
+      position: relative;
+      z-index: 10;
+      text-align: center;
+      margin-bottom: 20px;
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Style variants */
+    .caption-box {
+      padding: 8px 14px;
+      line-height: 1.3;
+      transition: all 0.2s ease;
+    }
+
+    /* Hormozi Style */
+    .style-hormozi {
+      font-family: Impact, sans-serif;
+      font-size: 20px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #FFFFFF;
+      text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+    }
+    .style-hormozi .highlight {
+      color: #FACC15;
+      background: #000000;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      transform: scale(1.08) rotate(-1deg);
+    }
+
+    /* MrBeast Style */
+    .style-beast {
+      font-family: "Arial Black", sans-serif;
+      font-size: 19px;
+      text-transform: uppercase;
+      color: #FFFFFF;
+      text-shadow: 3px 3px 0 #000;
+    }
+    .style-beast .highlight {
+      color: #EF4444;
+      text-shadow: 3px 3px 0 #FBBF24;
+      display: inline-block;
+      transform: scale(1.15);
+      animation: beastBounce 0.4s ease;
+    }
+
+    @keyframes beastBounce {
+      0% { transform: scale(0.9); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1.15); }
+    }
+
+    /* Cyber Neon */
+    .style-neon {
+      font-family: var(--font-mono);
+      font-size: 17px;
+      font-weight: 800;
+      color: #FFFFFF;
+      text-shadow: 0 0 10px #06B6D4, 0 0 20px #06B6D4;
+    }
+    .style-neon .highlight {
+      color: #F43F5E;
+      text-shadow: 0 0 12px #F43F5E, 0 0 24px #F43F5E;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+
+    /* Clean Editorial */
+    .style-editorial {
+      font-family: var(--font);
+      font-size: 16px;
+      font-weight: 600;
+      color: #E2E8F0;
+      background: rgba(0, 0, 0, 0.7);
+      border-radius: 8px;
+    }
+    .style-editorial .highlight {
+      color: #38BDF8;
+      font-weight: 800;
+      text-decoration: underline;
+    }
+
+    /* Simulator Controls on Right */
+    .simulator-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .sim-panel-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .sim-panel-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .style-selector {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .style-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      text-align: left;
+      cursor: pointer;
+      color: var(--text);
+      transition: all 0.2s;
+    }
+
+    .style-btn:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: var(--primary);
+    }
+
+    .style-btn.active {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: var(--primary);
+      box-shadow: 0 0 16px rgba(59, 130, 246, 0.2);
+    }
+
+    .style-btn-title {
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 2px;
+    }
+
+    .style-btn-sub {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .sim-toggle-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .sim-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .sim-toggle-btn.active {
+      color: #FFFFFF;
+      background: rgba(16, 185, 129, 0.15);
+      border-color: var(--green);
+    }
+
+    .sim-progress-bar {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .sim-progress-fill {
+      height: 100%;
+      width: 30%;
+      background: var(--primary);
+      transition: width 0.1s linear;
+    }
+
+    /* Comparison Slider Section */
+    .comparison-section {
+      padding: 60px 0;
+    }
+
+    .comparison-box {
+      max-width: 900px;
+      margin: 0 auto;
+      position: relative;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      aspect-ratio: 16 / 9;
+      user-select: none;
+    }
+
+    .comparison-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background-size: cover;
+      background-position: center;
+    }
+
+    .comparison-before {
+      background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.6)), url('assets/clipfarm_pixel_cover_1790057279460.jpg') center/cover;
+    }
+
+    .comparison-after {
+      position: absolute;
+      inset: 0;
+      width: 50%;
+      overflow: hidden;
+      border-right: 2px solid #3B82F6;
+      background: linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.3)), url('assets/clipfarm_cover.jpg') center/cover;
+    }
+
+    .comparison-after-inner {
+      width: 900px;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      background: url('assets/clipfarm_cover.jpg') center/cover;
+    }
+
+    .comparison-slider-handle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #3B82F6;
+      border: 3px solid #FFFFFF;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: ew-resize;
+      z-index: 30;
+    }
+
+    .comparison-label {
+      position: absolute;
+      bottom: 16px;
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      z-index: 25;
+    }
+
+    .label-before { right: 16px; color: #94A3B8; }
+    .label-after { left: 16px; color: #60A5FA; }
+
+    /* Features Grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 24px;
+      margin-bottom: 80px;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 32px;
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(59, 130, 246, 0.4);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .feature-icon-box {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #60A5FA;
+    }
+
+    .feature-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      letter-spacing: -0.3px;
+    }
+
+    .feature-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Comparison Table (ClipFarm vs SaaS) */
+    .vs-section {
+      padding: 80px 0;
+    }
+
+    .vs-table-wrapper {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow-x: auto;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .vs-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .vs-table th, .vs-table td {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+
+    .vs-table th {
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-dim);
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+    }
+
+    .vs-table th.col-clipfarm, .vs-table td.col-clipfarm {
+      background: rgba(59, 130, 246, 0.07);
+      color: #FFFFFF;
+      font-weight: 700;
+    }
+
+    .vs-badge-good {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #34D399;
+      font-weight: 700;
+    }
+
+    .vs-badge-bad {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #F87171;
+    }
+
+    /* How It Works Walkthrough */
+    .steps-section {
+      padding: 80px 0;
+    }
+
+    .steps-nav {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+
+    .step-nav-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 10px 20px;
+      border-radius: var(--radius-full);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .step-nav-btn.active {
+      background: var(--primary);
+      color: #FFFFFF;
+      border-color: var(--primary);
+      box-shadow: 0 4px 14px var(--primary-glow);
+    }
+
+    .step-display {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 36px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items: center;
+    }
+
+    .step-terminal {
+      background: #090D15;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: #A5B4FC;
+      box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .terminal-circle {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .terminal-title {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-left: 8px;
+    }
+
+    /* Documentation Section */
+    .docs-section {
+      padding: 90px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .docs-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 40px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 36px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .docs-sidebar {
+      border-right: 1px solid var(--border);
+      padding-right: 24px;
+    }
+
+    .docs-search {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      color: #FFFFFF;
+      font-size: 13px;
+      margin-bottom: 20px;
+      outline: none;
+    }
+
+    .docs-search:focus {
+      border-color: var(--primary);
+    }
+
+    .docs-nav-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .docs-nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      font-size: 13.5px;
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .docs-nav-link:hover {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text);
+    }
+
+    .docs-nav-link.active {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60A5FA;
+      font-weight: 600;
+      border-left: 3px solid var(--primary);
+    }
+
+    .docs-content {
+      padding-left: 12px;
+      max-height: 800px;
+      overflow-y: auto;
+      padding-right: 12px;
+    }
+
+    .doc-article {
+      display: none;
+    }
+
+    .doc-article.active {
+      display: block;
+      animation: fadeIn 0.25s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .doc-article h2 {
+      font-size: 26px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+      color: #FFFFFF;
+    }
+
+    .doc-article h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 24px 0 10px;
+      color: #E2E8F0;
+    }
+
+    .doc-article p {
+      font-size: 14.5px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      line-height: 1.65;
+    }
+
+    .doc-article ul, .doc-article ol {
+      margin-left: 20px;
+      margin-bottom: 18px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .doc-article li {
+      margin-bottom: 6px;
+    }
+
+    .code-block {
+      background: #090E18;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 18px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: #93C5FD;
+      position: relative;
+      margin: 14px 0 20px;
+      overflow-x: auto;
+    }
+
+    .code-block button.copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .code-block button.copy-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #FFFFFF;
+    }
+
+    /* Downloads Matrix */
+    .downloads-section {
+      padding: 90px 0;
+    }
+
+    .downloads-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    .download-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: all 0.25s ease;
+    }
+
+    .download-card.highlight {
+      border-color: var(--primary);
+      box-shadow: 0 0 30px var(--primary-glow);
+    }
+
+    .download-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+
+    .download-badge-detected {
+      position: absolute;
+      top: -12px;
+      right: 20px;
+      background: #10B981;
+      color: #064E3B;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+      box-shadow: 0 4px 10px rgba(16, 185, 129, 0.4);
+      display: none;
+    }
+
+    .download-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .download-icon {
+      font-size: 36px;
+    }
+
+    .download-title h3 {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .download-format-badge {
+      font-size: 11px;
+      font-weight: 700;
+      color: #38BDF8;
+      background: rgba(56, 189, 248, 0.1);
+      padding: 2px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-top: 4px;
+    }
+
+    .download-desc {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 20px;
+      flex-grow: 1;
+    }
+
+    .download-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-bottom: 18px;
+      font-weight: 600;
+    }
+
+    .download-links-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* FAQ Section */
+    .faq-section {
+      padding: 70px 0 100px;
+    }
+
+    .faq-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    .faq-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 24px;
+    }
+
+    .faq-question {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #FFFFFF;
+    }
+
+    .faq-answer {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Footer */
+    .footer {
+      background: #05070B;
+      border-top: 1px solid var(--border);
+      padding: 60px 0 30px;
+      color: var(--text-dim);
+      font-size: 13.5px;
+    }
+
+    .footer-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 24px;
+      margin-bottom: 40px;
+      padding-bottom: 30px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 24px;
+      list-style: none;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover {
+      color: #FFFFFF;
+    }
+
+    .footer-bottom {
+      text-align: center;
+      font-size: 12px;
+    }
+
+    /* Toast Notification */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #10B981;
+      color: #FFFFFF;
+      font-weight: 600;
+      font-size: 13px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
+      transform: translateY(10px);
+      z-index: 1000;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Responsive */
+    @media (max-width: 960px) {
+      .hero-title { font-size: 40px; }
+      .simulator-wrapper { grid-template-columns: 1fr; }
+      .docs-layout { grid-template-columns: 1fr; }
+      .docs-sidebar { border-right: none; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
+      .step-display { grid-template-columns: 1fr; }
+      .faq-grid { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ambient-glow"></div>
+
+  <!-- Navigation -->
+  <header class="nav">
+    <div class="container nav-container">
+      <a href="#" class="brand">
+        <img src="assets/app_icon.png" alt="ClipFarm Logo" class="brand-icon">
+        <span class="brand-name">
+          ClipFarm Studio
+          <span class="brand-pill">v2.0.0</span>
+        </span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="#simulator">Live Demo</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#comparison">Why Free?</a></li>
+        <li><a href="#how-it-works">How It Works</a></li>
+        <li><a href="#docs">Documentation</a></li>
+        <li><a href="#downloads">Downloads</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <a href="https://github.com/santimacorp-droid/ClipFarm" target="_blank" rel="noopener" class="btn btn-outline" style="font-size: 13px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          Star on GitHub
+        </a>
+        <a href="#downloads" class="btn btn-primary" id="nav-download-btn">
+          Download v2.0
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-badge">
+        <span class="dot"></span>
+        100% Free & Open-Source • Local & Private Desktop Studio
+      </div>
+
+      <h1 class="hero-title">
+        Turn Long Videos into <span class="gradient">Viral Short Clips</span> in Seconds
+      </h1>
+
+      <p class="hero-subtitle">
+        AI scene extraction, smart 9:16 vertical re-framing, kinetic word-by-word captions, and multiplatform hooks. Run locally on your GPU with zero monthly subscriptions.
+      </p>
+
+      <div class="hero-cta-group">
+        <div class="hero-cta-buttons">
+          <a href="#downloads" class="btn btn-primary btn-lg" id="hero-detected-btn">
+            <span id="hero-os-icon">💾</span>
+            <span id="hero-os-label">Download for Desktop</span>
+          </a>
+          <a href="#simulator" class="btn btn-secondary btn-lg">
+            ⚡ Try Interactive Demo
+          </a>
+        </div>
+
+        <!-- Terminal Quick Install -->
+        <div class="hero-terminal">
+          <span style="color: var(--text-dim);">$</span>
+          <span id="quick-cmd" style="flex: 1; text-align: left;">curl -fsSL https://raw.githubusercontent.com/santimacorp-droid/ClipFarm/main/install.sh | bash</span>
+          <button onclick="copyCommand('quick-cmd')" title="Copy Command">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="hero-stats">
+        <div class="hero-stat-item">
+          <h4>$0 / mo</h4>
+          <p>Zero Subscription Fees</p>
+        </div>
+        <div class="hero-stat-item">
+          <h4>100%</h4>
+          <p>Local & Private Footage</p>
+        </div>
+        <div class="hero-stat-item">
+          <h4>60 FPS</h4>
+          <p>Hardware Accelerated</p>
+        </div>
+        <div class="hero-stat-item">
+          <h4>4 Platforms</h4>
+          <p>TikTok • Shorts • Reels • FB</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Studio Simulator -->
+  <section class="simulator-section" id="simulator">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Interactive Experience</span>
+        <h2 class="section-title">See How ClipFarm Renders Viral Hooks</h2>
+        <p class="section-subtitle">
+          Test different kinetic subtitle styles, hook banners, and smart aspect ratio framing in real time right in your browser.
+        </p>
+      </div>
+
+      <div class="simulator-wrapper">
+        <!-- Phone Visualizer -->
+        <div class="phone-container">
+          <div class="phone-mockup">
+            <div class="phone-notch"></div>
+            <div class="phone-screen" id="sim-screen">
+              
+              <!-- Hook Banner -->
+              <div class="simulated-hook-banner" id="sim-hook">
+                <div class="simulated-hook-tag">🔥 VIRAL HOOK DETECTED</div>
+                <div class="simulated-hook-text">Wait until you see how this changes everything!</div>
+              </div>
+
+              <!-- Center Speaker Avatar -->
+              <div class="simulated-speaker">
+                <div class="speaker-glow-avatar"></div>
+              </div>
+
+              <!-- Animated Kinetic Subtitles -->
+              <div class="simulated-captions">
+                <div class="caption-box style-hormozi" id="caption-box">
+                  <span class="caption-word" id="word-0">THE</span>
+                  <span class="caption-word" id="word-1">BIGGEST</span>
+                  <span class="caption-word highlight" id="word-2">SECRET</span>
+                  <span class="caption-word" id="word-3">TO</span>
+                  <span class="caption-word" id="word-4">GROWTH</span>
+                </div>
+              </div>
+
+              <!-- Social Bottom CTAs -->
+              <div style="display: flex; justify-content: space-between; align-items: center; z-index: 10; font-size: 11px; color: rgba(255,255,255,0.7);">
+                <span>@clipfarm_studio</span>
+                <span>🎵 Original Sound</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Simulator Controls -->
+        <div class="simulator-controls">
+          <div>
+            <h3 class="sim-panel-title">Kinetic Subtitle Engine</h3>
+            <p class="sim-panel-desc">
+              Powered by word-level Whisper timestamps and Libass rendering. Zero screen-stacking collisions, pure kinetic energy.
+            </p>
+          </div>
+
+          <div>
+            <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; display: block;">Select Caption Preset:</span>
+            <div class="style-selector">
+              <button class="style-btn active" onclick="setCaptionStyle('hormozi')">
+                <div class="style-btn-title">⚡ Hormozi Yellow</div>
+                <div class="style-btn-sub">High contrast, impact stroke</div>
+              </button>
+              <button class="style-btn" onclick="setCaptionStyle('beast')">
+                <div class="style-btn-title">💥 MrBeast Pop</div>
+                <div class="style-btn-sub">Vibrant bounce, attention snap</div>
+              </button>
+              <button class="style-btn" onclick="setCaptionStyle('neon')">
+                <div class="style-btn-title">🤖 Cyber Neon</div>
+                <div class="style-btn-sub">Electric glow, monospace tech</div>
+              </button>
+              <button class="style-btn" onclick="setCaptionStyle('editorial')">
+                <div class="style-btn-title">✍️ Clean Minimal</div>
+                <div class="style-btn-sub">Subtle dark pill, modern font</div>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; display: block;">Toggles & Framing:</span>
+            <div class="sim-toggle-row">
+              <button class="sim-toggle-btn active" id="btn-toggle-hook" onclick="toggleHookBanner()">
+                <span>🏷️ Hook Banner: ON</span>
+              </button>
+              <button class="sim-toggle-btn" id="btn-toggle-play" onclick="togglePlayback()">
+                <span id="play-status-icon">⏸️ Pause Ticker</span>
+              </button>
+            </div>
+          </div>
+
+          <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-dim);">
+              <span>Speech Synchronization</span>
+              <span id="sim-time">00:03.45 / 00:15.00</span>
+            </div>
+            <div class="sim-progress-bar">
+              <div class="sim-progress-fill" id="sim-bar"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive 16:9 vs 9:16 Comparison Slider -->
+  <section class="comparison-section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Smart Re-framing</span>
+        <h2 class="section-title">Widescreen 16:9 → Vertical 9:16</h2>
+        <p class="section-subtitle">
+          Drag the interactive slider below to see how ClipFarm converts standard landscape video into portrait format with dynamic ambient fill and speaker tracking.
+        </p>
+      </div>
+
+      <div class="comparison-box" id="comp-box">
+        <div class="comparison-img comparison-before"></div>
+        <div class="comparison-after" id="comp-after">
+          <div class="comparison-after-inner"></div>
+        </div>
+        <div class="comparison-slider-handle" id="comp-handle">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18-6-6 6-6M15 6l6 6-6 6"/></svg>
+        </div>
+        <span class="comparison-label label-after">9:16 Smart Vertical</span>
+        <span class="comparison-label label-before">16:9 Landscape Original</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Grid -->
+  <section class="features-section" id="features">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Production Engine</span>
+        <h2 class="section-title">Everything You Need to Scale Short-Form</h2>
+        <p class="section-subtitle">
+          Built from the ground up to replace clunky SaaS wrappers with native, hardware-accelerated desktop power.
+        </p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon-box">🧠</div>
+          <h3 class="feature-title">AI Viral Moment Detection</h3>
+          <p class="feature-desc">
+            Evaluates your transcripts across 4 core viral dimensions: narrative hook, emotional intensity, information density, and resolution payoff.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">🎙️</div>
+          <h3 class="feature-title">Local Whisper Word Timestamps</h3>
+          <p class="feature-desc">
+            Offline speech-to-text with precision word boundaries. No audio is ever uploaded to 3rd-party servers, keeping sensitive interviews 100% confidential.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">⚡</div>
+          <h3 class="feature-title">Multi-GPU Acceleration</h3>
+          <p class="feature-desc">
+            Optimized for NVIDIA CUDA, Apple Silicon Metal (MPS), and Intel/AMD DirectML. Render 1080x1920 60fps clips in a fraction of real time.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">🎨</div>
+          <h3 class="feature-title">Non-Overlapping Kinetic ASS</h3>
+          <p class="feature-desc">
+            Strict mathematical subtitle partitioning prevents screen-filling text spam and Libass line collisions at 00:00.00, ensuring buttery-smooth animations.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">📱</div>
+          <h3 class="feature-title">Multiplatform CTA Hooks</h3>
+          <p class="feature-desc">
+            Instantly generates platform-specific copywriting, hashtags, and visual call-to-actions tailored for TikTok, Instagram Reels, YouTube Shorts, and Facebook.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">🗂️</div>
+          <h3 class="feature-title">Batch Operations & Multi-Select</h3>
+          <p class="feature-desc">
+            Manage dozens of video projects simultaneously. Multi-select batch deletion, instant retry, and thumbnail management keep your workspace clean.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Value Proposition Comparison Table -->
+  <section class="vs-section" id="comparison">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Value Proposition</span>
+        <h2 class="section-title">ClipFarm Studio vs. SaaS Clippers</h2>
+        <p class="section-subtitle">
+          Why pay $300-$700/year for monthly SaaS tools with arbitrary limits and privacy concerns?
+        </p>
+      </div>
+
+      <div class="vs-table-wrapper">
+        <table class="vs-table">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th class="col-clipfarm">ClipFarm Studio</th>
+              <th>OpusClip / Munch</th>
+              <th>Klap / Vidyo.ai</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Pricing</td>
+              <td class="col-clipfarm"><span class="vs-badge-good">✓ $0 (100% Free Forever)</span></td>
+              <td><span class="vs-badge-bad">✕ $29–$59 / month</span></td>
+              <td><span class="vs-badge-bad">✕ $39 / month</span></td>
+            </tr>
+            <tr>
+              <td>Video Length Cap</td>
+              <td class="col-clipfarm"><span class="vs-badge-good">✓ Unlimited (Local Hardware)</span></td>
+              <td><span class="vs-badge-bad">✕ 60 - 150 min / mo</span></td>
+              <td><span class="vs-badge-bad">✕ 100 min / mo</span></td>
+            </tr>
+            <tr>
+              <td>Watermarks</td>
+              <td class="col-clipfarm"><span class="vs-badge-good">✓ Never (Clean Exports)</span></td>
+              <td><span class="vs-badge-bad">✕ Watermarked unless paid</span></td>
+              <td><span class="vs-badge-bad">✕ Watermarked</span></td>
+            </tr>
+            <tr>
+              <td>Footage Privacy</td>
+              <td class="col-clipfarm"><span class="vs-badge-good">✓ 100% Local on Machine</span></td>
+              <td><span class="vs-badge-bad">✕ Uploaded to cloud</span></td>
+              <td><span class="vs-badge-bad">✕ Cloud storage</span></td>
+            </tr>
+            <tr>
+              <td>Offline Capability</td>
+              <td class="col-clipfarm"><span class="vs-badge-good">✓ Local Whisper + Ollama</span></td>
+              <td><span class="vs-badge-bad">✕ Internet required</span></td>
+              <td><span class="vs-badge-bad">✕ Internet required</span></td>
+            </tr>
+            <tr>
+              <td>Batch Management</td>
+              <td class="col-clipfarm"><span class="vs-badge-good">✓ Multi-select batch delete</span></td>
+              <td><span class="vs-badge-bad">✕ Single operations</span></td>
+              <td><span class="vs-badge-bad">✕ Limited bulk</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works (Interactive 4-Step Pipeline) -->
+  <section class="steps-section" id="how-it-works">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Simple 4-Step Workflow</span>
+        <h2 class="section-title">From 1hr Podcast to 10 Viral Shorts</h2>
+        <p class="section-subtitle">
+          Click any step to inspect the automated pipeline under the hood.
+        </p>
+      </div>
+
+      <div class="steps-nav">
+        <button class="step-nav-btn active" onclick="switchStep(1)">1. Import & Ingest</button>
+        <button class="step-nav-btn" onclick="switchStep(2)">2. Whisper Speech-to-Text</button>
+        <button class="step-nav-btn" onclick="switchStep(3)">3. AI Hook Scoring</button>
+        <button class="step-nav-btn" onclick="switchStep(4)">4. 9:16 Render & CTAs</button>
+      </div>
+
+      <div class="step-display">
+        <div>
+          <h3 id="step-title" style="font-size: 24px; font-weight: 700; margin-bottom: 12px; color: #FFFFFF;">
+            1. Drag & Drop Video or Paste YouTube URL
+          </h3>
+          <p id="step-desc" style="font-size: 15px; color: var(--text-muted); line-height: 1.6; margin-bottom: 24px;">
+            Upload your podcast, webinar, or interview in MP4, MOV, MKV, or AVI. Or paste a YouTube URL to automatically download the highest 1080p bitrate stream.
+          </p>
+          <ul id="step-bullets" style="color: var(--text-muted); font-size: 14px; margin-left: 20px; line-height: 1.8;">
+            <li>Zero lossy pre-compression</li>
+            <li>Optional subtitle (.srt) file support for instant processing</li>
+            <li>Automatic aspect ratio & audio channel detection</li>
+          </ul>
+        </div>
+
+        <div class="step-terminal">
+          <div class="terminal-header">
+            <span class="terminal-circle" style="background: #EF4444;"></span>
+            <span class="terminal-circle" style="background: #F59E0B;"></span>
+            <span class="terminal-circle" style="background: #10B981;"></span>
+            <span class="terminal-title">pipeline_worker.py</span>
+          </div>
+          <pre id="step-code" style="margin: 0; white-space: pre-wrap;">
+[INFO] Ingesting video: podcast_ep42_4k.mp4
+[INFO] Duration: 01:14:32.40 | Audio: 48kHz Stereo AAC
+[INFO] Resolving media stream... Native 1920x1080 @ 60fps detected.
+[SUCCESS] Ingest validated. Dispatching to Whisper audio queue...</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Comprehensive Documentation Section -->
+  <section class="docs-section" id="docs">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Documentation & Manual</span>
+        <h2 class="section-title">Complete User & Developer Guide</h2>
+        <p class="section-subtitle">
+          Everything you need to configure hardware acceleration, local LLMs, and custom branding.
+        </p>
+      </div>
+
+      <div class="docs-layout">
+        <!-- Sidebar Navigation -->
+        <div class="docs-sidebar">
+          <input type="text" class="docs-search" id="docs-search-input" placeholder="Search documentation..." onkeyup="filterDocs()">
+          
+          <ul class="docs-nav-list" id="docs-nav-list">
+            <li><a class="docs-nav-link active" onclick="showDoc('install')">🚀 Installation Guides</a></li>
+            <li><a class="docs-nav-link" onclick="showDoc('speech')">🎙️ Whisper & Speech-to-Text</a></li>
+            <li><a class="docs-nav-link" onclick="showDoc('llm')">🧠 AI & LLM Providers</a></li>
+            <li><a class="docs-nav-link" onclick="showDoc('captions')">🎨 Kinetic Caption Styles</a></li>
+            <li><a class="docs-nav-link" onclick="showDoc('framing')">📱 9:16 Smart Framing</a></li>
+            <li><a class="docs-nav-link" onclick="showDoc('campaigns')">💼 Brand & Affiliate Mode</a></li>
+            <li><a class="docs-nav-link" onclick="showDoc('faq')">❓ FAQ & Troubleshooting</a></li>
+          </ul>
+        </div>
+
+        <!-- Document Content Body -->
+        <div class="docs-content">
+          
+          <!-- Chapter 1: Installation -->
+          <article class="doc-article active" id="doc-install">
+            <h2>Installation & Setup Guide</h2>
+            <p>ClipFarm Studio provides cross-platform desktop installers and portable packages for Windows, macOS, and Linux.</p>
+            
+            <h3>🪟 Windows 10 & 11</h3>
+            <ol>
+              <li>Download <strong>ClipFarm-Studio-Setup.exe</strong> from the downloads section.</li>
+              <li>Run the installer and follow the setup wizard.</li>
+              <li>Or download the portable <strong>.zip</strong> package and double-click <code>Install_ClipFarm.bat</code> followed by <code>Launch_ClipFarm.bat</code>.</li>
+            </ol>
+            <div class="code-block">
+              <code># Requirements: Windows 10/11 64-bit, 8GB+ RAM, NVIDIA GPU recommended for CUDA.</code>
+            </div>
+
+            <h3>🍏 macOS (Apple Silicon M1/M2/M3 & Intel)</h3>
+            <ol>
+              <li>Download <strong>ClipFarm-Studio-macOS.zip</strong> and extract it.</li>
+              <li>Right-click <code>Launch_ClipFarm.command</code> and select <strong>Open</strong>.</li>
+              <li>When prompted by Gatekeeper on first run, click <em>Open Anyway</em> in System Settings &gt; Privacy &amp; Security.</li>
+            </ol>
+
+            <h3>🐧 Ubuntu / Debian & Universal Linux</h3>
+            <p>Install via the official Debian package:</p>
+            <div class="code-block">
+              <span id="cmd-deb">sudo dpkg -i clipfarm_2.0.0_amd64.deb</span>
+              <button class="copy-btn" onclick="copyCommand('cmd-deb')">Copy</button>
+            </div>
+            <p>Or run the Universal Self-Extracting installer:</p>
+            <div class="code-block">
+              <span id="cmd-run">chmod +x ClipFarm-Studio-Linux-x86_64.run &amp;&amp; ./ClipFarm-Studio-Linux-x86_64.run</span>
+              <button class="copy-btn" onclick="copyCommand('cmd-run')">Copy</button>
+            </div>
+          </article>
+
+          <!-- Chapter 2: Speech Recognition -->
+          <article class="doc-article" id="doc-speech">
+            <h2>Whisper Speech Recognition Setup</h2>
+            <p>ClipFarm Studio utilizes OpenAI's Whisper model architecture with word-level alignment to generate precise timestamps for kinetic captions.</p>
+            
+            <h3>Local Whisper Model Tiers</h3>
+            <ul>
+              <li><strong>tiny / base:</strong> Ultra-fast, ideal for low-spec laptops with 4GB RAM.</li>
+              <li><strong>small (Recommended):</strong> The sweet spot for speed and accuracy in English/Spanish/French.</li>
+              <li><strong>medium / large-v3:</strong> Studio-grade transcription accuracy with multi-language nuances and technical jargon.</li>
+            </ul>
+
+            <h3>Hardware Acceleration Flags</h3>
+            <p>In <code>Settings &gt; Speech Recognition</code>, you can enable:</p>
+            <ul>
+              <li><strong>CUDA (NVIDIA):</strong> Utilizes PyTorch CUDA tensors for 10x-20x transcription speeds.</li>
+              <li><strong>MPS (Metal Performance Shaders):</strong> Native Apple Silicon acceleration for Mac M-series chips.</li>
+              <li><strong>CPU Multi-threading:</strong> Configurable thread counts (e.g., 4 to 16 threads) for systems without dedicated GPUs.</li>
+            </ul>
+
+            <h3>Optional Subtitle (.srt) Upload</h3>
+            <p>Already have an accurate human transcript or YouTube SRT file? Upload it alongside your video to bypass transcription entirely and jump straight to AI viral scoring.</p>
+          </article>
+
+          <!-- Chapter 3: LLM Providers -->
+          <article class="doc-article" id="doc-llm">
+            <h2>Configuring AI & LLM Providers</h2>
+            <p>ClipFarm analyzes video transcripts to find punchy hooks and emotional highlights using large language models.</p>
+
+            <h3>Supported Providers</h3>
+            <ul>
+              <li><strong>OpenAI:</strong> GPT-4o, GPT-4o-mini (fastest &amp; most reliable).</li>
+              <li><strong>Anthropic:</strong> Claude 3.5 Sonnet, Claude 3 Haiku (superb narrative reasoning).</li>
+              <li><strong>Google Gemini:</strong> Gemini 1.5 Flash / Pro (high context window).</li>
+              <li><strong>Ollama (100% Offline):</strong> Run Llama 3, Mistral, or Qwen locally on your machine with 0 external network requests.</li>
+              <li><strong>DeepSeek / Tongyi Qwen / Custom OpenAI-Compatible:</strong> Any vLLM, LM Studio, or local API endpoint.</li>
+            </ul>
+
+            <h3>Custom Scoring Thresholds</h3>
+            <p>You can adjust the minimum viral threshold in Settings (default: 70/100). Higher thresholds only extract the top 10% highest-energy moments.</p>
+          </article>
+
+          <!-- Chapter 4: Captions -->
+          <article class="doc-article" id="doc-captions">
+            <h2>Kinetic Caption Customization</h2>
+            <p>Subtitles are rendered via <strong>libass</strong> with custom advanced ASS subtitle event scripting.</p>
+
+            <h3>Key Styling Parameters</h3>
+            <ul>
+              <li><strong>Primary Color:</strong> Base text color (default: clean white <code>&H00FFFFFF</code>).</li>
+              <li><strong>Highlight Color:</strong> Active spoken word highlight (vibrant yellow <code>&H0000FFFF</code> or cyan).</li>
+              <li><strong>Border &amp; Shadow:</strong> Heavy 3px black stroke ensures high readability on any video background.</li>
+              <li><strong>Non-Overlapping Intervals:</strong> ClipFarm guarantees that $t_i^{\text{end}} = t_{i+1}^{\text{start}}$, preventing subtitle stacking bugs at millisecond zero.</li>
+              <li><strong>Vertical Margin:</strong> Position captions at bottom (for TikTok UI clearance), center, or top.</li>
+            </ul>
+          </article>
+
+          <!-- Chapter 5: Smart Framing -->
+          <article class="doc-article" id="doc-framing">
+            <h2>9:16 Vertical Smart Framing</h2>
+            <p>Convert horizontal 16:9 recordings into vertical format designed for smartphone screens:</p>
+            <ul>
+              <li><strong>9:16 Blur Fill:</strong> Keeps the full 16:9 video centered with a dynamically blurred and zoomed background matching the video colors.</li>
+              <li><strong>Smart Face Crop:</strong> Detects face coordinates and tracks the active speaker across cuts.</li>
+              <li><strong>Split Screen:</strong> Displays two speakers stacked vertically for interviews and debate podcasts.</li>
+            </ul>
+          </article>
+
+          <!-- Chapter 6: Campaigns -->
+          <article class="doc-article" id="doc-campaigns">
+            <h2>Brand Campaigns & Affiliate Mode</h2>
+            <p>ClipFarm includes a dedicated Campaign pipeline for sponsored content and influencer marketing:</p>
+            <ul>
+              <li><strong>Brief Parser:</strong> Paste a brand PDF or text brief; ClipFarm automatically parses required hashtags, banned phrases, and moment requirements.</li>
+              <li><strong>Watermark Manager:</strong> Add custom transparent brand logos in top-left, top-right, or lower-third positions.</li>
+              <li><strong>FTC Compliance Check:</strong> Automatically injects required <code>#ad</code> and sponsor disclosures into the generated social copy.</li>
+            </ul>
+          </article>
+
+          <!-- Chapter 7: FAQ -->
+          <article class="doc-article" id="doc-faq">
+            <h2>FAQ & Troubleshooting</h2>
+            <h3>FFmpeg is missing or not detected</h3>
+            <p>ClipFarm bundles an FFmpeg binary in portable releases. If using system Linux, install via <code>sudo apt install ffmpeg</code>.</p>
+            
+            <h3>CUDA Out of Memory</h3>
+            <p>If you have a 4GB or 6GB GPU, select the <strong>small</strong> or <strong>base</strong> Whisper model instead of <strong>large-v3</strong>, or lower Celery concurrency to 1 worker.</p>
+
+            <h3>How do I batch delete old projects?</h3>
+            <p>On the dashboard, click the <strong>Select</strong> button in the Projects toolbar, check the projects you wish to remove, and click <strong>Delete Selected</strong>.</p>
+          </article>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Downloads Section -->
+  <section class="downloads-section" id="downloads">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Direct Downloads</span>
+        <h2 class="section-title">Get ClipFarm Studio v2.0.0</h2>
+        <p class="section-subtitle">
+          Download the latest stable release for Windows, macOS, or Linux. All packages are 100% free and open-source.
+        </p>
+      </div>
+
+      <div class="downloads-grid">
+        <!-- Windows Card -->
+        <div class="download-card" id="card-windows">
+          <div class="download-badge-detected" id="badge-windows">Auto-detected</div>
+          <div class="download-header">
+            <span class="download-icon">🪟</span>
+            <div class="download-title">
+              <h3>Windows 10 / 11</h3>
+              <span class="download-format-badge">64-bit Architecture</span>
+            </div>
+          </div>
+          <p class="download-desc">
+            Official 1-Click Setup Wizard and portable editions for Windows 10 &amp; 11 with full CUDA GPU support.
+          </p>
+          <div class="download-meta">
+            <span>v2.0.0</span> • <span>11.6 MB</span> • <span>SHA256 Verified</span>
+          </div>
+          <div class="download-links-group">
+            <a href="https://github.com/santimacorp-droid/ClipFarm/releases/latest/download/ClipFarm-Studio-Setup.exe" class="btn btn-primary" download>
+              Download .exe Installer
+            </a>
+            <a href="https://github.com/santimacorp-droid/ClipFarm/releases/latest/download/ClipFarm-Studio-Windows-x64.zip" class="btn btn-secondary" download>
+              Download Portable .zip
+            </a>
+          </div>
+        </div>
+
+        <!-- macOS Card -->
+        <div class="download-card" id="card-macos">
+          <div class="download-badge-detected" id="badge-macos">Auto-detected</div>
+          <div class="download-header">
+            <span class="download-icon">🍏</span>
+            <div class="download-title">
+              <h3>macOS</h3>
+              <span class="download-format-badge">Apple Silicon &amp; Intel</span>
+            </div>
+          </div>
+          <p class="download-desc">
+            Native studio bundle with 1-click launch script. Fully optimized for Apple Silicon Metal (MPS) hardware acceleration.
+          </p>
+          <div class="download-meta">
+            <span>v2.0.0</span> • <span>16.3 MB</span> • <span>macOS 12+</span>
+          </div>
+          <div class="download-links-group">
+            <a href="https://github.com/santimacorp-droid/ClipFarm/releases/latest/download/ClipFarm-Studio-macOS.zip" class="btn btn-primary" download>
+              Download macOS Bundle (.zip)
+            </a>
+          </div>
+        </div>
+
+        <!-- Ubuntu / Debian Card -->
+        <div class="download-card" id="card-linux">
+          <div class="download-badge-detected" id="badge-linux">Auto-detected</div>
+          <div class="download-header">
+            <span class="download-icon">🐧</span>
+            <div class="download-title">
+              <h3>Ubuntu / Debian</h3>
+              <span class="download-format-badge">.deb Package</span>
+            </div>
+          </div>
+          <p class="download-desc">
+            Native Debian package for Ubuntu, Debian, Pop!_OS, Linux Mint. Installs desktop entries and system dependencies.
+          </p>
+          <div class="download-meta">
+            <span>v2.0.0</span> • <span>13.1 MB</span> • <span>x86_64</span>
+          </div>
+          <div class="download-links-group">
+            <a href="https://github.com/santimacorp-droid/ClipFarm/releases/latest/download/clipfarm_2.0.0_amd64.deb" class="btn btn-primary" download>
+              Download .deb Package
+            </a>
+            <a href="https://github.com/santimacorp-droid/ClipFarm/releases/latest/download/ClipFarm-Studio-Linux-x86_64.run" class="btn btn-secondary" download>
+              Download .run Installer
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Universal Alternative Downloads -->
+      <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <h4 style="font-size: 15px; font-weight: 700; color: #FFFFFF;">Looking for Linux Portable or Docker?</h4>
+          <p style="font-size: 13px; color: var(--text-muted);">
+            Download <a href="https://github.com/santimacorp-droid/ClipFarm/releases/latest/download/ClipFarm-Studio-Linux-x86_64.tar.gz" style="color: #60A5FA;">ClipFarm-Studio-Linux-x86_64.tar.gz</a> (16.1 MB) or run via Docker: <code>docker compose up</code>
+          </p>
+        </div>
+        <a href="https://github.com/santimacorp-droid/ClipFarm/releases" target="_blank" rel="noopener" class="btn btn-outline" style="font-size: 13px;">
+          View All GitHub Releases →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section class="faq-section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Common Inquiries</span>
+        <h2 class="section-title">Frequently Asked Questions</h2>
+      </div>
+
+      <div class="faq-grid">
+        <div class="faq-item">
+          <h4 class="faq-question">Is ClipFarm Studio really 100% free?</h4>
+          <p class="faq-answer">
+            Yes! ClipFarm Studio is open-source under the MIT license. There are no paywalls, hidden export watermarks, or artificial video length limits.
+          </p>
+        </div>
+
+        <div class="faq-item">
+          <h4 class="faq-question">Can I use it completely offline?</h4>
+          <p class="faq-answer">
+            Absolutely. If you select local Whisper for speech recognition and local Ollama for AI scoring, not a single byte of video or audio leaves your device.
+          </p>
+        </div>
+
+        <div class="faq-item">
+          <h4 class="faq-question">Does it support YouTube downloads?</h4>
+          <p class="faq-answer">
+            Yes. You can paste any public YouTube or Bilibili video URL directly into the import bar to download and clip high-quality highlights automatically.
+          </p>
+        </div>
+
+        <div class="faq-item">
+          <h4 class="faq-question">What languages are supported for captions?</h4>
+          <p class="faq-answer">
+            Whisper supports 99+ languages including English, Spanish, Chinese, French, German, Japanese, Portuguese, and Arabic with precise word timing.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-top">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <img src="assets/app_icon.png" alt="ClipFarm Logo" style="width: 28px; height: 28px; border-radius: 8px;">
+          <span style="font-weight: 700; color: #FFFFFF; font-size: 16px;">ClipFarm Studio</span>
+          <span style="font-size: 12px; color: var(--text-dim);">Open Source AI Video Clipper</span>
+        </div>
+
+        <ul class="footer-links">
+          <li><a href="https://github.com/santimacorp-droid/ClipFarm" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://github.com/santimacorp-droid/ClipFarm/issues" target="_blank" rel="noopener">Issues</a></li>
+          <li><a href="https://github.com/santimacorp-droid/ClipFarm/releases" target="_blank" rel="noopener">Releases</a></li>
+          <li><a href="#docs">Docs</a></li>
+          <li><a href="#downloads">Downloads</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-bottom">
+        <p>© 2026 ClipFarm Project. Open-source software licensed under MIT. Built for creators, editors, and indie hackers.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Toast Notification -->
+  <div id="toast">Copied to clipboard!</div>
+
+  <!-- Interactive Scripts -->
+  <script>
+    // 1. Dynamic OS Detection
+    function detectUserOS() {
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      let os = 'windows';
+
+      if (userAgent.includes('mac') || userAgent.includes('darwin')) {
+        os = 'macos';
+      } else if (userAgent.includes('linux') || userAgent.includes('ubuntu') || userAgent.includes('debian')) {
+        os = 'linux';
+      } else if (userAgent.includes('win')) {
+        os = 'windows';
+      }
+
+      // Update hero CTA button
+      const heroBtn = document.getElementById('hero-detected-btn');
+      const heroIcon = document.getElementById('hero-os-icon');
+      const heroLabel = document.getElementById('hero-os-label');
+
+      if (os === 'windows') {
+        heroIcon.textContent = '🪟';
+        heroLabel.textContent = 'Download for Windows 10/11 (.exe)';
+        heroBtn.href = 'https://github.com/santimacorp-droid/ClipFarm/releases/latest/download/ClipFarm-Studio-Setup.exe';
+        document.getElementById('card-windows')?.classList.add('highlight');
+        const badge = document.getElementById('badge-windows');
+        if (badge) badge.style.display = 'block';
+      } else if (os === 'macos') {
+        heroIcon.textContent = '🍏';
+        heroLabel.textContent = 'Download for macOS (Apple Silicon & Intel)';
+        heroBtn.href = 'https://github.com/santimacorp-droid/ClipFarm/releases/latest/download/ClipFarm-Studio-macOS.zip';
+        document.getElementById('card-macos')?.classList.add('highlight');
+        const badge = document.getElementById('badge-macos');
+        if (badge) badge.style.display = 'block';
+      } else if (os === 'linux') {
+        heroIcon.textContent = '🐧';
+        heroLabel.textContent = 'Download for Linux (.deb)';
+        heroBtn.href = 'https://github.com/santimacorp-droid/ClipFarm/releases/latest/download/clipfarm_2.0.0_amd64.deb';
+        document.getElementById('card-linux')?.classList.add('highlight');
+        const badge = document.getElementById('badge-linux');
+        if (badge) badge.style.display = 'block';
+      }
+    }
+
+    // 2. Interactive Caption Styles
+    const captionStyles = {
+      hormozi: 'style-hormozi',
+      beast: 'style-beast',
+      neon: 'style-neon',
+      editorial: 'style-editorial'
+    };
+
+    function setCaptionStyle(styleKey) {
+      const box = document.getElementById('caption-box');
+      if (!box) return;
+
+      // Reset class
+      box.className = 'caption-box ' + (captionStyles[styleKey] || 'style-hormozi');
+
+      // Update button active states
+      document.querySelectorAll('.style-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      event.currentTarget.classList.add('active');
+    }
+
+    // 3. Caption Playback Ticker Simulation
+    let isPlaying = true;
+    let currentWordIndex = 2;
+    const totalWords = 5;
+    let tickerInterval = null;
+
+    function startTicker() {
+      if (tickerInterval) clearInterval(tickerInterval);
+      tickerInterval = setInterval(() => {
+        if (!isPlaying) return;
+
+        // Clear all highlights
+        for (let i = 0; i < totalWords; i++) {
+          const w = document.getElementById('word-' + i);
+          if (w) w.classList.remove('highlight');
+        }
+
+        // Highlight next
+        currentWordIndex = (currentWordIndex + 1) % totalWords;
+        const activeWord = document.getElementById('word-' + currentWordIndex);
+        if (activeWord) activeWord.classList.add('highlight');
+
+        // Progress bar simulation
+        const pct = Math.round(((currentWordIndex + 1) / totalWords) * 100);
+        const bar = document.getElementById('sim-bar');
+        if (bar) bar.style.width = pct + '%';
+
+        const timeElem = document.getElementById('sim-time');
+        if (timeElem) {
+          const sec = (currentWordIndex * 0.8 + 1.2).toFixed(2);
+          timeElem.textContent = '00:0' + sec + ' / 00:04.00';
+        }
+      }, 750);
+    }
+
+    function togglePlayback() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('btn-toggle-play');
+      const icon = document.getElementById('play-status-icon');
+      if (isPlaying) {
+        icon.textContent = '⏸️ Pause Ticker';
+        btn.classList.remove('active');
+      } else {
+        icon.textContent = '▶️ Resume Ticker';
+        btn.classList.add('active');
+      }
+    }
+
+    function toggleHookBanner() {
+      const banner = document.getElementById('sim-hook');
+      const btn = document.getElementById('btn-toggle-hook');
+      if (!banner || !btn) return;
+
+      if (banner.style.display === 'none') {
+        banner.style.display = 'block';
+        btn.innerHTML = '<span>🏷️ Hook Banner: ON</span>';
+        btn.classList.add('active');
+      } else {
+        banner.style.display = 'none';
+        btn.innerHTML = '<span>🏷️ Hook Banner: OFF</span>';
+        btn.classList.remove('active');
+      }
+    }
+
+    // 4. Comparison Slider
+    const compBox = document.getElementById('comp-box');
+    const compAfter = document.getElementById('comp-after');
+    const compHandle = document.getElementById('comp-handle');
+    let isDraggingSlider = false;
+
+    function updateSlider(x) {
+      if (!compBox || !compAfter || !compHandle) return;
+      const rect = compBox.getBoundingClientRect();
+      let offsetX = x - rect.left;
+      if (offsetX < 20) offsetX = 20;
+      if (offsetX > rect.width - 20) offsetX = rect.width - 20;
+      const percentage = (offsetX / rect.width) * 100;
+
+      compAfter.style.width = percentage + '%';
+      compHandle.style.left = percentage + '%';
+    }
+
+    if (compBox) {
+      compBox.addEventListener('mousedown', (e) => {
+        isDraggingSlider = true;
+        updateSlider(e.clientX);
+      });
+      window.addEventListener('mouseup', () => { isDraggingSlider = false; });
+      window.addEventListener('mousemove', (e) => {
+        if (isDraggingSlider) updateSlider(e.clientX);
+      });
+
+      // Touch support
+      compBox.addEventListener('touchstart', (e) => {
+        isDraggingSlider = true;
+        if (e.touches.length > 0) updateSlider(e.touches[0].clientX);
+      });
+      window.addEventListener('touchend', () => { isDraggingSlider = false; });
+      window.addEventListener('touchmove', (e) => {
+        if (isDraggingSlider && e.touches.length > 0) updateSlider(e.touches[0].clientX);
+      });
+    }
+
+    // 5. Steps Walkthrough
+    const stepsData = {
+      1: {
+        title: "1. Drag & Drop Video or Paste YouTube URL",
+        desc: "Upload your podcast, webinar, or interview in MP4, MOV, MKV, or AVI. Or paste a YouTube URL to automatically download the highest 1080p bitrate stream.",
+        bullets: [
+          "Zero lossy pre-compression",
+          "Optional subtitle (.srt) file support for instant processing",
+          "Automatic aspect ratio & audio channel detection"
+        ],
+        code: `[INFO] Ingesting video: podcast_ep42_4k.mp4\n[INFO] Duration: 01:14:32.40 | Audio: 48kHz Stereo AAC\n[INFO] Resolving media stream... Native 1920x1080 @ 60fps detected.\n[SUCCESS] Ingest validated. Dispatching to Whisper audio queue...`
+      },
+      2: {
+        title: "2. Precision Whisper Speech-to-Text",
+        desc: "Extracts word-level timestamps using Whisper with strict non-overlapping mathematical intervals to avoid millisecond subtitle collisions.",
+        bullets: [
+          "GPU-accelerated through PyTorch CUDA, MPS (Apple Silicon), or CPU",
+          "condition_on_previous_text=False eliminates repetitive stutter loops",
+          "Multi-language support across 99+ languages"
+        ],
+        code: `[INFO] Transcribing audio with Whisper small.en...\n[INFO] Device: CUDA (NVIDIA GeForce RTX 4080) | Workers: 2\n[PROGRESS] 100% transcript complete in 38.4s\n[SUCCESS] 4,820 words indexed with millisecond boundary intervals.`
+      },
+      3: {
+        title: "3. Multi-Metric AI Viral Hook Scoring",
+        desc: "Evaluates conversational momentum, emotional climaxes, and topic transitions to identify the highest-retention clips.",
+        bullets: [
+          "Scores clips from 0 to 100 on hook strength and pacing",
+          "Generates tailored titles and platform copy (TikTok, Reels, Shorts)",
+          "Integrates with local Ollama models or OpenAI/Claude/Gemini"
+        ],
+        code: `[LLM] Evaluating transcript candidate chunks with gpt-4o-mini...\n[MOMENT FOUND] "The $10M mistake that saved the company"\n - Timestamp: 14:22.10 -> 14:58.30 (Duration: 36.2s)\n - Score: 94/100 (Hook: 9.8, Energy: 9.4, Narrative: 9.0)\n[STATUS] 8 viral highlight candidates extracted.`
+      },
+      4: {
+        title: "4. 9:16 Re-Framing & Kinetic Subtitle Burn",
+        desc: "Dynamically transforms landscape video to vertical 9:16 with animated word highlights and platform-tailored callouts.",
+        bullets: [
+          "Hardware-accelerated libass subtitle burning",
+          "Ambient blurred background matching video colors",
+          "Direct export to 1080x1920 MP4 ready for social upload"
+        ],
+        code: `[FFMPEG] Applying 9:16 smart vertical filter with background blur...\n[ASS] Burning kinetic subtitles with Hormozi Yellow preset...\n[ENCODE] H.264 nvenc_h264 @ 8500kbps 60fps...\n[SUCCESS] Exported: clip_01_viralsecret_1080x1920.mp4 (Ready to share!)`
+      }
+    };
+
+    function switchStep(stepNum) {
+      const data = stepsData[stepNum];
+      if (!data) return;
+
+      document.getElementById('step-title').textContent = data.title;
+      document.getElementById('step-desc').textContent = data.desc;
+      document.getElementById('step-code').textContent = data.code;
+
+      const bulletsContainer = document.getElementById('step-bullets');
+      bulletsContainer.innerHTML = '';
+      data.bullets.forEach(b => {
+        const li = document.createElement('li');
+        li.textContent = b;
+        bulletsContainer.appendChild(li);
+      });
+
+      // Update button active state
+      document.querySelectorAll('.step-nav-btn').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx + 1 === stepNum);
+      });
+    }
+
+    // 6. Documentation Navigation & Search
+    function showDoc(docId) {
+      document.querySelectorAll('.doc-article').forEach(art => {
+        art.classList.remove('active');
+      });
+      const target = document.getElementById('doc-' + docId);
+      if (target) target.classList.add('active');
+
+      document.querySelectorAll('.docs-nav-link').forEach(link => {
+        link.classList.remove('active');
+      });
+      event.currentTarget.classList.add('active');
+    }
+
+    function filterDocs() {
+      const query = document.getElementById('docs-search-input').value.toLowerCase();
+      document.querySelectorAll('.doc-article').forEach(article => {
+        const text = article.textContent.toLowerCase();
+        if (text.includes(query) || !query) {
+          article.style.display = article.classList.contains('active') ? 'block' : 'none';
+        }
+      });
+    }
+
+    // 7. Clipboard Copy Helper
+    function copyCommand(elementId) {
+      const elem = document.getElementById(elementId);
+      if (!elem) return;
+      const text = elem.textContent || elem.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById('toast');
+        if (toast) {
+          toast.classList.add('show');
+          setTimeout(() => { toast.classList.remove('show'); }, 2200);
+        }
+      });
+    }
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', () => {
+      detectUserOS();
+      startTicker();
+    });
+  </script>
+</body>
+</html>

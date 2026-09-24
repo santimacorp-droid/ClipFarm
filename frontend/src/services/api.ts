@@ -155,7 +155,7 @@ export interface WatermarkPreset {
   logo_filename: string
   logo_url?: string
   logo_exists?: boolean
-  position: 'bottom_right' | 'bottom_left' | 'top_right' | 'top_left'
+  position: 'bottom_right' | 'bottom_left' | 'top_right' | 'top_left' | 'top_center' | 'center_left' | 'center' | 'center_right' | 'bottom_center' | string
   scale_percent: number
   opacity: number
   margin: number
@@ -177,11 +177,16 @@ export interface VideoCategoriesResponse {
 }
 
 export interface ProcessingStatus {
-  status: 'processing' | 'completed' | 'error'
+  status: 'pending' | 'processing' | 'completed' | 'error'
   current_step: number
   total_steps: number
   step_name: string
+  substep?: string
   progress: number
+  step_percent?: number
+  is_alive?: boolean
+  elapsed_seconds?: number
+  recent_logs?: string[]
   error_message?: string
 }
 
@@ -200,29 +205,36 @@ export interface BilibiliVideoInfo {
 
 export interface BilibiliDownloadRequest {
   url: string
-  project_name: string
+  project_name?: string
   video_category?: string
   browser?: string
   caption_style?: string
   duration_mode?: string
+  aspect_ratio?: string
   show_hook_banner?: boolean
   watermark_preset_id?: string
 }
 
 export interface BilibiliDownloadTask {
-  id: string
-  url: string
-  project_name: string
+  id?: string
+  task_id?: string
+  url?: string
+  project_name?: string
   video_category?: string
   browser?: string
-  status: 'pending' | 'processing' | 'completed' | 'failed'
-  progress: number
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'created' | string
+  progress?: number
   error_message?: string
+  message?: string
   video_info?: BilibiliVideoInfo
   project_id?: string
-  created_at: string
-  updated_at: string
+  created_at?: string
+  updated_at?: string
 }
+
+export type YouTubeDownloadRequest = BilibiliDownloadRequest
+export type YouTubeDownloadTask = BilibiliDownloadTask
+
 
 // Settings relatedAPI
 export const settingsApi = {
@@ -253,6 +265,17 @@ export const settingsApi = {
       api_key: apiKey,
       base_url: baseUrl
     })
+  },
+
+  // Get live detection status for local AI engines (Ollama and LM Studio)
+  getLocalAIStatus: (): Promise<{
+    success: boolean
+    data: {
+      ollama: { available: boolean; base_url: string; models: string[]; message: string }
+      lmstudio: { available: boolean; base_url: string; models: string[]; message: string }
+    }
+  }> => {
+    return api.get('/settings/local-status')
   },
 
   // Get all available models
@@ -311,7 +334,7 @@ export const projectApi = {
   },
 
   // Upload file and create project
-  uploadFiles: async (data: UploadFilesRequest): Promise<Project> => {
+  uploadFiles: async (data: UploadFilesRequest, onProgress?: (percent: number) => void): Promise<Project> => {
     const formData = new FormData()
     formData.append('video_file', data.video_file)
     if (data.srt_file) {
@@ -351,6 +374,12 @@ export const projectApi = {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        onUploadProgress: (progressEvent) => {
+          if (onProgress && progressEvent.total) {
+            const percent = Math.min(99, Math.round((progressEvent.loaded * 100) / progressEvent.total))
+            onProgress(percent)
+          }
+        },
       })
       trackVideoImported({
         source: 'upload',
@@ -368,9 +397,53 @@ export const projectApi = {
     }
   },
 
+  // Instant native local import (zero-copy / direct filesystem path)
+  importLocalVideo: async (data: {
+    video_path: string
+    srt_path?: string
+    project_name: string
+    video_category?: string
+    caption_style?: string
+    duration_mode?: string
+    aspect_ratio?: string
+    show_hook_banner?: boolean
+    watermark_preset_id?: string
+    watermark_text?: string
+    watermark_text_opacity?: number
+    watermark_text_position?: string
+  }): Promise<Project> => {
+    try {
+      const project = await api.post<unknown, Project>('/projects/import-local', data)
+      trackVideoImported({
+        source: 'upload',
+        fileType: 'local_file',
+      })
+      return project
+    } catch (error: any) {
+      trackProcessingFailed({
+        stage: 'import',
+        message: error?.message,
+        code: error?.response?.status,
+      })
+      throw error
+    }
+  },
+
   // Delete project
   deleteProject: async (id: string): Promise<void> => {
     await api.delete(`/projects/${id}`)
+  },
+
+  // Batch delete projects
+  batchDeleteProjects: async (ids: string[]): Promise<{ deleted: string[]; failed: string[]; count: number }> => {
+    try {
+      const res = await api.post('/projects/batch-delete', { project_ids: ids })
+      return res.data
+    } catch {
+      // Fallback: delete sequentially if batch endpoint fails
+      await Promise.all(ids.map(id => api.delete(`/projects/${id}`)))
+      return { deleted: ids, failed: [], count: ids.length }
+    }
   },
 
   // Start processing project
@@ -739,27 +812,24 @@ export const projectApi = {
   // Generate project thumbnail
   generateThumbnail: async (projectId: string): Promise<{success: boolean, thumbnail: string, message: string}> => {
     return api.post(`/projects/${projectId}/generate-thumbnail`)
+  },
+
+  // Reveal project directory or output directory in native OS file explorer
+  revealProjectFolder: async (projectId: string): Promise<{ success: boolean; path: string }> => {
+    return api.post(`/projects/${projectId}/reveal`)
+  },
+
+  // Reveal clip in native OS file explorer
+  revealClipInFolder: async (clipId: string, platform?: string): Promise<{ success: boolean; path: string }> => {
+    const query = platform ? `?platform=${encodeURIComponent(platform)}` : ''
+    return api.post(`/clips/${clipId}/reveal${query}`)
   }
 }
 
-// Video download relatedAPI
-export const bilibiliApi = {
-  // ParsingBSite video information
+// Video download related API (YouTube)
+export const youtubeApi = {
+  // Parse YouTube video information
   parseVideoInfo: async (url: string, browser?: string): Promise<{success: boolean, video_info: BilibiliVideoInfo}> => {
-    const formData = new FormData()
-    formData.append('url', url)
-    if (browser) {
-      formData.append('browser', browser)
-    }
-    return api.post('/bilibili/parse', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
-  },
-
-  // ParsingYouTubeVideo information
-  parseYouTubeVideoInfo: async (url: string, browser?: string): Promise<{success: boolean, video_info: BilibiliVideoInfo}> => {
     const formData = new FormData()
     formData.append('url', url)
     if (browser) {
@@ -772,46 +842,34 @@ export const bilibiliApi = {
     })
   },
 
-  // CreationBSite download task
+  // Create YouTube download task
   createDownloadTask: async (data: BilibiliDownloadRequest): Promise<BilibiliDownloadTask> => {
-    const task = await api.post<unknown, BilibiliDownloadTask>('/bilibili/download', data)
-    trackVideoImported({ source: 'url', fileType: 'bilibili' })
-    return task
-  },
-
-  // CreationYouTubeDownload task
-  createYouTubeDownloadTask: async (data: BilibiliDownloadRequest): Promise<BilibiliDownloadTask> => {
     const task = await api.post<unknown, BilibiliDownloadTask>('/youtube/download', data)
     trackVideoImported({ source: 'url', fileType: 'youtube' })
     return task
   },
 
-  // Get download task status
+  // Retrieve YouTube download task status
   getTaskStatus: async (taskId: string): Promise<BilibiliDownloadTask> => {
-    return api.get(`/bilibili/tasks/${taskId}`)
-  },
-
-  // RetrievingYouTubeDownload task status
-  getYouTubeTaskStatus: async (taskId: string): Promise<BilibiliDownloadTask> => {
     return api.get(`/youtube/tasks/${taskId}`)
   },
 
-  // Get all download tasks
+  // Get all YouTube download tasks
   getAllTasks: async (): Promise<BilibiliDownloadTask[]> => {
-    return api.get('/bilibili/tasks')
-  },
-
-  // Get allYouTubeDownload task
-  getAllYouTubeTasks: async (): Promise<BilibiliDownloadTask[]> => {
     return api.get('/youtube/tasks')
   }
 }
 
-export const youtubeApi = {
-  parseVideoInfo: bilibiliApi.parseYouTubeVideoInfo,
-  createDownloadTask: bilibiliApi.createYouTubeDownloadTask,
-  getTaskStatus: bilibiliApi.getYouTubeTaskStatus,
-  getAllTasks: bilibiliApi.getAllYouTubeTasks
+// Legacy alias for backward compatibility
+export const bilibiliApi = {
+  parseVideoInfo: youtubeApi.parseVideoInfo,
+  parseYouTubeVideoInfo: youtubeApi.parseVideoInfo,
+  createDownloadTask: youtubeApi.createDownloadTask,
+  createYouTubeDownloadTask: youtubeApi.createDownloadTask,
+  getTaskStatus: youtubeApi.getTaskStatus,
+  getYouTubeTaskStatus: youtubeApi.getTaskStatus,
+  getAllTasks: youtubeApi.getAllTasks,
+  getAllYouTubeTasks: youtubeApi.getAllTasks
 }
 
 // System status relatedAPI
@@ -860,18 +918,77 @@ export const watermarkApi = {
   updatePreset: (id: string, updates: Partial<WatermarkPreset>): Promise<WatermarkPreset> => {
     return api.put(`/watermarks/presets/${id}`, updates)
   },
+  uploadLogo: (id: string, formData: FormData): Promise<WatermarkPreset> => {
+    return api.post(`/watermarks/presets/${id}/logo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
   deletePreset: (id: string): Promise<{ success: boolean; message: string }> => {
     return api.delete(`/watermarks/presets/${id}`)
   }
 }
 
+export interface SpeechConfigData {
+  method: string
+  whisper_config?: {
+    model_name: string
+    language: string
+    custom_models_dir?: string
+    enable_timestamps?: boolean
+    enable_punctuation?: boolean
+    enable_speaker_diarization?: boolean
+    timeout?: number
+  }
+  openai_config?: {
+    api_key: string
+    endpoint?: string
+    model_name?: string
+    language: string
+    enable_timestamps?: boolean
+    enable_punctuation?: boolean
+  }
+  azure_config?: {
+    api_key: string
+    region: string
+    language: string
+    enable_timestamps?: boolean
+    enable_punctuation?: boolean
+  }
+  google_config?: {
+    api_key: string
+    language: string
+    enable_timestamps?: boolean
+    enable_punctuation?: boolean
+  }
+  aliyun_config?: {
+    api_key: string
+    language: string
+    enable_timestamps?: boolean
+    enable_punctuation?: boolean
+  }
+  custom_api_config?: {
+    api_key: string
+    endpoint: string
+    model_name?: string
+    language: string
+    enable_timestamps?: boolean
+    enable_punctuation?: boolean
+  }
+  enable_fallback?: boolean
+  fallback_method?: string
+  output_format?: string
+}
+
 // Speech recognition / Whisper Runtime and model management
 export const speechApi = {
+  getConfig: (): Promise<SpeechConfigData> => api.get('/speech-recognition/config'),
+  updateConfig: (data: Partial<SpeechConfigData>): Promise<unknown> => api.put('/speech-recognition/config', data),
   getRuntimeStatus: (): Promise<WhisperRuntimeStatus> => api.get('/whisper/runtime-status'),
   installRuntime: (): Promise<{ started: boolean; message: string }> => api.post('/whisper/install'),
   uninstallRuntime: (): Promise<{ success: boolean; message: string }> => api.post('/whisper/uninstall'),
   getModels: (): Promise<WhisperModel[]> => api.get('/whisper-models'),
   downloadModel: (model: string): Promise<unknown> => api.post('/whisper-models/download', { model }),
+  cancelDownload: (model: string): Promise<unknown> => api.post(`/whisper-models/${model}/cancel-download`),
   deleteModel: (model: string): Promise<unknown> => api.delete(`/whisper-models/${model}`),
 }
 

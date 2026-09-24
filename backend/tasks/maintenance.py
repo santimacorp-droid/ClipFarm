@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from celery import current_task, shared_task
+from sqlalchemy import text
 
 from ..core.celery_app import celery_app
 from ..core.database import SessionLocal
@@ -67,7 +68,7 @@ def cleanup_expired_tasks(self, days: int = 7) -> Dict[str, Any]:
                 except Exception as e:
                     logger.error(f"Clean failed tasks: {task.id}, Error: {e}")
             
-            logger.info(f"Cleanup of expired tasks complete, cleaned up: {count} {cleaned_count} tasks")
+            logger.info(f"Cleanup of expired tasks complete, cleaned up: {cleaned_count} tasks")
             return {
                 'success': True,
                 'cleaned_count': cleaned_count,
@@ -103,22 +104,26 @@ def health_check(self) -> Dict[str, Any]:
         # Checking database connection
         try:
             db = SessionLocal()
-            db.execute("SELECT 1")
+            db.execute(text("SELECT 1"))
             db.close()
             health_status['checks']['database'] = {'status': 'healthy', 'message': 'Database connection is normal'}
         except Exception as e:
             health_status['checks']['database'] = {'status': 'unhealthy', 'message': f'Database connection failed: {e}'}
             health_status['status'] = 'unhealthy'
         
-        # Checking Redis connection
-        try:
-            import redis
-            r = redis.Redis.from_url('redis://localhost:6379/0')
-            r.ping()
-            health_status['checks']['redis'] = {'status': 'healthy', 'message': 'RedisConnection established'}
-        except Exception as e:
-            health_status['checks']['redis'] = {'status': 'unhealthy', 'message': f'RedisConnection failed: {e}'}
-            health_status['status'] = 'unhealthy'
+        # Checking Redis connection (only if Redis is configured)
+        redis_url = os.getenv('REDIS_URL', '')
+        if redis_url:
+            try:
+                import redis
+                r = redis.Redis.from_url(redis_url)
+                r.ping()
+                health_status['checks']['redis'] = {'status': 'healthy', 'message': 'Redis connection established'}
+            except Exception as e:
+                health_status['checks']['redis'] = {'status': 'unhealthy', 'message': f'Redis connection failed: {e}'}
+                health_status['status'] = 'unhealthy'
+        else:
+            health_status['checks']['redis'] = {'status': 'skipped', 'message': 'Redis not configured (desktop mode)'}
         
         # Check disk space
         try:
@@ -144,11 +149,11 @@ def health_check(self) -> Dict[str, Any]:
         except Exception as e:
             health_status['checks']['memory'] = {'status': 'unknown', 'message': f'Cannot check memory status: {e}'}
         
-        logger.info(f"System health check completed, status: {status}: {health_status['status']}")
+        logger.info(f"System health check completed, status: {health_status['status']}")
         return health_status
         
     except Exception as e:
-        logger.error(f"System health check failed, error: {e}: {e}")
+        logger.error(f"System health check failed, error: {e}")
         raise
 
 

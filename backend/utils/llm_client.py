@@ -5,7 +5,7 @@ import json
 import logging
 import os
 import re
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from collections.abc import Generator
 
 # Fix import issues

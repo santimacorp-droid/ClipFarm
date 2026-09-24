@@ -14,10 +14,10 @@ from typing import Dict, List, Any
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from ..core.database import SessionLocal
-from ..models.project import Project, ProjectStatus
-from ..models.task import Task, TaskStatus
-from ..services.pipeline_adapter import create_pipeline_adapter_sync
+from backend.core.database import SessionLocal
+from backend.models.project import Project, ProjectStatus
+from backend.models.task import Task, TaskStatus
+from backend.services.pipeline_adapter import create_pipeline_adapter_sync
 import logging
 
 # Setting logging
@@ -59,7 +59,8 @@ async def execute_real_pipeline(project_id: str):
             logger.info(f"Task record created: {task.id}")
             
             # Preparing file paths
-            data_root = project_root / "data" / "projects" / project_id
+            from backend.core.path_utils import get_project_directory
+            data_root = get_project_directory(project_id)
             input_video_path = data_root / "raw" / "input.mp4"
             input_srt_path = data_root / "raw" / "input.srt"
             

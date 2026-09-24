@@ -6,20 +6,11 @@ import {
   ExclamationCircleOutlined, 
   ReloadOutlined
 } from '@ant-design/icons'
-import { projectApi } from '../services/api'
+import { projectApi, ProcessingStatus } from '../services/api'
 import { useProjectStore } from '../store/useProjectStore'
 
 const { Text } = Typography
 const { Step } = Steps
-
-interface ProcessingStatus {
-  status: 'processing' | 'completed' | 'error'
-  current_step: number
-  total_steps: number
-  step_name: string
-  progress: number
-  error_message?: string
-}
 
 interface TaskProgressModalProps {
   visible: boolean
