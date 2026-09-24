@@ -5,7 +5,7 @@ Provide file upload, download, and access functionality
 
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pathlib import Path
@@ -212,21 +212,65 @@ async def download_clip_file(
         logger.error(f"Downloading slice file failed: {e}")
         raise HTTPException(status_code=500, detail=f"Downloading slice file failed: {str(e)}")
 
+def _serve_video_file(file_path: Path, request: Optional[Request] = None, format: Optional[str] = None):
+    import subprocess
+    import os
+
+    user_agent = request.headers.get("user-agent", "") if request else ""
+    wants_webm = (format == "webm") or ("QtWebEngine" in user_agent)
+
+    media_type = "video/mp4"
+    serve_path = str(file_path)
+
+    if wants_webm:
+        webm_path = file_path.with_suffix(".preview.webm")
+        if not webm_path.exists() or webm_path.stat().st_size == 0:
+            try:
+                cmd = [
+                    "ffmpeg", "-y",
+                    "-i", str(file_path),
+                    "-vf", "scale=-2:720",
+                    "-c:v", "libvpx-vp9",
+                    "-b:v", "0",
+                    "-crf", "38",
+                    "-deadline", "realtime",
+                    "-cpu-used", "8",
+                    "-c:a", "libopus",
+                    "-f", "webm",
+                    str(webm_path)
+                ]
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60, check=False)
+            except Exception as conv_err:
+                logger.warning(f"On-demand WebM preview transcode failed: {conv_err}")
+
+        if webm_path.exists() and webm_path.stat().st_size > 0:
+            serve_path = str(webm_path)
+            media_type = "video/webm"
+
+    return FileResponse(
+        path=str(serve_path),
+        media_type=media_type,
+        filename=os.path.basename(serve_path),
+        content_disposition_type="inline",
+        headers={
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "public, max-age=3600"
+        }
+    )
+
+
 @router.api_route("/projects/{project_id}/clips/{clip_id}", methods=["GET", "HEAD"])
 async def get_project_clip_video(
     project_id: str,
     clip_id: str,
+    request: Request,
+    format: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     """
     Get project slice video (frontend compatible playback)
     """
     try:
-        # Validating project existence
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project does not exist")
-        
         from ...core.path_utils import find_clip_video_file
 
         file_path, clip = find_clip_video_file(project_id, clip_id, db=db)
@@ -237,16 +281,7 @@ async def get_project_clip_video(
         if clip and clip.project_id and str(clip.project_id) != str(project_id):
             raise HTTPException(status_code=403, detail="Slice does not belong to project")
         
-        # Return video file, supports online playback
-        return FileResponse(
-            path=str(file_path),
-            filename=file_path.name,
-            media_type="video/mp4",
-            headers={
-                "Accept-Ranges": "bytes",  # Support range requests for video playback
-                "Cache-Control": "public, max-age=3600"  # Cache 1 hour
-            }
-        )
+        return _serve_video_file(file_path, request=request, format=format)
         
     except HTTPException:
         raise
@@ -291,46 +326,25 @@ async def download_collection_file(
         logger.error(f"Downloading bundle file failed: {e}")
         raise HTTPException(status_code=500, detail=f"Downloading bundle file failed: {str(e)}")
 
-@router.get("/projects/{project_id}/collections/{collection_id}")
+@router.api_route("/projects/{project_id}/collections/{collection_id}", methods=["GET", "HEAD"])
 async def get_project_collection_video(
     project_id: str,
     collection_id: str,
+    request: Request,
+    format: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     """
-    Get project ensemble video (frontend compatible playback)IDAnd setIDGet video
+    Get project ensemble video (frontend compatible playback) ID and set ID
     """
     try:
-        # Validating project existence
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project does not exist")
-        
-        # Get set record
-        collection = db.query(Collection).filter(Collection.id == collection_id).first()
-        if not collection:
-            raise HTTPException(status_code=404, detail="Set does not exist")
-        
-        # Verify whether ensemble belongs to this project (if any)project_idThe field says)
-        # Note: This assumesCollectionModel hasproject_idFields, adjust as needed
-        
-        if not collection.export_path:
+        from ...core.path_utils import find_collection_video_file
+
+        file_path, collection = find_collection_video_file(project_id, collection_id, db=db)
+        if not file_path or not file_path.exists():
             raise HTTPException(status_code=404, detail="Bundle file does not exist")
-        
-        file_path = Path(collection.export_path)
-        if not file_path.exists():
-            raise HTTPException(status_code=404, detail="Bundle file does not exist")
-        
-        # Return video file, supports online playback
-        return FileResponse(
-            path=str(file_path),
-            filename=f"collection_{collection_id}.mp4",
-            media_type="video/mp4",
-            headers={
-                "Accept-Ranges": "bytes",  # Support range requests for video playback
-                "Cache-Control": "public, max-age=3600"  # Cache1hours
-            }
-        )
+
+        return _serve_video_file(file_path, request=request, format=format)
         
     except HTTPException:
         raise

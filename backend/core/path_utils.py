@@ -280,20 +280,22 @@ def find_clip_video_file(
             if p.exists() and p.is_file():
                 return p, clip_obj
 
-        # 2. Build candidate directories to inspect
+        # 2. Build candidate directories to inspect across all possible data roots
         target_project_id = project_id or (str(clip_obj.project_id) if clip_obj and getattr(clip_obj, 'project_id', None) else None)
         candidate_dirs = []
-        if target_project_id:
-            proj_dir = get_project_directory(str(target_project_id))
+        possible_roots = list(dict.fromkeys([get_data_directory(), get_default_app_data_dir(), get_project_root() / "data"]))
+        for r in possible_roots:
+            if target_project_id:
+                proj_dir = r / "projects" / str(target_project_id)
+                candidate_dirs.extend([
+                    proj_dir / "output" / "clips",
+                    proj_dir / "output",
+                    proj_dir
+                ])
             candidate_dirs.extend([
-                proj_dir / "output" / "clips",
-                proj_dir / "output",
-                proj_dir
+                r / "output" / "clips",
+                r / "clips"
             ])
-        candidate_dirs.extend([
-            get_clips_directory(),
-            get_output_directory() / "clips"
-        ])
 
         # 3. Search for video files
         orig_id = None
@@ -401,32 +403,55 @@ def find_collection_video_file(
 
         target_project_id = project_id or (str(collection_obj.project_id) if collection_obj and getattr(collection_obj, 'project_id', None) else None)
         candidate_dirs = []
-        if target_project_id:
-            proj_dir = get_project_directory(str(target_project_id))
+        possible_roots = list(dict.fromkeys([get_data_directory(), get_default_app_data_dir(), get_project_root() / "data"]))
+        for r in possible_roots:
+            if target_project_id:
+                proj_dir = r / "projects" / str(target_project_id)
+                candidate_dirs.extend([
+                    proj_dir / "output" / "collections",
+                    proj_dir / "output",
+                    proj_dir / "export",
+                    proj_dir
+                ])
             candidate_dirs.extend([
-                proj_dir / "output" / "collections",
-                proj_dir / "output",
-                proj_dir / "export",
-                proj_dir
+                r / "output" / "collections",
+                r / "collections"
             ])
-        candidate_dirs.extend([
-            get_collections_directory(),
-            get_output_directory() / "collections"
-        ])
+
+        norm_names_to_match = set()
+        if collection_id:
+            norm_names_to_match.add("".join(c.lower() for c in str(collection_id) if c.isalnum()))
+        if collection_obj:
+            if getattr(collection_obj, 'name', None):
+                norm_names_to_match.add("".join(c.lower() for c in collection_obj.name if c.isalnum()))
+            if getattr(collection_obj, 'export_path', None):
+                norm_names_to_match.add("".join(c.lower() for c in Path(collection_obj.export_path).stem if c.isalnum()))
 
         for d in candidate_dirs:
             if not d.exists():
                 continue
             mp4_files = list(d.glob("*.mp4"))
             for f in mp4_files:
-                if collection_id in f.stem or (collection_obj and getattr(collection_obj, 'name', None) and collection_obj.name in f.stem):
-                    if collection_obj and db:
-                        try:
-                            collection_obj.export_path = str(f)
-                            db.commit()
-                        except Exception:
-                            pass
-                    return f, collection_obj
+                norm_f = "".join(c.lower() for c in f.stem if c.isalnum())
+                for norm_target in norm_names_to_match:
+                    if norm_target and (norm_target in norm_f or norm_f in norm_target):
+                        if collection_obj and db:
+                            try:
+                                collection_obj.export_path = str(f)
+                                db.commit()
+                            except Exception:
+                                pass
+                        return f, collection_obj
+
+            if len(mp4_files) == 1 and ("collections" in str(d)):
+                f = mp4_files[0]
+                if collection_obj and db:
+                    try:
+                        collection_obj.export_path = str(f)
+                        db.commit()
+                    except Exception:
+                        pass
+                return f, collection_obj
 
         return None, collection_obj
     except Exception:

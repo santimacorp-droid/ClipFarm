@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Layout, Button } from 'antd'
-import { SettingOutlined, ArrowLeftOutlined, BulbOutlined, MoonOutlined, FireOutlined, CoffeeOutlined, RobotOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { SettingOutlined, ArrowLeftOutlined, BulbOutlined, MoonOutlined, FireOutlined, CoffeeOutlined, RobotOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTheme } from '../context/ThemeContext'
 import { checkApiConfig, ApiConfigStatus } from '../utils/apiConfigCheck'
@@ -108,30 +108,28 @@ const Header: React.FC = () => {
         >
           Campaigns
         </Button>
-        <Button
-          type="text"
-          icon={apiStatus?.isOfflineMode ? <ThunderboltOutlined style={{ color: '#60A5FA' }} /> : <RobotOutlined style={{ color: apiStatus?.hasValidConfig ? '#52c41a' : '#faad14' }} />}
-          onClick={() => openModal({ title: 'AI Model & Engine Settings', onSuccess: () => checkStatus() })}
-          style={{
-            color: apiStatus?.hasValidConfig ? 'var(--ac-sub)' : '#faad14',
-            border: `1px solid ${apiStatus?.hasValidConfig ? 'var(--ac-line)' : 'rgba(250, 173, 20, 0.4)'}`,
-            borderRadius: '999px',
-            height: '36px',
-            padding: '0 14px',
-            background: apiStatus?.hasValidConfig ? 'var(--ac-card)' : 'rgba(250, 173, 20, 0.12)',
-            fontSize: '13px',
-            fontWeight: 500,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          <span>
-            {apiStatus?.hasValidConfig
-              ? (apiStatus.isOfflineMode ? '⚡ Offline Engine' : (apiStatus.displayLabel.length > 18 ? apiStatus.displayLabel.slice(0, 18) + '...' : apiStatus.displayLabel))
-              : '⚠️ AI Setup Required'}
-          </span>
-        </Button>
+        {apiStatus && !apiStatus.hasValidConfig && (
+          <Button
+            type="text"
+            icon={<RobotOutlined style={{ color: '#faad14' }} />}
+            onClick={() => openModal({ title: 'AI Model & Engine Settings', onSuccess: () => checkStatus() })}
+            style={{
+              color: '#faad14',
+              border: '1px solid rgba(250, 173, 20, 0.4)',
+              borderRadius: '999px',
+              height: '36px',
+              padding: '0 14px',
+              background: 'rgba(250, 173, 20, 0.12)',
+              fontSize: '13px',
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <span>⚠️ AI Setup Required</span>
+          </Button>
+        )}
         <Button
           type="text"
           icon={<SettingOutlined style={{ color: location.pathname === '/settings' ? '#1890ff' : 'var(--ac-sub)' }} />}

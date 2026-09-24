@@ -6,7 +6,7 @@ from typing import List, Optional
 import os
 import json
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from ...core.database import get_db
@@ -206,12 +206,15 @@ async def get_clips(
 @router.api_route("/{clip_id}/video", methods=["GET", "HEAD"])
 async def get_clip_video(
     clip_id: str,
+    request: Request,
     platform: Optional[str] = Query(None),
+    format: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     clip_service: ClipService = Depends(get_clip_service)
 ):
-    """Stream a clip's MP4 file to the browser with correct MIME type."""
+    """Stream a clip's MP4 file (or WebM for QtWebEngine / preview) to the browser with correct MIME type."""
     from ...core.path_utils import find_clip_video_file
+    import subprocess
 
     clip = db.query(Clip).filter_by(id=clip_id).first()
     if not clip:
@@ -264,10 +267,41 @@ async def get_clip_video(
     if os.path.getsize(target_video_path) == 0:
         raise HTTPException(status_code=404, detail="Video file is empty (0 bytes)")
 
+    user_agent = request.headers.get("user-agent", "") if request else ""
+    wants_webm = (format == "webm") or ("QtWebEngine" in user_agent)
+    
+    media_type = "video/mp4"
+    serve_path = target_video_path
+
+    if wants_webm:
+        webm_path = Path(target_video_path).with_suffix(".preview.webm")
+        if not webm_path.exists() or webm_path.stat().st_size == 0:
+            try:
+                cmd = [
+                    "ffmpeg", "-y",
+                    "-i", str(target_video_path),
+                    "-vf", "scale=-2:720",
+                    "-c:v", "libvpx-vp9",
+                    "-b:v", "0",
+                    "-crf", "38",
+                    "-deadline", "realtime",
+                    "-cpu-used", "8",
+                    "-c:a", "libopus",
+                    "-f", "webm",
+                    str(webm_path)
+                ]
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=45, check=False)
+            except Exception as conv_err:
+                logger.warning(f"On-demand WebM preview transcode failed: {conv_err}")
+
+        if webm_path.exists() and webm_path.stat().st_size > 0:
+            serve_path = str(webm_path)
+            media_type = "video/webm"
+
     return FileResponse(
-        path=str(target_video_path),
-        media_type="video/mp4",
-        filename=os.path.basename(target_video_path),
+        path=str(serve_path),
+        media_type=media_type,
+        filename=os.path.basename(serve_path),
         content_disposition_type="inline",
         headers={
             "Accept-Ranges": "bytes",

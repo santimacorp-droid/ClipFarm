@@ -240,7 +240,32 @@ export type YouTubeDownloadTask = BilibiliDownloadTask
 export const settingsApi = {
   // Get system configuration
   getSettings: (): Promise<any> => {
-    return api.get('/settings')
+    return api.get('/settings/')
+  },
+
+  // Get data / download directory info
+  getDataDirectoryInfo: (): Promise<{
+    data_directory: string
+    is_custom: boolean
+    default_data_dir: string
+    custom_data_dir?: string | null
+    free_space_mb?: number
+    total_space_mb?: number
+    used_space_mb?: number
+    space_usage_percent?: number
+    disk_usage?: any
+  }> => {
+    return api.get('/settings/paths/data-directory')
+  },
+
+  // Update download / data directory path
+  updateDataDirectory: (newPath: string, migrateData: boolean = true): Promise<{ success: boolean; message: string; new_path: string }> => {
+    return api.post(`/settings/paths/data-directory?new_path=${encodeURIComponent(newPath)}&migrate_data=${migrateData}`)
+  },
+
+  // Reveal download / data directory in OS file manager
+  revealDataDirectory: (): Promise<{ success: boolean; path: string }> => {
+    return api.post('/settings/paths/reveal')
   },
 
   // Update system configuration

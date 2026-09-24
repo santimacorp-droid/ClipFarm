@@ -1,13 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Modal, Row, Col, Button, Space, Typography, Tag, message, Popconfirm } from 'antd'
-import { PlayCircleOutlined, DeleteOutlined, MenuOutlined, CloseOutlined, LeftOutlined, RightOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
+import { PlayCircleOutlined, DeleteOutlined, MenuOutlined, CloseOutlined, LeftOutlined, RightOutlined, PlusOutlined } from '@ant-design/icons'
 import ReactPlayer from 'react-player'
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd'
 import { Collection, Clip, useProjectStore } from '../store/useProjectStore'
 import { projectApi } from '../services/api'
 import AddClipToCollectionModal from './AddClipToCollectionModal'
 import { useCollectionVideoDownload } from '../hooks/useCollectionVideoDownload'
-import UploadModal from './UploadModal'
 import EditableTitle from './EditableTitle'
 import './CollectionPreviewModal.css'
 
@@ -43,7 +42,6 @@ const CollectionPreviewModal: React.FC<CollectionPreviewModalProps> = ({
 
   const [showAddClipModal, setShowAddClipModal] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
-  const [showUploadModal, setShowUploadModal] = useState(false)
   const playerRef = useRef<ReactPlayer>(null)
   const { setDragging } = useProjectStore()
   const { isGenerating, generateAndDownloadCollectionVideo } = useCollectionVideoDownload()
@@ -258,13 +256,6 @@ const CollectionPreviewModal: React.FC<CollectionPreviewModalProps> = ({
                 onClick={handleGenerateVideo}
               >
                 Export Video
-              </Button>
-              <Button 
-                type="default" 
-                icon={<UploadOutlined />}
-                onClick={() => message.info('Feature under development', 3)}
-              >
-                Publish to Bilibili
               </Button>
               {onDelete && (
                 <Popconfirm
@@ -525,18 +516,7 @@ const CollectionPreviewModal: React.FC<CollectionPreviewModalProps> = ({
         onConfirm={handleAddClips}
       />
 
-      {/* submission popup */}
-      <UploadModal
-        visible={showUploadModal}
-        onCancel={() => setShowUploadModal(false)}
-        projectId={projectId}
-        clipIds={collectionClips.map(clip => clip.id)}
-        clipTitles={collectionClips.map(clip => clip.generated_title || clip.title || 'video clip')}
-        onSuccess={() => {
-          // Posting succeeded. Refresh data or display notification.
-          console.log('Collection posting succeeded')
-        }}
-      />
+
     </Modal>
   )
 }

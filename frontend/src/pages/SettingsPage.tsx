@@ -18,7 +18,9 @@ import {
   Switch,
   Statistic,
   Table,
-  Popconfirm
+  Popconfirm,
+  Checkbox,
+  Progress
 } from 'antd'
 import { 
   KeyOutlined, 
@@ -36,7 +38,9 @@ import {
   PictureOutlined,
   CoffeeOutlined,
   CheckCircleOutlined,
-  CloseCircleOutlined
+  CloseCircleOutlined,
+  FolderOpenOutlined,
+  HddOutlined
 } from '@ant-design/icons'
 import { settingsApi } from '../services/api'
 import SpeechRecognitionConfig from '../components/SpeechRecognitionConfig'
@@ -1534,9 +1538,96 @@ const AppSettings: React.FC = () => {
   const [autostartEnabled, setAutostartEnabled] = useState(false)
   const [loading, setLoading] = useState(false)
 
+  // Download & Storage directory state
+  const [dirInfo, setDirInfo] = useState<{
+    data_directory: string
+    is_custom: boolean
+    default_data_dir: string
+    free_space_mb?: number
+    total_space_mb?: number
+    used_space_mb?: number
+    space_usage_percent?: number
+  } | null>(null)
+  const [newPath, setNewPath] = useState('')
+  const [migrateData, setMigrateData] = useState(true)
+  const [updatingDir, setUpdatingDir] = useState(false)
+  const [revealingDir, setRevealingDir] = useState(false)
+
   useEffect(() => {
     checkAutostartStatus()
+    loadDataDirInfo()
   }, [])
+
+  const loadDataDirInfo = async () => {
+    try {
+      const info = await settingsApi.getDataDirectoryInfo()
+      if (info && info.data_directory) {
+        setDirInfo(info)
+        setNewPath(info.data_directory)
+      }
+    } catch (error) {
+      console.error('Failed to load data directory info:', error)
+    }
+  }
+
+  const handleRevealFolder = async () => {
+    setRevealingDir(true)
+    try {
+      const res = await settingsApi.revealDataDirectory()
+      if (res.success) {
+        message.success('Opened storage folder in file manager')
+      } else {
+        message.info(`Folder path: ${res.path}`)
+      }
+    } catch (err: any) {
+      message.error(err?.message || 'Failed to open file manager')
+    } finally {
+      setRevealingDir(false)
+    }
+  }
+
+  const handleSaveDataDir = async () => {
+    const trimmed = newPath.trim()
+    if (!trimmed) {
+      message.error('Please specify a valid folder path')
+      return
+    }
+    if (dirInfo && trimmed === dirInfo.data_directory) {
+      message.info('Download destination is unchanged')
+      return
+    }
+
+    setUpdatingDir(true)
+    try {
+      const res = await settingsApi.updateDataDirectory(trimmed, migrateData)
+      message.success(res.message || 'Download destination updated successfully')
+      await loadDataDirInfo()
+    } catch (err: any) {
+      console.error('Failed to update data directory:', err)
+      message.error(err?.response?.data?.detail || err?.message || 'Failed to update destination')
+    } finally {
+      setUpdatingDir(false)
+    }
+  }
+
+  const handleResetDefaultDir = async () => {
+    if (!dirInfo?.default_data_dir) return
+    setUpdatingDir(true)
+    try {
+      const res = await settingsApi.updateDataDirectory(dirInfo.default_data_dir, migrateData)
+      message.success(res.message || 'Reset download destination to default')
+      await loadDataDirInfo()
+    } catch (err: any) {
+      message.error(err?.response?.data?.detail || err?.message || 'Failed to reset destination')
+    } finally {
+      setUpdatingDir(false)
+    }
+  }
+
+  const formatGb = (mb?: number) => {
+    if (!mb) return '0 GB'
+    return (mb / 1024).toFixed(1) + ' GB'
+  }
 
   const checkAutostartStatus = async () => {
     try {
@@ -1581,6 +1672,137 @@ const AppSettings: React.FC = () => {
 
   return (
     <div>
+      {/* Download Destination & Storage Section */}
+      <Card 
+        size="small" 
+        style={{ 
+          background: 'rgba(255,255,255,0.04)', 
+          border: '1px solid var(--ac-line)',
+          marginBottom: '16px',
+          borderRadius: 8
+        }}
+      >
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <FolderOpenOutlined style={{ color: '#6366f1', fontSize: 18 }} />
+              <Text strong style={{ color: 'var(--ac-ink)', fontSize: 15 }}>
+                Download Destination & Storage
+              </Text>
+              {dirInfo && (
+                <Tag color={dirInfo.is_custom ? 'blue' : 'default'} style={{ marginLeft: 4 }}>
+                  {dirInfo.is_custom ? 'Custom Location' : 'Default System Location'}
+                </Tag>
+              )}
+            </div>
+            <Button
+              icon={<FolderOpenOutlined />}
+              onClick={handleRevealFolder}
+              loading={revealingDir}
+              style={{
+                borderColor: 'var(--ac-line)',
+                background: 'var(--ac-card)',
+                color: 'var(--ac-ink)'
+              }}
+            >
+              Open in File Manager
+            </Button>
+          </div>
+          <Text type="secondary" style={{ color: 'var(--ac-sub)', fontSize: 13, display: 'block' }}>
+            Where ClipFarm saves downloaded source videos, exported clips, highlights, and collections.
+          </Text>
+        </div>
+
+        {dirInfo && (
+          <div style={{ marginBottom: 14 }}>
+            <div
+              style={{
+                padding: '8px 12px',
+                background: 'var(--ac-card)',
+                border: '1px solid var(--ac-line)',
+                borderRadius: 6,
+                fontFamily: 'monospace',
+                fontSize: 13,
+                color: 'var(--ac-ink)',
+                wordBreak: 'break-all',
+                marginBottom: 10
+              }}
+            >
+              {dirInfo.data_directory}
+            </div>
+
+            {dirInfo.total_space_mb && dirInfo.total_space_mb > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--ac-sub)', marginBottom: 4 }}>
+                  <span>
+                    <HddOutlined style={{ marginRight: 4 }} /> Disk Space
+                  </span>
+                  <span>
+                    {formatGb(dirInfo.free_space_mb)} free of {formatGb(dirInfo.total_space_mb)} ({dirInfo.space_usage_percent}% used)
+                  </span>
+                </div>
+                <Progress
+                  percent={dirInfo.space_usage_percent || 0}
+                  size="small"
+                  status={dirInfo.space_usage_percent && dirInfo.space_usage_percent > 90 ? 'exception' : 'normal'}
+                  strokeColor="#6366f1"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        <Divider style={{ margin: '12px 0', borderColor: 'var(--ac-line)' }} />
+
+        <div>
+          <Text strong style={{ color: 'var(--ac-ink)', fontSize: 13, display: 'block', marginBottom: 8 }}>
+            Change Storage Destination
+          </Text>
+          <Space.Compact style={{ width: '100%', marginBottom: 10 }}>
+            <Input
+              value={newPath}
+              onChange={(e) => setNewPath(e.target.value)}
+              placeholder="Enter directory path (e.g. /path/to/storage or D:\ClipFarm)"
+              style={{
+                background: 'var(--ac-card)',
+                borderColor: 'var(--ac-line)',
+                color: 'var(--ac-ink)'
+              }}
+            />
+            <Button
+              type="primary"
+              icon={<SaveOutlined />}
+              loading={updatingDir}
+              onClick={handleSaveDataDir}
+            >
+              Save Destination
+            </Button>
+            {dirInfo?.is_custom && (
+              <Button
+                onClick={handleResetDefaultDir}
+                loading={updatingDir}
+                style={{
+                  borderColor: 'var(--ac-line)',
+                  background: 'var(--ac-card)',
+                  color: 'var(--ac-ink)'
+                }}
+              >
+                Reset to Default
+              </Button>
+            )}
+          </Space.Compact>
+
+          <Checkbox
+            checked={migrateData}
+            onChange={(e) => setMigrateData(e.target.checked)}
+            style={{ color: 'var(--ac-sub)', fontSize: 13 }}
+          >
+            Migrate existing video files and projects to the new location
+          </Checkbox>
+        </div>
+      </Card>
+
+      {/* Startup & System Integration */}
       <Row gutter={[16, 16]}>
         <Col span={24}>
           <Card 

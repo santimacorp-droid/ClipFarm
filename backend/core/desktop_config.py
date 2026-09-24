@@ -8,6 +8,7 @@ directory while development builds can keep using the project workspace.
 
 import os
 import shutil
+import json
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
@@ -358,3 +359,64 @@ def ensure_desktop_directories() -> bool:
 
 def save_desktop_config(config: DesktopConfig) -> bool:
     return True
+
+
+def get_data_dir_info():
+    config = get_desktop_config()
+    data_dir = config.paths.data_dir
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    total, used, free = shutil.disk_usage(data_dir)
+    total_mb = round(total / (1024 * 1024), 1)
+    free_mb = round(free / (1024 * 1024), 1)
+    used_mb = round(used / (1024 * 1024), 1)
+    percent = round((used / total) * 100, 1) if total > 0 else 0.0
+
+    default_dir = path_utils.get_default_app_data_dir()
+    is_custom = data_dir.resolve() != default_dir.resolve()
+
+    return {
+        "data_directory": str(data_dir),
+        "custom_data_dir": str(data_dir) if is_custom else None,
+        "is_custom": is_custom,
+        "default_data_dir": str(default_dir),
+        "free_space_mb": free_mb,
+        "total_space_mb": total_mb,
+        "used_space_mb": used_mb,
+        "space_usage_percent": percent
+    }
+
+
+def set_data_dir(new_path: str, migrate_data: bool = True):
+    config = get_desktop_config()
+    try:
+        target_path = Path(new_path).expanduser().resolve()
+        res = config.set_data_dir(target_path, migrate_from_old=migrate_data)
+
+        # Also persist to settings.json
+        try:
+            settings_file = target_path / "settings.json"
+            settings_dict = {}
+            if settings_file.exists():
+                with open(settings_file, "r", encoding="utf-8") as f:
+                    settings_dict = json.load(f)
+            if "paths" not in settings_dict:
+                settings_dict["paths"] = {}
+            settings_dict["paths"]["data_directory"] = str(target_path)
+            with open(settings_file, "w", encoding="utf-8") as f:
+                json.dump(settings_dict, f, indent=2)
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "message": "Data directory updated successfully",
+            "new_path": str(target_path),
+            "migrated_files": [],
+            "failed_files": []
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }

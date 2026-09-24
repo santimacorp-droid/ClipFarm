@@ -12,8 +12,7 @@ import {
   ClockCircleOutlined,
   UserOutlined,
   SearchOutlined,
-  RobotOutlined,
-  ThunderboltOutlined
+  RobotOutlined
 } from '@ant-design/icons'
 import { useDropzone } from 'react-dropzone'
 import { projectApi, watermarkApi, youtubeApi, VideoCategory, WatermarkPreset, BilibiliVideoInfo } from '../services/api'
@@ -397,93 +396,81 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
       }} />
       
 
-      {/* AI Engine Status Banner & Setup Trigger */}
-      <div 
-        style={{ 
-          marginBottom: '16px',
-          padding: '12px 18px',
-          borderRadius: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: apiStatus?.hasValidConfig
-            ? (apiStatus.isOfflineMode ? 'rgba(59, 130, 246, 0.08)' : 'rgba(82, 196, 26, 0.08)')
-            : 'rgba(250, 173, 20, 0.12)',
-          border: `1px solid ${apiStatus?.hasValidConfig ? (apiStatus.isOfflineMode ? 'rgba(59, 130, 246, 0.25)' : 'rgba(82, 196, 26, 0.25)') : 'rgba(250, 173, 20, 0.4)'}`,
-          transition: 'all 0.3s ease'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            background: apiStatus?.hasValidConfig
-              ? (apiStatus.isOfflineMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(82, 196, 26, 0.2)')
-              : 'rgba(250, 173, 20, 0.2)',
+      {/* AI Engine Status Banner & Setup Trigger (Only visible when setup is required) */}
+      {apiStatus && !apiStatus.hasValidConfig && (
+        <div 
+          style={{ 
+            marginBottom: '16px',
+            padding: '12px 18px',
+            borderRadius: '12px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            color: apiStatus?.hasValidConfig
-              ? (apiStatus.isOfflineMode ? '#60A5FA' : '#52c41a')
-              : '#faad14',
-            fontSize: '16px'
-          }}>
-            {apiStatus?.isOfflineMode ? <ThunderboltOutlined /> : <RobotOutlined />}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--ac-ink)' }}>
-                {apiStatus?.displayLabel || 'Checking AI Engine...'}
-              </span>
-              <span style={{
-                fontSize: '10px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                padding: '1px 6px',
-                borderRadius: '4px',
-                background: apiStatus?.hasValidConfig
-                  ? (apiStatus.isOfflineMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(82, 196, 26, 0.2)')
-                  : 'rgba(250, 173, 20, 0.2)',
-                color: apiStatus?.hasValidConfig
-                  ? (apiStatus.isOfflineMode ? '#60A5FA' : '#52c41a')
-                  : '#faad14'
-              }}>
-                {apiStatus?.hasValidConfig ? (apiStatus.isOfflineMode ? 'OFFLINE HEURISTIC' : 'CLOUD AI READY') : 'SETUP REQUIRED'}
-              </span>
-            </div>
-            <span style={{ fontSize: '11.5px', color: 'var(--ac-muted)', marginTop: '2px' }}>
-              {apiStatus?.hasValidConfig
-                ? (apiStatus.isOfflineMode
-                    ? 'Using built-in transcript & audio heuristics. No API key required.'
-                    : 'AI engine will identify viral hooks, grade highlights, and generate titles.')
-                : 'Click to select an AI provider and enter your API key, or choose the built-in offline engine.'}
-            </span>
-          </div>
-        </div>
-
-        <Button
-          size="small"
-          type={apiStatus?.hasValidConfig ? 'default' : 'primary'}
-          onClick={() => {
-            openApiModal({
-              title: apiStatus?.hasValidConfig ? 'Change AI Provider / Model' : 'Configure AI Engine',
-              onSuccess: () => refreshApiStatus()
-            })
-          }}
-          style={{
-            borderRadius: '6px',
-            fontSize: '12px',
-            fontWeight: 600,
-            ...(apiStatus?.hasValidConfig 
-              ? { borderColor: 'var(--ac-line)', background: 'var(--ac-card)', color: 'var(--ac-ink)' }
-              : { background: 'linear-gradient(135deg, #faad14 0%, #ff7875 100%)', border: 'none', color: '#fff', boxShadow: '0 2px 8px rgba(250, 173, 20, 0.4)' }
-            )
+            justifyContent: 'space-between',
+            background: 'rgba(250, 173, 20, 0.12)',
+            border: '1px solid rgba(250, 173, 20, 0.4)',
+            transition: 'all 0.3s ease'
           }}
         >
-          {apiStatus?.hasValidConfig ? 'Change Provider / Key' : 'Set Up AI Engine'}
-        </Button>
-      </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              background: 'rgba(250, 173, 20, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#faad14',
+              fontSize: '16px'
+            }}>
+              <RobotOutlined />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--ac-ink)' }}>
+                  {apiStatus?.displayLabel || 'AI Engine: Setup Required'}
+                </span>
+                <span style={{
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  padding: '1px 6px',
+                  borderRadius: '4px',
+                  background: 'rgba(250, 173, 20, 0.2)',
+                  color: '#faad14'
+                }}>
+                  SETUP REQUIRED
+                </span>
+              </div>
+              <span style={{ fontSize: '11.5px', color: 'var(--ac-muted)', marginTop: '2px' }}>
+                Click to select an AI provider and enter your API key, or choose the built-in offline engine.
+              </span>
+            </div>
+          </div>
+
+          <Button
+            size="small"
+            type="primary"
+            onClick={() => {
+              openApiModal({
+                title: 'Configure AI Engine',
+                onSuccess: () => refreshApiStatus()
+              })
+            }}
+            style={{
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #faad14 0%, #ff7875 100%)',
+              border: 'none',
+              color: '#fff',
+              boxShadow: '0 2px 8px rgba(250, 173, 20, 0.4)'
+            }}
+          >
+            Set Up AI Engine
+          </Button>
+        </div>
+      )}
 
       {/* Source Selection Tabs */}
       <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>

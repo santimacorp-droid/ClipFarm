@@ -160,6 +160,7 @@ async def check_desktop_mode_endpoint():
     }
 
 
+@router.get("", response_model=DesktopSettings)
 @router.get("/", response_model=DesktopSettings)
 async def get_settings():
     """Getting all settings"""
@@ -170,22 +171,26 @@ async def get_settings():
         
         # Tries reading from saved settings file.
         settings_file = config.paths.data_dir / "settings.json"
-        print(f"Setting file path: {settings_file}")
-        print(f"Settings file exists: {settings_file.exists()}")
         
         if settings_file.exists():
             try:
                 with open(settings_file, 'r', encoding='utf-8') as f:
                     saved_settings = json.load(f)
                 
-                print(f"Settings read from file: {saved_settings.get('basic', {}).get('app_name', 'unknown')}")
+                # If paths is missing or null, supply default paths
+                if not saved_settings.get("paths"):
+                    saved_settings["paths"] = {
+                        "data_directory": str(config.paths.data_dir),
+                        "cache_directory": str(config.paths.cache_dir),
+                        "temp_directory": str(config.paths.temp_dir)
+                    }
                 
                 # Validates and returns saved settings.
                 settings = DesktopSettings(**saved_settings)
                 return settings
             except Exception as e:
                 # Falls back to default configuration if read fails.
-                print(f"Failed to read settings file: {e}")
+                logger.warning(f"Failed to read settings file: {e}")
                 pass
         
         # Building path settings
@@ -278,6 +283,18 @@ async def get_data_directory_info():
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get data directory information.: {str(e)}")
+
+@router.post("/paths/reveal")
+async def reveal_data_directory():
+    """Opens download/data directory in OS native file explorer."""
+    try:
+        from backend.core.path_utils import reveal_in_file_manager, get_data_directory
+        data_dir = get_data_directory()
+        ok = reveal_in_file_manager(data_dir)
+        return {"success": ok, "path": str(data_dir)}
+    except Exception as e:
+        logger.error(f"Failed to reveal data directory: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/")
 async def clear_settings(
