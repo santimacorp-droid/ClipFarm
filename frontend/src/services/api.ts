@@ -177,7 +177,7 @@ export interface VideoCategoriesResponse {
 }
 
 export interface ProcessingStatus {
-  status: 'pending' | 'processing' | 'completed' | 'error'
+  status: 'pending' | 'processing' | 'completed' | 'error' | 'failed'
   current_step: number
   total_steps: number
   step_name: string

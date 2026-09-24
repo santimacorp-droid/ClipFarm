@@ -11,12 +11,15 @@ import {
   CheckCircleFilled,
   ClockCircleOutlined,
   UserOutlined,
-  SearchOutlined
+  SearchOutlined,
+  RobotOutlined,
+  ThunderboltOutlined
 } from '@ant-design/icons'
 import { useDropzone } from 'react-dropzone'
 import { projectApi, watermarkApi, youtubeApi, VideoCategory, WatermarkPreset, BilibiliVideoInfo } from '../services/api'
 import { useProjectStore } from '../store/useProjectStore'
-import { validateApiConfigBeforeProjectCreation } from '../utils/apiConfigCheck'
+import { validateApiConfig, checkApiConfig, ApiConfigStatus } from '../utils/apiConfigCheck'
+import { useApiModalStore } from '../store/useApiModalStore'
 
 const { Text } = Typography
 
@@ -51,6 +54,21 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
   }>({})
   
   const { addProject } = useProjectStore()
+  const [apiStatus, setApiStatus] = useState<ApiConfigStatus | null>(null)
+  const openApiModal = useApiModalStore(state => state.openModal)
+
+  const refreshApiStatus = async () => {
+    try {
+      const status = await checkApiConfig()
+      setApiStatus(status)
+    } catch (e) {
+      console.warn('Failed to refresh API status:', e)
+    }
+  }
+
+  useEffect(() => {
+    refreshApiStatus()
+  }, [])
 
   // Load video category & watermark preset configuration
   useEffect(() => {
@@ -111,7 +129,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
     multiple: true
   })
 
-  const handleUpload = async () => {
+  const executeUpload = async () => {
     if (!files.video) {
       message.error('Please select a video file')
       return
@@ -119,12 +137,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
 
     if (!projectName.trim()) {
       message.error('Please enter a project name')
-      return
-    }
-
-    // Check API configuration
-    const hasValidApiConfig = await validateApiConfigBeforeProjectCreation()
-    if (!hasValidApiConfig) {
       return
     }
 
@@ -217,6 +229,32 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
     }
   }
 
+  const handleUpload = async () => {
+    if (!files.video) {
+      message.error('Please select a video file')
+      return
+    }
+
+    if (!projectName.trim()) {
+      message.error('Please enter a project name')
+      return
+    }
+
+    // Prompt for API key / provider if nothing is present or not yet chosen
+    const hasValid = await validateApiConfig({
+      actionName: 'Adding Video',
+      onProceed: () => {
+        executeUpload()
+        refreshApiStatus()
+      }
+    })
+    if (!hasValid) {
+      return
+    }
+
+    await executeUpload()
+  }
+
   const removeFile = (type: 'video' | 'srt') => {
     setFiles(prev => {
       const newFiles = { ...prev }
@@ -268,30 +306,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
     return null
   }
 
-  const handleUrlDownload = async () => {
-    const trimmedUrl = videoUrl.trim()
-    if (!trimmedUrl) {
-      message.error('Please enter a YouTube video URL')
-      return
-    }
-
-    let effectiveProjectName = projectName.trim()
-    if (!effectiveProjectName) {
-      const info = await handleParseUrl(trimmedUrl)
-      if (info?.title) {
-        effectiveProjectName = info.title
-        setProjectName(info.title)
-      } else {
-        effectiveProjectName = `YouTube_${Date.now()}`
-        setProjectName(effectiveProjectName)
-      }
-    }
-
-    const hasValidApiConfig = await validateApiConfigBeforeProjectCreation()
-    if (!hasValidApiConfig) {
-      return
-    }
-
+  const executeUrlDownload = async (trimmedUrl: string, effectiveProjectName: string) => {
     setSubmittingUrl(true)
     try {
       const res = await youtubeApi.createDownloadTask({
@@ -322,6 +337,40 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
     }
   }
 
+  const handleUrlDownload = async () => {
+    const trimmedUrl = videoUrl.trim()
+    if (!trimmedUrl) {
+      message.error('Please enter a YouTube video URL')
+      return
+    }
+
+    let effectiveProjectName = projectName.trim()
+    if (!effectiveProjectName) {
+      const info = await handleParseUrl(trimmedUrl)
+      if (info?.title) {
+        effectiveProjectName = info.title
+        setProjectName(info.title)
+      } else {
+        effectiveProjectName = `YouTube_${Date.now()}`
+        setProjectName(effectiveProjectName)
+      }
+    }
+
+    // Prompt for API key / provider before importing YouTube video
+    const hasValid = await validateApiConfig({
+      actionName: 'Importing Video',
+      onProceed: () => {
+        executeUrlDownload(trimmedUrl, effectiveProjectName)
+        refreshApiStatus()
+      }
+    })
+    if (!hasValid) {
+      return
+    }
+
+    await executeUrlDownload(trimmedUrl, effectiveProjectName)
+  }
+
   const hasMediaSelected = importSource === 'file'
     ? Boolean(files.video)
     : Boolean(parsedInfo || (videoUrl.trim().length > 10 && (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be'))))
@@ -348,7 +397,94 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
       }} />
       
 
-      
+      {/* AI Engine Status Banner & Setup Trigger */}
+      <div 
+        style={{ 
+          marginBottom: '16px',
+          padding: '12px 18px',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: apiStatus?.hasValidConfig
+            ? (apiStatus.isOfflineMode ? 'rgba(59, 130, 246, 0.08)' : 'rgba(82, 196, 26, 0.08)')
+            : 'rgba(250, 173, 20, 0.12)',
+          border: `1px solid ${apiStatus?.hasValidConfig ? (apiStatus.isOfflineMode ? 'rgba(59, 130, 246, 0.25)' : 'rgba(82, 196, 26, 0.25)') : 'rgba(250, 173, 20, 0.4)'}`,
+          transition: 'all 0.3s ease'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            background: apiStatus?.hasValidConfig
+              ? (apiStatus.isOfflineMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(82, 196, 26, 0.2)')
+              : 'rgba(250, 173, 20, 0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: apiStatus?.hasValidConfig
+              ? (apiStatus.isOfflineMode ? '#60A5FA' : '#52c41a')
+              : '#faad14',
+            fontSize: '16px'
+          }}>
+            {apiStatus?.isOfflineMode ? <ThunderboltOutlined /> : <RobotOutlined />}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--ac-ink)' }}>
+                {apiStatus?.displayLabel || 'Checking AI Engine...'}
+              </span>
+              <span style={{
+                fontSize: '10px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                padding: '1px 6px',
+                borderRadius: '4px',
+                background: apiStatus?.hasValidConfig
+                  ? (apiStatus.isOfflineMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(82, 196, 26, 0.2)')
+                  : 'rgba(250, 173, 20, 0.2)',
+                color: apiStatus?.hasValidConfig
+                  ? (apiStatus.isOfflineMode ? '#60A5FA' : '#52c41a')
+                  : '#faad14'
+              }}>
+                {apiStatus?.hasValidConfig ? (apiStatus.isOfflineMode ? 'OFFLINE HEURISTIC' : 'CLOUD AI READY') : 'SETUP REQUIRED'}
+              </span>
+            </div>
+            <span style={{ fontSize: '11.5px', color: 'var(--ac-muted)', marginTop: '2px' }}>
+              {apiStatus?.hasValidConfig
+                ? (apiStatus.isOfflineMode
+                    ? 'Using built-in transcript & audio heuristics. No API key required.'
+                    : 'AI engine will identify viral hooks, grade highlights, and generate titles.')
+                : 'Click to select an AI provider and enter your API key, or choose the built-in offline engine.'}
+            </span>
+          </div>
+        </div>
+
+        <Button
+          size="small"
+          type={apiStatus?.hasValidConfig ? 'default' : 'primary'}
+          onClick={() => {
+            openApiModal({
+              title: apiStatus?.hasValidConfig ? 'Change AI Provider / Model' : 'Configure AI Engine',
+              onSuccess: () => refreshApiStatus()
+            })
+          }}
+          style={{
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: 600,
+            ...(apiStatus?.hasValidConfig 
+              ? { borderColor: 'var(--ac-line)', background: 'var(--ac-card)', color: 'var(--ac-ink)' }
+              : { background: 'linear-gradient(135deg, #faad14 0%, #ff7875 100%)', border: 'none', color: '#fff', boxShadow: '0 2px 8px rgba(250, 173, 20, 0.4)' }
+            )
+          }}
+        >
+          {apiStatus?.hasValidConfig ? 'Change Provider / Key' : 'Set Up AI Engine'}
+        </Button>
+      </div>
+
       {/* Source Selection Tabs */}
       <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
         <Segmented

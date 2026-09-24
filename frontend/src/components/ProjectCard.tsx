@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { Project } from '../store/useProjectStore'
 import { projectApi } from '../services/api'
 import { UnifiedStatusBar } from './UnifiedStatusBar'
+import { validateApiConfig } from '../utils/apiConfigCheck'
 // import { 
 //   getProjectStatusConfig, 
 //   calculateProjectProgress, 
@@ -287,7 +288,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                          Math.round((project.current_step / project.total_steps) * 100) : 
                          project.status === 'processing' ? 10 : 0
 
-  const handleRetry = async (opts?: { silent?: boolean }) => {
+  const doRetry = async (opts?: { silent?: boolean }) => {
     if (isRetrying) return
 
     setIsRetrying(true)
@@ -313,6 +314,19 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     } finally {
       setIsRetrying(false)
     }
+  }
+
+  const handleRetry = async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      const hasValid = await validateApiConfig({
+        actionName: 'Retrying Project',
+        onProceed: () => {
+          doRetry(opts)
+        }
+      })
+      if (!hasValid) return
+    }
+    await doRetry(opts)
   }
 
   return (

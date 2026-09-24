@@ -89,7 +89,6 @@ class DataSyncService:
                     description=project_metadata.get("description", ""),
                     project_type=ProjectType.KNOWLEDGE,  # Default Type
                     status=ProjectStatus.COMPLETED if project_metadata.get("status") == "completed" else ProjectStatus.PENDING,
-                    source_file=project_metadata.get("source_file"),
                     video_path=project_metadata.get("video_path"),
                     thumbnail=project_metadata.get("thumbnail"),
                     processing_config=project_metadata.get("processing_config", {}),

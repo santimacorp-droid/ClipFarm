@@ -16,6 +16,7 @@ import { Clip } from '../store/useProjectStore'
 import { projectApi } from '../services/api'
 import EditableTitle from './EditableTitle'
 import CaptionEditorModal from './CaptionEditorModal'
+import { validateApiConfig } from '../utils/apiConfigCheck'
 import './ClipCard.css'
 
 export interface PlatformConfig {
@@ -111,6 +112,17 @@ const ClipCard: React.FC<ClipCardProps> = ({
   const handlePlatformSwitch = (platformId: string) => {
     setLocalPlatform(platformId)
     onPlatformChange?.(platformId)
+  }
+
+  const handleOpenCaptionEditor = async () => {
+    const hasValid = await validateApiConfig({
+      actionName: 'Editing Video Captions',
+      onProceed: () => {
+        setShowCaptionEditor(true)
+      }
+    })
+    if (!hasValid) return
+    setShowCaptionEditor(true)
   }
 
   const finalVideoUrl = `/api/v1/clips/${clip.id}/video?v=${videoVersion}&platform=${activePlatform}`
@@ -693,7 +705,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
             <Button
               size="small"
               icon={<FileTextOutlined />}
-              onClick={() => setShowCaptionEditor(true)}
+              onClick={handleOpenCaptionEditor}
               style={{
                 flex: 1,
                 borderRadius: '6px',

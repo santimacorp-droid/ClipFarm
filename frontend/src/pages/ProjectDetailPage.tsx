@@ -31,6 +31,7 @@ import CollectionPreviewModal from '../components/CollectionPreviewModal'
 import CreateCollectionModal from '../components/CreateCollectionModal'
 import { useCollectionVideoDownload } from '../hooks/useCollectionVideoDownload'
 import { ProjectTaskManager } from '../components/ProjectTaskManager'
+import { validateApiConfig } from '../utils/apiConfigCheck'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -182,7 +183,7 @@ const ProjectDetailPage: React.FC = () => {
     }
   }
 
-  const handleStartProcessing = async () => {
+  const doStartProcessing = async () => {
     if (!id) return
     setStatusLoading(true)
     try {
@@ -195,6 +196,19 @@ const ProjectDetailPage: React.FC = () => {
     } finally {
       setStatusLoading(false)
     }
+  }
+
+  const handleStartProcessing = async () => {
+    if (!id) return
+    const hasValid = await validateApiConfig({
+      actionName: 'Processing Video',
+      onProceed: () => {
+        doStartProcessing()
+      }
+    })
+    if (!hasValid) return
+
+    await doStartProcessing()
   }
 
   const handleCreateCollection = async (title: string, summary: string, clipIds: string[]) => {

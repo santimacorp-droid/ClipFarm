@@ -17,6 +17,7 @@ import { Clip } from '../store/useProjectStore'
 import { projectApi } from '../services/api'
 import EditableTitle from './EditableTitle'
 import CaptionEditorModal from './CaptionEditorModal'
+import { validateApiConfig } from '../utils/apiConfigCheck'
 
 const { Text, Title } = Typography
 
@@ -80,7 +81,7 @@ const ClipDetailModal: React.FC<ClipDetailModalProps> = ({
     }
   }, [socialCopy, activeCaptionTab, clip])
 
-  const handleRegenerateSocial = async () => {
+  const doRegenerateSocial = async () => {
     if (!clip) return
     setRegeneratingSocial(true)
     try {
@@ -94,6 +95,19 @@ const ClipDetailModal: React.FC<ClipDetailModalProps> = ({
     } finally {
       setRegeneratingSocial(false)
     }
+  }
+
+  const handleRegenerateSocial = async () => {
+    if (!clip) return
+    const hasValid = await validateApiConfig({
+      actionName: 'Generating Social Copy',
+      onProceed: () => {
+        doRegenerateSocial()
+      }
+    })
+    if (!hasValid) return
+
+    await doRegenerateSocial()
   }
 
   const handleSaveSocial = async () => {

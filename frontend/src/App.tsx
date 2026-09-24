@@ -3,6 +3,7 @@ import { Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import { Layout, Spin } from 'antd'
 import HomePage from './pages/HomePage'
 import Header from './components/Header'
+import { ApiConfigModal } from './components/ApiConfigModal'
 import { trackPageview } from './appEvents/client'
 
 const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage'))
@@ -52,6 +53,7 @@ function App() {
           </Routes>
         </Suspense>
       </Content>
+      <ApiConfigModal />
     </Layout>
   )
 }

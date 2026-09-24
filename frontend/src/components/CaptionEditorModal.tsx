@@ -29,11 +29,13 @@ import {
   ClockCircleOutlined,
   CloseOutlined,
   UploadOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
+  RobotOutlined
 } from '@ant-design/icons'
 import ReactPlayer from 'react-player'
 import { Clip } from '../store/useProjectStore'
 import { subtitleApi, SubtitleSegment, projectApi } from '../services/api'
+import { useApiModalStore } from '../store/useApiModalStore'
 
 const { Text, Title } = Typography
 const { TextArea } = Input
@@ -457,6 +459,20 @@ export const CaptionEditorModal: React.FC<CaptionEditorModalProps> = ({
                 padding: '1px 8px'
               }}>
                 {segments.length} cues
+              </Tag>
+              <Tag 
+                onClick={() => useApiModalStore.getState().openModal({ title: 'AI Model & Engine Settings' })}
+                style={{
+                  borderRadius: '999px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  color: 'var(--ac-sub)',
+                  border: '1px solid var(--ac-line)',
+                  fontSize: '11px',
+                  padding: '1px 8px',
+                  cursor: 'pointer'
+                }}
+              >
+                <RobotOutlined style={{ marginRight: '4px' }} /> AI Settings
               </Tag>
             </div>
             <Text style={{ color: 'var(--ac-sub, #A6A29B)', fontSize: '13px' }}>
