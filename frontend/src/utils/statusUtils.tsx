@@ -228,14 +228,22 @@ export const calculateProjectProgress = (
  * Convert old status values to new unified status values
  */
 export const normalizeProjectStatus = (status: string): ProjectStatus => {
-  switch (status) {
+  const s = (status || '').toLowerCase().trim()
+  switch (s) {
     case 'error':
-      return 'failed'
-    case 'pending':
-    case 'processing':
-    case 'completed':
     case 'failed':
-      return status as ProjectStatus
+      return 'failed'
+    case 'completed':
+    case 'success':
+    case 'done':
+      return 'completed'
+    case 'processing':
+    case 'running':
+    case 'downloading':
+    case 'analyzing':
+      return 'processing'
+    case 'pending':
+    case 'queued':
     default:
       return 'pending'
   }

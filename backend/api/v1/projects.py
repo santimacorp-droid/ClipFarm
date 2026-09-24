@@ -344,7 +344,7 @@ async def create_project(
 @router.get("/", response_model=ProjectListResponse)
 async def get_projects(
     page: int = Query(1, ge=1, description="Page number"),
-    size: int = Query(20, ge=1, le=100, description="Page size"),
+    size: int = Query(100, ge=1, le=500, description="Page size"),
     status: Optional[str] = Query(None, description="Filter by status"),
     project_type: Optional[str] = Query(None, description="Filter by project type"),
     search: Optional[str] = Query(None, description="Search in name and description"),

@@ -23,6 +23,7 @@ import { projectApi } from '../services/api'
 import { useSimpleProgressStore } from '../stores/useSimpleProgressStore'
 import { Project, useProjectStore } from '../store/useProjectStore'
 import { useProjectPolling } from '../hooks/useProjectPolling'
+import { normalizeProjectStatus } from '../utils/statusUtils'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -177,18 +178,27 @@ const HomePage: React.FC = () => {
   }
 
   const totalCount = projects.length
-  const completedCount = projects.filter(p => p.status === 'completed').length
-  const processingCount = projects.filter(p => p.status === 'processing' || p.status === 'pending').length
-  const failedCount = projects.filter(p => p.status === 'error' || p.status === 'failed').length
+  const completedCount = projects.filter(p => normalizeProjectStatus(p.status) === 'completed').length
+  const processingCount = projects.filter(p => {
+    const s = normalizeProjectStatus(p.status)
+    return s === 'processing' || s === 'pending'
+  }).length
+  const failedCount = projects.filter(p => normalizeProjectStatus(p.status) === 'failed').length
 
   const filteredProjects = (projects || [])
     .filter(project => {
-      const matchesStatus = statusFilter === 'all' || project.status === statusFilter
-      return matchesStatus
+      if (statusFilter === 'all') return true
+      const s = normalizeProjectStatus(project.status)
+      if (statusFilter === 'completed') return s === 'completed'
+      if (statusFilter === 'processing') return s === 'processing' || s === 'pending'
+      if (statusFilter === 'failed' || statusFilter === 'error') return s === 'failed'
+      return s === statusFilter
     })
     .sort((a, b) => {
       // Sort by creation date descending, most recent first
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
+      return timeB - timeA
     })
 
   const filteredIds = filteredProjects.map(p => p.id)
@@ -311,7 +321,7 @@ const HomePage: React.FC = () => {
                     { label: `All (${totalCount})`, value: 'all' },
                     { label: `Completed (${completedCount})`, value: 'completed' },
                     { label: `Processing (${processingCount})`, value: 'processing' },
-                    { label: `Failed (${failedCount})`, value: 'error' },
+                    { label: `Failed (${failedCount})`, value: 'failed' },
                   ]}
                   size="middle"
                 />

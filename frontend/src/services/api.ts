@@ -323,8 +323,8 @@ export const projectApi = {
 
   // Get all projects
   getProjects: async (): Promise<Project[]> => {
-    const response = await api.get('/projects/')
-    // Process pagination response structure and returnitemsArray
+    const response = await api.get('/projects/?size=100')
+    // Process pagination response structure and return items Array
     return (response as any).items || response || []
   },
 

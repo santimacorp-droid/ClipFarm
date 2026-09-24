@@ -71,7 +71,10 @@ class BaseRepository(Generic[ModelType]):
         Returns:
             Model instance list
         """
-        return self.db.query(self.model).offset(skip).limit(limit).all()
+        query = self.db.query(self.model)
+        if hasattr(self.model, "created_at"):
+            query = query.order_by(self.model.created_at.desc())
+        return query.offset(skip).limit(limit).all()
     
     def update(self, id: str, auto_commit: bool = True, **kwargs) -> Optional[ModelType]:
         """
@@ -137,11 +140,13 @@ class BaseRepository(Generic[ModelType]):
         """
         return self.db.query(self.model).filter(self.model.id == id).first() is not None
     
-    def find_by(self, **kwargs) -> List[ModelType]:
+    def find_by(self, skip: int = 0, limit: Optional[int] = None, **kwargs) -> List[ModelType]:
         """
         Find records matching criteria
         
         Args:
+            skip: Number of skipped records
+            limit: Record count limit to return
             **kwargs: Query conditions
             
         Returns:
@@ -153,7 +158,14 @@ class BaseRepository(Generic[ModelType]):
                 filters.append(getattr(self.model, field) == value)
         
         if filters:
-            return self.db.query(self.model).filter(and_(*filters)).all()
+            query = self.db.query(self.model).filter(and_(*filters))
+            if hasattr(self.model, "created_at"):
+                query = query.order_by(self.model.created_at.desc())
+            if skip > 0:
+                query = query.offset(skip)
+            if limit is not None:
+                query = query.limit(limit)
+            return query.all()
         return []
     
     def find_one_by(self, **kwargs) -> Optional[ModelType]:
@@ -175,17 +187,26 @@ class BaseRepository(Generic[ModelType]):
             return self.db.query(self.model).filter(and_(*filters)).first()
         return None
     
-    def find_by_condition(self, condition) -> List[ModelType]:
+    def find_by_condition(self, condition, skip: int = 0, limit: Optional[int] = None) -> List[ModelType]:
         """
         Find records based on custom conditions
         
         Args:
             condition: SQLAlchemyQuery conditions
+            skip: Number of skipped records
+            limit: Record count limit to return
             
         Returns:
             List of matched model instances
         """
-        return self.db.query(self.model).filter(condition).all()
+        query = self.db.query(self.model).filter(condition)
+        if hasattr(self.model, "created_at"):
+            query = query.order_by(self.model.created_at.desc())
+        if skip > 0:
+            query = query.offset(skip)
+        if limit is not None:
+            query = query.limit(limit)
+        return query.all()
     
     def find_one_by_condition(self, condition) -> Optional[ModelType]:
         """

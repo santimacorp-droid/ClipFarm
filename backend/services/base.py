@@ -33,7 +33,7 @@ class BaseService(Generic[RepoModelType, CreateSchemaType, UpdateSchemaType, Res
     ) -> List[RepoModelType]:
         """Get multiple records with optional filtering."""
         if filters:
-            return self.repository.find_by(**filters)
+            return self.repository.find_by(skip=skip, limit=limit, **filters)
         return self.repository.get_all(skip=skip, limit=limit)
     
     def create(self, **kwargs) -> RepoModelType:
