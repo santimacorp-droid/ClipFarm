@@ -3,7 +3,7 @@ YouTubeRelatedAPIRouter handlerYouTubeVideo parsing and download functionality
 """
 
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, HTTPException, Form, UploadFile, File
 from pydantic import BaseModel
 import sys
@@ -15,6 +15,7 @@ import asyncio
 from datetime import datetime
 from contextlib import contextmanager
 import os
+import shutil
 import yt_dlp
 
 logger = logging.getLogger(__name__)
