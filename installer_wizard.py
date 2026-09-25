@@ -8,19 +8,24 @@ import sys
 import os
 import time
 import shutil
+import json
 import platform
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 ICON_PATH = PROJECT_ROOT / "app_icon.png"
 
-def get_python_interpreter() -> str:
+def get_python_interpreter(custom_root: Optional[Path] = None) -> str:
     """Ensure the project's virtualenv Python interpreter is prioritized."""
+    root = custom_root or PROJECT_ROOT
     candidates = [
         os.environ.get("CLIPFARM_PYTHON"),
+        root / "venv" / "bin" / "python",
         PROJECT_ROOT / "venv" / "bin" / "python",
         Path.home() / ".local" / "share" / "clipfarm" / "venv" / "bin" / "python",
+        root / "venv" / "Scripts" / "python.exe",
         PROJECT_ROOT / "venv" / "Scripts" / "python.exe",
     ]
     for c in candidates:
@@ -83,38 +88,113 @@ def check_system_environment() -> dict:
 
     return results
 
-def perform_installation_steps(create_desktop: bool, create_menu: bool, progress_callback=None) -> bool:
+def perform_installation_steps(
+    create_desktop: bool, 
+    create_menu: bool, 
+    progress_callback=None,
+    target_dir: Optional[Path] = None,
+    data_dir: Optional[Path] = None
+) -> bool:
     """Execute installation and configuration steps."""
     def notify(pct: int, title: str, log_msg: str):
         if progress_callback:
             progress_callback(pct, title, log_msg)
         time.sleep(0.35)
 
-    notify(15, "Setting up application storage", "Creating local data, output, and log directories...")
-    (PROJECT_ROOT / "data").mkdir(exist_ok=True)
-    (PROJECT_ROOT / "output").mkdir(exist_ok=True)
-    (PROJECT_ROOT / "logs").mkdir(exist_ok=True)
+    install_root = Path(target_dir).resolve() if target_dir else PROJECT_ROOT.resolve()
 
-    notify(35, "Configuring local database", "Initializing SQLite schema and project tables...")
+    # Step 1: If custom installation directory requested, deploy files
+    if install_root != PROJECT_ROOT.resolve():
+        notify(10, "Deploying workspace files", f"Copying ClipFarm files to {install_root}...")
+        install_root.mkdir(parents=True, exist_ok=True)
+        ignore_names = {".git", ".gemini", "node_modules", "__pycache__", ".pytest_cache", "venv"}
+        for item in PROJECT_ROOT.iterdir():
+            if item.name in ignore_names:
+                continue
+            dest = install_root / item.name
+            try:
+                if item.is_dir():
+                    if dest.exists():
+                        shutil.rmtree(dest, ignore_errors=True)
+                    shutil.copytree(item, dest, ignore=shutil.ignore_patterns("*.pyc", "__pycache__", "node_modules"))
+                else:
+                    shutil.copy2(item, dest)
+            except Exception as copy_err:
+                print(f"Notice during copy {item.name}: {copy_err}")
+
+        # Symlink or copy venv if present
+        src_venv = PROJECT_ROOT / "venv"
+        dest_venv = install_root / "venv"
+        if src_venv.exists() and not dest_venv.exists():
+            try:
+                os.symlink(src_venv, dest_venv)
+            except Exception:
+                try:
+                    shutil.copytree(src_venv, dest_venv, symlinks=True)
+                except Exception:
+                    pass
+
+    # Step 2: Set up application storage & custom data directory
+    notify(25, "Setting up application storage", "Creating local data, output, and log directories...")
+    (install_root / "data").mkdir(exist_ok=True)
+    (install_root / "output").mkdir(exist_ok=True)
+    (install_root / "logs").mkdir(exist_ok=True)
+
+    if data_dir:
+        storage_dir = Path(data_dir).resolve()
+        storage_dir.mkdir(parents=True, exist_ok=True)
+        (storage_dir / "projects").mkdir(parents=True, exist_ok=True)
+        (storage_dir / "output").mkdir(parents=True, exist_ok=True)
+        (storage_dir / "temp").mkdir(parents=True, exist_ok=True)
+        (storage_dir / "cache").mkdir(parents=True, exist_ok=True)
+
+        for s_file in [storage_dir / "settings.json", install_root / "data" / "settings.json"]:
+            try:
+                cur = {}
+                if s_file.exists():
+                    try:
+                        with open(s_file, "r", encoding="utf-8") as f:
+                            cur = json.load(f)
+                    except Exception:
+                        cur = {}
+                if "paths" not in cur:
+                    cur["paths"] = {}
+                cur["paths"]["data_directory"] = str(storage_dir)
+                cur["paths"]["cache_directory"] = str(storage_dir / "cache")
+                cur["paths"]["temp_directory"] = str(storage_dir / "temp")
+                s_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(s_file, "w", encoding="utf-8") as f:
+                    json.dump(cur, f, indent=2)
+            except Exception as e:
+                print(f"Notice: writing settings.json: {e}")
+
+    # Step 3: Configure local database
+    notify(45, "Configuring local database", "Initializing SQLite schema and project tables...")
     try:
+        sys.path.insert(0, str(install_root))
+        os.environ["CLIPFARM_DESKTOP_MODE"] = "true"
+        if data_dir:
+            os.environ["CLIPFARM_DATA_DIR"] = str(Path(data_dir).resolve())
         from backend.core.database import engine
         from backend.models.base import Base
         Base.metadata.create_all(bind=engine)
     except Exception as e:
         print(f"Notice: database init: {e}")
 
-    notify(60, "Configuring launcher permissions", "Setting executable attributes for desktop launchers...")
+    # Step 4: Configure launcher permissions
+    notify(65, "Configuring launcher permissions", "Setting executable attributes for desktop launchers...")
     for script_name in ["launch_clipfarm.sh", "desktop_app.py", "launch_clipfarm.py", "Launch_ClipFarm.command"]:
-        p = PROJECT_ROOT / script_name
+        p = install_root / script_name
         if p.exists() and not sys.platform.startswith("win"):
             os.chmod(p, 0o755)
 
-    notify(80, "Registering desktop integration", "Creating desktop shortcut and application menu entries...")
+    # Step 5: Register desktop integration
+    notify(85, "Registering desktop integration", "Creating desktop shortcut and application menu entries...")
     if sys.platform.startswith("linux"):
         # Install multi-resolution icons into user's hicolor icon theme
         try:
             from PIL import Image
-            src_icon = PROJECT_ROOT / "app_icon.png"
+            src_icon = install_root / "app_icon.png"
             if src_icon.is_file():
                 img = Image.open(src_icon)
                 base_icon_dir = Path.home() / ".local" / "share" / "icons" / "hicolor"
@@ -141,16 +221,16 @@ Type=Application
 Name=ClipFarm Studio
 GenericName=AI Video Clipping Studio
 Comment=AI Short-Form Video Clipping & Studio
-Exec={PROJECT_ROOT}/launch_clipfarm.sh
+Exec={install_root}/launch_clipfarm.sh
 Icon=clipfarm
-Path={PROJECT_ROOT}
+Path={install_root}
 Terminal=false
 StartupNotify=true
 StartupWMClass=ClipFarm
 Categories=AudioVideo;Video;AudioVideoEditing;
 Keywords=video;clips;ai;shortform;tiktok;reels;youtube;
 """
-        desktop_file = PROJECT_ROOT / "ClipFarm.desktop"
+        desktop_file = install_root / "ClipFarm.desktop"
         desktop_file.write_text(desktop_content, encoding="utf-8")
         os.chmod(desktop_file, 0o755)
 
@@ -178,17 +258,17 @@ Keywords=video;clips;ai;shortform;tiktok;reels;youtube;
     elif sys.platform == "win32" and create_desktop:
         try:
             desktop_dir = Path.home() / "Desktop"
-            bat_target = PROJECT_ROOT / "Launch_ClipFarm.bat"
+            bat_target = install_root / "Launch_ClipFarm.bat"
             vbs_script = f"""
             Set oWS = WScript.CreateObject("WScript.Shell")
             sLinkFile = "{desktop_dir}\\ClipFarm Studio.lnk"
             Set oLink = oWS.CreateShortcut(sLinkFile)
             oLink.TargetPath = "{bat_target}"
-            oLink.WorkingDirectory = "{PROJECT_ROOT}"
+            oLink.WorkingDirectory = "{install_root}"
             oLink.Description = "ClipFarm Studio AI Video Clipping"
             oLink.Save
             """
-            vbs_path = PROJECT_ROOT / "temp_create_shortcut.vbs"
+            vbs_path = install_root / "temp_create_shortcut.vbs"
             vbs_path.write_text(vbs_script, encoding="utf-8")
             subprocess.run(["cscript", "//nologo", str(vbs_path)], check=False)
             if vbs_path.exists():
@@ -199,159 +279,229 @@ Keywords=video;clips;ai;shortform;tiktok;reels;youtube;
     notify(100, "Installation complete", "All components configured and verified successfully.")
     return True
 
-# ==============================================================================
-# Modern Dark GUI Wizard (PyQt6)
-# ==============================================================================
+def get_checkmark_path() -> str:
+    candidates = [
+        PROJECT_ROOT / "docs" / "assets" / "check_white.png",
+        PROJECT_ROOT / "build" / "check_white.png",
+        Path(__file__).resolve().parent / "docs" / "assets" / "check_white.png",
+    ]
+    for c in candidates:
+        if c.is_file():
+            return c.as_posix()
+    fallback_path = Path.home() / ".cache" / "clipfarm" / "check_white.png"
+    try:
+        fallback_path.parent.mkdir(parents=True, exist_ok=True)
+        if not fallback_path.exists():
+            from PIL import Image, ImageDraw
+            img = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            draw.line([(8, 16), (13, 22), (24, 10)], fill=(255, 255, 255, 255), width=3)
+            img.save(fallback_path, "PNG")
+        return fallback_path.as_posix()
+    except Exception:
+        return candidates[0].as_posix()
 
-MODERN_STYLESHEET = """
-QMainWindow {
-    background-color: #0E1118;
-}
-QWidget#sidebar {
-    background-color: #080A0F;
-    border-right: 1px solid #1C2230;
-}
-QWidget#contentArea {
-    background-color: #0E1118;
-}
-QLabel {
+def get_modern_stylesheet() -> str:
+    checkmark_url = get_checkmark_path()
+    return f"""
+QMainWindow {{
+    background-color: #0A0D14;
+}}
+QWidget#sidebar {{
+    background-color: #07090E;
+    border-right: 1px solid #161D2B;
+}}
+QWidget#contentArea {{
+    background-color: #0A0D14;
+}}
+QLabel {{
     color: #E2E8F0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
-QLabel#pageTitle {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}}
+QLabel#pageTitle {{
     font-size: 22px;
     font-weight: 800;
     color: #FFFFFF;
     letter-spacing: -0.5px;
-}
-QLabel#pageSubtitle {
+}}
+QLabel#pageSubtitle {{
     font-size: 13px;
     color: #94A3B8;
     margin-top: 2px;
     margin-bottom: 16px;
-}
-QFrame#card {
-    background-color: #141923;
-    border: 1px solid #232A3B;
+}}
+QFrame#card {{
+    background-color: #101522;
+    border: 1px solid #1E283B;
+    border-radius: 10px;
+    padding: 16px;
+}}
+QFrame#diagCard {{
+    background-color: #101522;
+    border: 1px solid #1B2335;
     border-radius: 10px;
     padding: 14px;
-}
-QFrame#diagCard {
-    background-color: #141923;
-    border: 1px solid #1F2737;
-    border-radius: 10px;
-    padding: 12px;
-}
-QFrame#diagCard:hover {
+}}
+QFrame#diagCard:hover {{
     border: 1px solid #3B82F6;
-    background-color: #171D2A;
-}
-QLabel#stepItemActive {
+    background-color: #131A2B;
+}}
+QLabel#stepItemActive {{
     color: #FFFFFF;
     font-weight: 700;
     font-size: 13px;
-    padding: 8px 12px;
-    background: #1D2536;
+    padding: 9px 14px;
+    background: #182236;
     border-left: 3px solid #3B82F6;
-    border-radius: 4px;
-}
-QLabel#stepItemInactive {
+    border-radius: 6px;
+}}
+QLabel#stepItemInactive {{
     color: #64748B;
     font-size: 13px;
-    padding: 8px 12px;
-}
-QLabel#stepItemDone {
+    padding: 9px 14px;
+}}
+QLabel#stepItemDone {{
     color: #10B981;
     font-size: 13px;
-    padding: 8px 12px;
+    padding: 9px 14px;
     font-weight: 600;
-}
-QProgressBar {
-    background-color: #161B26;
-    border: 1px solid #242D3D;
+}}
+QProgressBar {{
+    background-color: #101522;
+    border: 1px solid #1E283B;
     border-radius: 6px;
     height: 12px;
     text-align: right;
-    margin-right: 2px;
-}
-QProgressBar::chunk {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3B82F6, stop:1 #60A5FA);
+}}
+QProgressBar::chunk {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2563EB, stop:1 #38BDF8);
     border-radius: 5px;
-}
-QPushButton#primaryBtn {
+}}
+QPushButton#primaryBtn {{
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2563EB, stop:1 #3B82F6);
     color: #FFFFFF;
     font-size: 13px;
     font-weight: 700;
-    padding: 9px 22px;
+    min-height: 40px;
+    padding: 0 24px;
     border: 1px solid #3B82F6;
-    border-radius: 7px;
-}
-QPushButton#primaryBtn:hover {
+    border-radius: 8px;
+}}
+QPushButton#primaryBtn:hover {{
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1D4ED8, stop:1 #2563EB);
-}
-QPushButton#primaryBtn:disabled {
-    background-color: #1E2533;
-    border: 1px solid #283347;
+    border-color: #60A5FA;
+}}
+QPushButton#primaryBtn:pressed {{
+    background: #1E40AF;
+}}
+QPushButton#primaryBtn:disabled {{
+    background-color: #161D2B;
+    border: 1px solid #212B3E;
     color: #475569;
-}
-QPushButton#secondaryBtn {
-    background-color: #161C26;
+}}
+QPushButton#secondaryBtn {{
+    background-color: #131824;
     color: #CBD5E1;
     font-size: 13px;
     font-weight: 600;
-    padding: 9px 18px;
-    border: 1px solid #273142;
-    border-radius: 7px;
-}
-QPushButton#secondaryBtn:hover {
-    background-color: #1F2737;
-    border-color: #38455C;
+    min-height: 40px;
+    padding: 0 20px;
+    border: 1px solid #222C3F;
+    border-radius: 8px;
+}}
+QPushButton#secondaryBtn:hover {{
+    background-color: #1C2436;
+    border-color: #3B82F6;
     color: #FFFFFF;
-}
-QCheckBox {
+}}
+QPushButton#secondaryBtn:pressed {{
+    background-color: #0E131D;
+}}
+QCheckBox {{
     color: #E2E8F0;
     font-size: 13px;
     font-weight: 500;
-    spacing: 10px;
-}
-QCheckBox::indicator {
-    width: 18px;
-    height: 18px;
-    border-radius: 5px;
-    border: 1px solid #334155;
-    background-color: #161B26;
-}
-QCheckBox::indicator:checked {
+    spacing: 12px;
+}}
+QCheckBox::indicator {{
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 1.5px solid #334155;
+    background-color: #0B0E16;
+}}
+QCheckBox::indicator:hover {{
+    border-color: #475569;
+    background-color: #141923;
+}}
+QCheckBox::indicator:checked {{
     background-color: #2563EB;
     border-color: #3B82F6;
-    image: url(data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>);
-}
-QLineEdit {
-    background-color: #161B26;
-    border: 1px solid #2A3448;
-    border-radius: 6px;
-    color: #CBD5E1;
-    padding: 8px 12px;
+    image: url({checkmark_url});
+}}
+QCheckBox::indicator:checked:hover {{
+    background-color: #1D4ED8;
+    border-color: #60A5FA;
+}}
+QLineEdit {{
+    background-color: #0B0E16;
+    border: 1.5px solid #222C3E;
+    border-radius: 8px;
+    color: #F8FAFC;
+    padding: 0 14px;
+    min-height: 40px;
     font-size: 13px;
-}
-QTextEdit#terminalLog {
-    background-color: #07090D;
-    border: 1px solid #1E2536;
+    selection-background-color: #2563EB;
+}}
+QLineEdit:hover {{
+    border-color: #334155;
+}}
+QLineEdit:focus {{
+    border: 1.5px solid #3B82F6;
+    background-color: #0F1422;
+    color: #FFFFFF;
+}}
+QPushButton#browseBtn {{
+    background-color: #1A2334;
+    color: #F1F5F9;
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 40px;
+    max-height: 40px;
+    min-width: 90px;
+    padding: 0 18px;
+    border: 1.5px solid #28354D;
+    border-radius: 8px;
+}}
+QPushButton#browseBtn:hover {{
+    background-color: #243047;
+    border-color: #3B82F6;
+    color: #FFFFFF;
+}}
+QPushButton#browseBtn:pressed {{
+    background-color: #151D2C;
+    border-color: #2563EB;
+}}
+QTextEdit#terminalLog {{
+    background-color: #07090E;
+    border: 1px solid #182030;
     border-radius: 8px;
     color: #38BDF8;
     font-family: "JetBrains Mono", "Cascadia Code", "Fira Code", monospace;
     font-size: 12px;
-    padding: 10px;
-}
+    padding: 12px;
+    line-height: 1.5;
+}}
 """
+
+MODERN_STYLESHEET = get_modern_stylesheet()
 
 def run_modern_gui_wizard():
     from PyQt6 import QtWidgets, QtCore, QtGui
 
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("ClipFarm Studio Setup")
-    app.setStyleSheet(MODERN_STYLESHEET)
+    app.setStyleSheet(get_modern_stylesheet())
 
     if ICON_PATH.exists():
         app.setWindowIcon(QtGui.QIcon(str(ICON_PATH)))
@@ -360,8 +510,8 @@ def run_modern_gui_wizard():
         def __init__(self):
             super().__init__()
             self.setWindowTitle("ClipFarm Studio Setup Wizard")
-            self.resize(860, 560)
-            self.setMinimumSize(820, 540)
+            self.resize(920, 620)
+            self.setMinimumSize(880, 580)
 
             # Center on screen
             screen = QtGui.QGuiApplication.primaryScreen()
@@ -388,7 +538,7 @@ def run_modern_gui_wizard():
             # 1. Left Sidebar
             self.sidebar = QtWidgets.QWidget()
             self.sidebar.setObjectName("sidebar")
-            self.sidebar.setFixedWidth(230)
+            self.sidebar.setFixedWidth(240)
             sidebar_layout = QtWidgets.QVBoxLayout(self.sidebar)
             sidebar_layout.setContentsMargins(20, 24, 20, 24)
             sidebar_layout.setSpacing(16)
@@ -435,7 +585,7 @@ def run_modern_gui_wizard():
             content_container = QtWidgets.QWidget()
             content_container.setObjectName("contentArea")
             content_v_layout = QtWidgets.QVBoxLayout(content_container)
-            content_v_layout.setContentsMargins(36, 32, 36, 24)
+            content_v_layout.setContentsMargins(34, 28, 34, 24)
             content_v_layout.setSpacing(0)
 
             self.stack = QtWidgets.QStackedWidget()
@@ -454,6 +604,8 @@ def run_modern_gui_wizard():
 
             self.btn_cancel = QtWidgets.QPushButton("Cancel")
             self.btn_cancel.setObjectName("secondaryBtn")
+            self.btn_cancel.setMinimumWidth(110)
+            self.btn_cancel.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
             self.btn_cancel.clicked.connect(self.close)
             nav_bar.addWidget(self.btn_cancel)
 
@@ -461,11 +613,15 @@ def run_modern_gui_wizard():
 
             self.btn_back = QtWidgets.QPushButton("Back")
             self.btn_back.setObjectName("secondaryBtn")
+            self.btn_back.setMinimumWidth(110)
+            self.btn_back.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
             self.btn_back.clicked.connect(self._go_back)
             nav_bar.addWidget(self.btn_back)
 
             self.btn_next = QtWidgets.QPushButton("Continue")
             self.btn_next.setObjectName("primaryBtn")
+            self.btn_next.setMinimumWidth(220)
+            self.btn_next.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
             self.btn_next.clicked.connect(self._go_next)
             nav_bar.addWidget(self.btn_next)
 
@@ -479,6 +635,7 @@ def run_modern_gui_wizard():
             for i, lbl in enumerate(self.step_labels):
                 if i == self.current_step:
                     lbl.setObjectName("stepItemActive")
+                    lbl.setText(f"{i+1}.  {self.steps[i]}")
                 elif i < self.current_step:
                     lbl.setObjectName("stepItemDone")
                     lbl.setText(f"✓  {self.steps[i]}")
@@ -510,6 +667,8 @@ def run_modern_gui_wizard():
                 self.btn_next.setText("Launch ClipFarm Studio  🚀")
                 self.btn_next.setEnabled(True)
 
+            self.btn_next.updateGeometry()
+
         def _go_next(self):
             if self.current_step == 2:
                 # Move to install progress page and trigger install
@@ -519,9 +678,10 @@ def run_modern_gui_wizard():
             elif self.current_step == 4:
                 # Finish & Launch
                 if self.cb_launch.isChecked():
-                    python_bin = get_python_interpreter()
-                    app_script = PROJECT_ROOT / "desktop_app.py"
-                    subprocess.Popen([python_bin, str(app_script)], cwd=str(PROJECT_ROOT))
+                    target_dir = getattr(self, 'target_root', PROJECT_ROOT)
+                    python_bin = get_python_interpreter(target_dir)
+                    app_script = target_dir / "desktop_app.py"
+                    subprocess.Popen([python_bin, str(app_script)], cwd=str(target_dir))
                 self.close()
             else:
                 self.current_step += 1
@@ -653,7 +813,7 @@ def run_modern_gui_wizard():
 
             title = QtWidgets.QLabel("Installation Preferences")
             title.setObjectName("pageTitle")
-            subtitle = QtWidgets.QLabel("Customize your installation path and system shortcuts.")
+            subtitle = QtWidgets.QLabel("Customize your installation path, storage location, and desktop shortcuts.")
             subtitle.setObjectName("pageSubtitle")
             layout.addWidget(title)
             layout.addWidget(subtitle)
@@ -662,43 +822,123 @@ def run_modern_gui_wizard():
             loc_card = QtWidgets.QFrame()
             loc_card.setObjectName("card")
             loc_layout = QtWidgets.QVBoxLayout(loc_card)
-            loc_layout.setContentsMargins(14, 12, 14, 12)
-            loc_layout.setSpacing(6)
+            loc_layout.setContentsMargins(18, 16, 18, 16)
+            loc_layout.setSpacing(10)
 
-            loc_lbl = QtWidgets.QLabel("Installation Workspace Directory:")
-            loc_lbl.setStyleSheet("font-size: 12px; font-weight: 700; color: #94A3B8;")
-            path_input = QtWidgets.QLineEdit(str(PROJECT_ROOT))
-            path_input.setReadOnly(True)
-            loc_layout.addWidget(loc_lbl)
-            loc_layout.addWidget(path_input)
+            # 1. Installation Workspace Directory
+            loc_header = QtWidgets.QLabel("📁  Installation Workspace Directory")
+            loc_header.setStyleSheet("font-size: 13px; font-weight: 700; color: #F1F5F9;")
+            loc_layout.addWidget(loc_header)
+
+            path_hint = QtWidgets.QLabel("Where application source code, desktop scripts, and local engines are deployed.")
+            path_hint.setStyleSheet("font-size: 11px; color: #94A3B8;")
+            loc_layout.addWidget(path_hint)
+
+            path_row = QtWidgets.QHBoxLayout()
+            path_row.setSpacing(10)
+            self.path_input = QtWidgets.QLineEdit(str(PROJECT_ROOT))
+            self.path_input.setPlaceholderText("Enter or select installation directory...")
+            
+            browse_path_btn = QtWidgets.QPushButton("Browse...")
+            browse_path_btn.setObjectName("browseBtn")
+            browse_path_btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            browse_path_btn.clicked.connect(self._browse_install_dir)
+
+            path_row.addWidget(self.path_input, stretch=1)
+            path_row.addWidget(browse_path_btn)
+            loc_layout.addLayout(path_row)
+
+            # Spacing & Divider
+            loc_layout.addSpacing(6)
+            div = QtWidgets.QFrame()
+            div.setFixedHeight(1)
+            div.setStyleSheet("background-color: #1E283B; border: none;")
+            loc_layout.addWidget(div)
+            loc_layout.addSpacing(6)
+
+            # 2. Media & Download Storage Directory
+            data_header = QtWidgets.QLabel("💾  Media & Storage Directory")
+            data_header.setStyleSheet("font-size: 13px; font-weight: 700; color: #F1F5F9;")
+            loc_layout.addWidget(data_header)
+
+            data_hint = QtWidgets.QLabel("Where raw videos, exported clips, highlights, and databases will be stored.")
+            data_hint.setStyleSheet("font-size: 11px; color: #94A3B8;")
+            loc_layout.addWidget(data_hint)
+
+            from backend.core.path_utils import get_default_app_data_dir
+            default_data_dir = str(get_default_app_data_dir())
+
+            data_row = QtWidgets.QHBoxLayout()
+            data_row.setSpacing(10)
+            self.data_input = QtWidgets.QLineEdit(default_data_dir)
+            self.data_input.setPlaceholderText("Enter or select media storage directory...")
+
+            browse_data_btn = QtWidgets.QPushButton("Browse...")
+            browse_data_btn.setObjectName("browseBtn")
+            browse_data_btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            browse_data_btn.clicked.connect(self._browse_data_dir)
+
+            data_row.addWidget(self.data_input, stretch=1)
+            data_row.addWidget(browse_data_btn)
+            loc_layout.addLayout(data_row)
+
             layout.addWidget(loc_card)
 
             # Integration Card
             int_card = QtWidgets.QFrame()
             int_card.setObjectName("card")
             int_layout = QtWidgets.QVBoxLayout(int_card)
-            int_layout.setContentsMargins(14, 12, 14, 12)
+            int_layout.setContentsMargins(18, 16, 18, 16)
             int_layout.setSpacing(10)
 
-            int_header = QtWidgets.QLabel("Desktop Integration & Setup Options:")
-            int_header.setStyleSheet("font-size: 12px; font-weight: 700; color: #94A3B8; margin-bottom: 2px;")
+            int_header = QtWidgets.QLabel("🖥️  Desktop Integration & Setup Options")
+            int_header.setStyleSheet("font-size: 13px; font-weight: 700; color: #F1F5F9; margin-bottom: 2px;")
             int_layout.addWidget(int_header)
 
             self.cb_desktop = QtWidgets.QCheckBox("Create a Desktop Shortcut (Double-click to launch natively)")
             self.cb_desktop.setChecked(True)
+            self.cb_desktop.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
             int_layout.addWidget(self.cb_desktop)
 
             self.cb_menu = QtWidgets.QCheckBox("Add to System Applications Menu (Searchable in GNOME Dash / Start Menu)")
             self.cb_menu.setChecked(True)
+            self.cb_menu.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
             int_layout.addWidget(self.cb_menu)
 
             self.cb_db = QtWidgets.QCheckBox("Pre-configure local SQLite storage and media caches")
             self.cb_db.setChecked(True)
+            self.cb_db.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
             int_layout.addWidget(self.cb_db)
 
             layout.addWidget(int_card)
             layout.addStretch()
             self.stack.addWidget(page)
+
+        def _browse_install_dir(self):
+            current = self.path_input.text().strip() or str(PROJECT_ROOT)
+            if not os.path.exists(current):
+                current = str(PROJECT_ROOT)
+            chosen = QtWidgets.QFileDialog.getExistingDirectory(
+                self,
+                "Select Installation Workspace Directory",
+                current,
+                QtWidgets.QFileDialog.Option.DontUseNativeDialog | QtWidgets.QFileDialog.Option.ShowDirsOnly
+            )
+            if chosen:
+                self.path_input.setText(os.path.abspath(chosen))
+
+        def _browse_data_dir(self):
+            current = self.data_input.text().strip() or str(Path.home())
+            if not os.path.exists(current):
+                current = str(Path.home())
+            chosen = QtWidgets.QFileDialog.getExistingDirectory(
+                self,
+                "Select Media & Download Storage Directory",
+                current,
+                QtWidgets.QFileDialog.Option.DontUseNativeDialog | QtWidgets.QFileDialog.Option.ShowDirsOnly
+            )
+            if chosen:
+                self.data_input.setText(os.path.abspath(chosen))
 
         def _build_progress_page(self):
             page = QtWidgets.QWidget()
@@ -722,8 +962,9 @@ def run_modern_gui_wizard():
             self.status_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #38BDF8;")
             self.pct_label = QtWidgets.QLabel("0%")
             self.pct_label.setStyleSheet("font-size: 13px; font-weight: 800; color: #FFFFFF;")
-            p_top.addWidget(self.status_title)
-            p_top.addStretch()
+            self.pct_label.setMinimumWidth(60)
+            self.pct_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
+            p_top.addWidget(self.status_title, stretch=1)
             p_top.addWidget(self.pct_label)
             bar_box.addLayout(p_top)
 
@@ -750,6 +991,11 @@ def run_modern_gui_wizard():
         def _start_install_process(self):
             create_desktop = self.cb_desktop.isChecked()
             create_menu = self.cb_menu.isChecked()
+            target_dir = Path(self.path_input.text().strip() or str(PROJECT_ROOT))
+            data_dir = Path(self.data_input.text().strip()) if hasattr(self, 'data_input') and self.data_input.text().strip() else None
+
+            self.target_root = target_dir
+            self.custom_data_dir = data_dir
 
             class InstallWorker(QtCore.QThread):
                 step_signal = QtCore.pyqtSignal(int, str, str)
@@ -759,7 +1005,9 @@ def run_modern_gui_wizard():
                     perform_installation_steps(
                         create_desktop=create_desktop,
                         create_menu=create_menu,
-                        progress_callback=lambda pct, title, msg: self.step_signal.emit(pct, title, msg)
+                        progress_callback=lambda pct, title, msg: self.step_signal.emit(pct, title, msg),
+                        target_dir=target_dir,
+                        data_dir=data_dir
                     )
                     self.done_signal.emit()
 
@@ -777,6 +1025,10 @@ def run_modern_gui_wizard():
         def _on_install_done(self):
             self.term_log.append("> [✓] All installation steps completed successfully.")
             time.sleep(0.5)
+            if hasattr(self, 'lbl_location') and hasattr(self, 'target_root'):
+                self.lbl_location.setText(f"📁  <b>Location:</b> {self.target_root}")
+            if hasattr(self, 'lbl_storage') and hasattr(self, 'custom_data_dir') and self.custom_data_dir:
+                self.lbl_storage.setText(f"💾  <b>Storage:</b> {self.custom_data_dir}")
             self.current_step = 4
             self._update_ui_state()
 
@@ -801,7 +1053,11 @@ def run_modern_gui_wizard():
             scard_layout.setSpacing(10)
 
             scard_layout.addWidget(QtWidgets.QLabel("🎉  <b>ClipFarm Studio is now installed and configured.</b>"))
-            scard_layout.addWidget(QtWidgets.QLabel(f"📁  <b>Location:</b> {PROJECT_ROOT}"))
+            self.lbl_location = QtWidgets.QLabel(f"📁  <b>Location:</b> {PROJECT_ROOT}")
+            scard_layout.addWidget(self.lbl_location)
+            from backend.core.path_utils import get_default_app_data_dir
+            self.lbl_storage = QtWidgets.QLabel(f"💾  <b>Storage:</b> {get_default_app_data_dir()}")
+            scard_layout.addWidget(self.lbl_storage)
             scard_layout.addWidget(QtWidgets.QLabel("🖥️  <b>Desktop Shortcut:</b> ~/Desktop/ClipFarm.desktop (Double-clickable)"))
             scard_layout.addWidget(QtWidgets.QLabel("⚡  <b>Engine:</b> Hardware-accelerated PyQt6 Native Studio"))
             layout.addWidget(scard)
@@ -810,6 +1066,7 @@ def run_modern_gui_wizard():
 
             self.cb_launch = QtWidgets.QCheckBox("Launch ClipFarm Studio immediately")
             self.cb_launch.setChecked(True)
+            self.cb_launch.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
             self.cb_launch.setStyleSheet("font-size: 14px; font-weight: 700; color: #38BDF8;")
             layout.addWidget(self.cb_launch)
 
