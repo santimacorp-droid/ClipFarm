@@ -681,7 +681,17 @@ def run_modern_gui_wizard():
                     target_dir = getattr(self, 'target_root', PROJECT_ROOT)
                     python_bin = get_python_interpreter(target_dir)
                     app_script = target_dir / "desktop_app.py"
-                    subprocess.Popen([python_bin, str(app_script)], cwd=str(target_dir))
+                    launch_kwargs = {
+                        "cwd": str(target_dir),
+                        "stdout": subprocess.DEVNULL,
+                        "stderr": subprocess.DEVNULL,
+                        "close_fds": True,
+                    }
+                    if sys.platform != "win32":
+                        launch_kwargs["start_new_session"] = True
+                    else:
+                        launch_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0)
+                    subprocess.Popen([python_bin, str(app_script)], **launch_kwargs)
                 self.close()
             else:
                 self.current_step += 1

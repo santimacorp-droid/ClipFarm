@@ -119,7 +119,7 @@ def run_native_qt_app(host: str, port: int, backend_proc: subprocess.Popen):
     QtCore.QCoreApplication.setOrganizationName("ClipFarm")
     app.setApplicationDisplayName("ClipFarm Studio")
     if hasattr(QtGui.QGuiApplication, "setDesktopFileName"):
-        QtGui.QGuiApplication.setDesktopFileName("ClipFarm.desktop")
+        QtGui.QGuiApplication.setDesktopFileName("ClipFarm")
 
     # Set application icon
     if ICON_PATH.exists():
