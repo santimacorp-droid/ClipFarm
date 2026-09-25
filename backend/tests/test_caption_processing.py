@@ -307,8 +307,8 @@ def test_multi_speaker_dual_track_ass():
 
 
 def test_overlap_resolution_behavior():
-    """Verify overlap resolution: >0.5s delays without truncation, cross-speaker overlap allowed."""
-    # 1. Same speaker with long overlap (> 0.5s) -> should delay second segment to prev.end + 0.05
+    """Verify overlap resolution: overlapping same-speaker cues clamp previous cue end time without pushing start time."""
+    # 1. Same speaker with long overlap (> 0.5s) -> should clamp previous cue end to 2.0s, starting second cue at exactly 2.0s
     same_spk_long_overlap = [
         {"start": 1.0, "end": 4.0, "text": "First phrase", "speaker": "SPEAKER_00"},
         {"start": 2.0, "end": 5.0, "text": "Second phrase", "speaker": "SPEAKER_00"},
@@ -316,9 +316,9 @@ def test_overlap_resolution_behavior():
     resolved = _resolve_overlapping_segments(same_spk_long_overlap)
     assert len(resolved) == 2
     assert resolved[0]['start'] == 1.0
-    assert resolved[0]['end'] == 4.0
-    assert resolved[1]['start'] == 4.05  # pushed after first ends
-    assert resolved[1]['end'] >= 5.0
+    assert resolved[0]['end'] == 2.0  # Clamped to start of next cue
+    assert resolved[1]['start'] == 2.0  # Anchored to audio speech start time (0 drift!)
+    assert resolved[1]['end'] == 5.0
 
     # 2. Same speaker with short overlap (<= 0.5s) -> truncates previous end
     same_spk_short_overlap = [
@@ -329,8 +329,23 @@ def test_overlap_resolution_behavior():
     assert len(resolved_short) == 2
     assert resolved_short[0]['end'] == 3.0
     assert resolved_short[1]['start'] == 3.0
+    assert resolved_short[1]['end'] == 5.0
 
-    # 3. Different speakers -> simultaneous overlap is preserved
+    # 3. Rolling YouTube/Whisper subtitles sequence has zero cumulative drift
+    rolling_cues = [
+        {"start": 0.03, "end": 4.98, "text": "Rolling cue one", "speaker": "SPEAKER_00"},
+        {"start": 2.10, "end": 6.09, "text": "Rolling cue two", "speaker": "SPEAKER_00"},
+        {"start": 4.50, "end": 8.00, "text": "Rolling cue three", "speaker": "SPEAKER_00"},
+        {"start": 6.20, "end": 9.50, "text": "Rolling cue four", "speaker": "SPEAKER_00"},
+    ]
+    resolved_rolling = _resolve_overlapping_segments(rolling_cues)
+    assert len(resolved_rolling) == 4
+    for orig, res in zip(rolling_cues, resolved_rolling):
+        assert abs(res['start'] - orig['start']) < 0.001, (
+            f"Start timestamp shifted: original {orig['start']} vs resolved {res['start']}"
+        )
+
+    # 4. Different speakers -> simultaneous overlap is preserved
     diff_spk_overlap = [
         {"start": 1.0, "end": 4.0, "text": "Speaker zero", "speaker": "SPEAKER_00"},
         {"start": 2.0, "end": 5.0, "text": "Speaker one", "speaker": "SPEAKER_01"},
@@ -496,5 +511,65 @@ def test_overlapping_whisper_words_strictly_non_overlapping():
             assert cues[i][1] <= cues[i + 1][0] + 0.001, (
                 f"Overlap detected: cue {i} ends at {cues[i][1]}, but cue {i+1} starts at {cues[i+1][0]}"
             )
+
+
+def test_extract_clip_snapping_bypassed_when_subtitles_present(monkeypatch):
+    """Verify that boundary snapping does not shift boundaries when ass_path is provided."""
+    called_snap = []
+
+    def mock_refine(video_path, start, end, enable_snapping=True):
+        called_snap.append((start, end))
+        return start + 1.5, end
+
+    from backend.utils.silence_detector import AudioBoundarySnapper
+    monkeypatch.setattr(AudioBoundarySnapper, "refine_clip_boundaries", mock_refine)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fake_video = Path(tmpdir) / "fake.mp4"
+        fake_video.write_bytes(b"dummy video data")
+        fake_ass = Path(tmpdir) / "fake.ass"
+        fake_ass.write_text("[Script Info]\nTitle: Test\n", encoding="utf-8")
+        out_clip = Path(tmpdir) / "out.mp4"
+
+        # Mock subprocess.run so FFmpeg doesn't actually execute
+        import subprocess
+        class MockResult:
+            returncode = 0
+            stderr = ""
+        monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: MockResult())
+        out_clip.write_bytes(b"rendered clip" * 100)
+
+        # Call with ass_path -> AudioBoundarySnapper should NOT be called
+        VideoProcessor.extract_clip(
+            input_video=fake_video,
+            output_path=out_clip,
+            start_time="00:00:10.000",
+            end_time="00:00:20.000",
+            ass_path=fake_ass
+        )
+        assert len(called_snap) == 0, "Boundary snapping should be bypassed when ass_path is passed!"
+
+        # Call with snap_boundaries=False -> AudioBoundarySnapper should NOT be called
+        VideoProcessor.extract_clip(
+            input_video=fake_video,
+            output_path=out_clip,
+            start_time="00:00:10.000",
+            end_time="00:00:20.000",
+            ass_path=None,
+            snap_boundaries=False
+        )
+        assert len(called_snap) == 0, "Boundary snapping should be bypassed when snap_boundaries=False!"
+
+        # Call without ass_path and snap_boundaries=True -> AudioBoundarySnapper SHOULD be called
+        VideoProcessor.extract_clip(
+            input_video=fake_video,
+            output_path=out_clip,
+            start_time="00:00:10.000",
+            end_time="00:00:20.000",
+            ass_path=None,
+            snap_boundaries=True
+        )
+        assert len(called_snap) == 1, "Boundary snapping should be called when no ass_path and snap_boundaries=True!"
+
 
 

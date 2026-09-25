@@ -142,9 +142,7 @@ class VideoGenerator:
             try:
                 from ..utils.sentence_boundary_extender import extend_to_sentence_boundary
                 for clip in clips_data:
-                    raw_end = float(
-                        VideoProcessor.convert_srt_time_to_ffmpeg_time(clip['end_time'])
-                    )
+                    raw_end = VideoProcessor.convert_ffmpeg_time_to_seconds(clip['end_time'])
                     adj_end = extend_to_sentence_boundary(raw_end, srt_words=Path(srt_path), tolerance_sec=12.0)
                     if adj_end > raw_end:
                         logger.info(f"Extended clip {clip.get('id')} end boundary from {raw_end:.2f}s to {adj_end:.2f}s for sentence completion.")

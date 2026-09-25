@@ -171,36 +171,42 @@ class AudioEnhancer:
         """
         extra_args: List[str] = []
         filter_parts: List[str] = []
-        mix_inputs: List[str] = ['[0:a]']
-        mix_weights: List[str] = ['1.0']
-
         bgm_path = cls.get_bgm_path(bgm_track, custom_bgm_path)
         pop_sfx_path = cls.get_sfx_path('pop') if sfx_enabled else None
+        has_bgm = bool(bgm_path and bgm_path.exists())
+        has_sfx = bool(sfx_enabled and pop_sfx_path and pop_sfx_path.exists())
+
+        if not has_bgm and not has_sfx:
+            return [], None, None
+
+        if has_bgm:
+            filter_parts.append('[0:a]asetpts=PTS-STARTPTS,aresample=async=1,asplit=2[a_main][a_sidechain]')
+        else:
+            filter_parts.append('[0:a]asetpts=PTS-STARTPTS,aresample=async=1[a_main]')
+
+        mix_inputs: List[str] = ['[a_main]']
+        mix_weights: List[str] = ['1.0']
 
         current_input_idx = base_input_offset
 
         # 1. BGM Track with loop and true sidechain compression ducking
-        if bgm_path and bgm_path.exists():
+        if has_bgm and bgm_path:
             extra_args.extend(['-stream_loop', '-1', '-i', str(bgm_path)])
             bgm_vol = max(0.02, min(0.60, float(bgm_volume)))
             filter_parts.append(f'[{current_input_idx}:a]volume={bgm_vol:.2f}[bgm_raw]')
-            # Sidechain ducking: when voice [0:a] speaks, BGM ducks automatically by 12-16dB
-            filter_parts.append(f'[bgm_raw][0:a]sidechaincompress=threshold=0.03:ratio=4:attack=40:release=300[bgm_ducked]')
+            # Sidechain ducking: when voice speaks, BGM ducks automatically by 12-16dB
+            filter_parts.append(f'[bgm_raw][a_sidechain]sidechaincompress=threshold=0.03:ratio=4:attack=40:release=300[bgm_ducked]')
             mix_inputs.append('[bgm_ducked]')
             mix_weights.append('0.35')
             current_input_idx += 1
 
         # 2. Hook Pop SFX (triggered at 0.15s start)
-        if sfx_enabled and pop_sfx_path and pop_sfx_path.exists():
+        if has_sfx and pop_sfx_path:
             extra_args.extend(['-i', str(pop_sfx_path)])
             filter_parts.append(f'[{current_input_idx}:a]adelay=150|150,volume=0.65[sfx_pop]')
             mix_inputs.append('[sfx_pop]')
             mix_weights.append('0.70')
             current_input_idx += 1
-
-        # If only main audio, no extra audio filter needed
-        if len(mix_inputs) == 1:
-            return [], None, None
 
         # Multi-input audio mixer
         input_nodes = ''.join(mix_inputs)

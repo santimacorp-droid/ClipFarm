@@ -188,9 +188,10 @@ def _resolve_overlapping_segments(segments: List[Dict[str, Any]]) -> List[Dict[s
     Resolves segment overlaps:
     1. If segments belong to different speakers, allows simultaneous dual-track playback.
     2. Within the same speaker (or without diarization):
-       - If overlap is <= 0.5s (minor boundary overlap), adjust boundaries cleanly.
-       - If overlap is > 0.5s (real speech overlap), push current segment to start after previous ends
-         (prev['end'] + 0.05) rather than truncating words, shifting any word timestamps accordingly.
+       - If cues start virtually simultaneously (<= 0.15s), merge them if short, or split interval.
+       - If cues overlap, clamp the earlier segment's display end time to the start of the next segment.
+         Start timestamps are strictly anchored to the audio timestamp when the speaker spoke,
+         preventing artificial delay drift.
     3. Preserves 'speaker' and 'words' metadata.
     4. Enforces strictly non-overlapping intervals within each speaker track.
     """
@@ -234,16 +235,16 @@ def _resolve_overlapping_segments(segments: List[Dict[str, Any]]) -> List[Dict[s
                     start = round(mid, 3)
                     end = round(max(mid + 0.2, raw_end), 3)
             else:
-                overlap_duration = prev['end'] - raw_start
-                if overlap_duration > 0.5:
-                    # True simultaneous speech — push second segment to after first ends
-                    start = round(prev['end'] + 0.05, 3)
-                    end = round(max(start + 0.2, raw_end), 3)
-                else:
-                    # Brief transcript timing artifact — truncate previous
-                    prev['end'] = round(raw_start, 3)
-                    start = round(raw_start, 3)
-                    end = round(max(start + 0.2, raw_end), 3)
+                # Sequential cues from the same speaker:
+                # The speaker begins speaking the new cue at raw_start.
+                # Clamp previous cue's display end to the start of the new cue.
+                # Ensure previous cue has a minimal visible duration of at least 0.1s.
+                prev['end'] = round(min(prev['end'], max(prev['start'] + 0.1, raw_start)), 3)
+                start = round(max(raw_start, prev['end']), 3)
+                end = round(max(start + 0.2, raw_end), 3)
+                if 'words' in prev:
+                    for w in prev['words']:
+                        w['end'] = min(float(w.get('end', 0.0)), prev['end'])
         else:
             start = round(raw_start, 3)
             end = round(raw_end, 3)
@@ -281,19 +282,10 @@ def _resolve_overlapping_segments(segments: List[Dict[str, Any]]) -> List[Dict[s
             curr_idx = spk_indices[idx]
             next_idx = spk_indices[idx + 1]
             if resolved[curr_idx]['end'] > resolved[next_idx]['start']:
-                ov = resolved[curr_idx]['end'] - resolved[next_idx]['start']
-                if ov > 0.5:
-                    shift = round(resolved[curr_idx]['end'] + 0.05 - resolved[next_idx]['start'], 3)
-                    resolved[next_idx]['start'] = round(resolved[curr_idx]['end'] + 0.05, 3)
-                    resolved[next_idx]['end'] = round(max(resolved[next_idx]['start'] + 0.2, resolved[next_idx]['end'] + shift), 3)
-                    if 'words' in resolved[next_idx]:
-                        for w in resolved[next_idx]['words']:
-                            w['start'] = round(float(w.get('start', 0.0)) + shift, 3)
-                            w['end'] = round(float(w.get('end', 0.0)) + shift, 3)
-                else:
-                    resolved[curr_idx]['end'] = resolved[next_idx]['start']
+                resolved[curr_idx]['end'] = resolved[next_idx]['start']
             if resolved[curr_idx]['end'] <= resolved[curr_idx]['start']:
                 resolved[curr_idx]['end'] = round(resolved[curr_idx]['start'] + 0.05, 3)
+                resolved[next_idx]['start'] = max(resolved[next_idx]['start'], resolved[curr_idx]['end'])
 
     return [r for r in resolved if r['end'] > r['start'] + 0.05]
 
@@ -718,9 +710,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         f"Dialogue: 1,{_seconds_to_ass_time(0.0)},{_seconds_to_ass_time(hook_end_time)},HookTitle,,0,0,0,,{clean_hook}"
                     )
 
-            # Track last end time per speaker/style to guarantee zero collision in libass
-            speaker_last_end: Dict[str, float] = {}
-
             for seg in clip_segs:
                 seg_text = _clean_emojis_for_ass(seg['text'].strip())
                 if not seg_text:
@@ -747,8 +736,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 if seg.get('speaker') and seg['speaker'] != 'SPEAKER_00':
                     style = "SecondSpeaker"
 
-                last_end = speaker_last_end.get(style, 0.0)
-                seg_start = max(last_end, float(seg['start']))
+                seg_start = float(seg['start'])
                 seg_end = max(seg_start + 0.2, float(seg['end']))
                 seg_duration = max(0.2, seg_end - seg_start)
                 total_tokens = len(tokens)
@@ -829,8 +817,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
                     token_cursor += group_len
                     current_group_start = g_end
-
-                speaker_last_end[style] = current_group_start
 
             output_ass_path = Path(output_ass_path)
             output_ass_path.parent.mkdir(parents=True, exist_ok=True)

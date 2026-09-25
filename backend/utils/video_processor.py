@@ -377,6 +377,7 @@ class VideoProcessor:
                     sfx_enabled: bool = False,
                     custom_bgm_path: Optional[str] = None,
                     max_clip_duration: float = 600.0,
+                    snap_boundaries: bool = True,
                     tracker: Optional[Any] = None) -> bool:
         """
         Extract clip from video with auto 9:16 vertical formatting (Reels/Shorts/TikTok), dynamic camera zoom,
@@ -406,15 +407,19 @@ class VideoProcessor:
             start_seconds = VideoProcessor.convert_ffmpeg_time_to_seconds(ffmpeg_start_time)
             end_seconds = VideoProcessor.convert_ffmpeg_time_to_seconds(ffmpeg_end_time)
             
-            try:
-                from .silence_detector import AudioBoundarySnapper
-                start_seconds, end_seconds = AudioBoundarySnapper.refine_clip_boundaries(
-                    input_video, start_seconds, end_seconds, enable_snapping=True
-                )
-                ffmpeg_start_time = VideoProcessor.convert_seconds_to_ffmpeg_time(start_seconds)
-                ffmpeg_end_time = VideoProcessor.convert_seconds_to_ffmpeg_time(end_seconds)
-            except Exception as snap_err:
-                logger.debug(f"Boundary snapping bypassed: {snap_err}")
+            # Only snap boundaries if explicitly requested AND no external ASS subtitles are provided.
+            # When ass_path is passed, subtitles were already synthesized to match start_time;
+            # shifting start_seconds here would desynchronize the burned-in captions!
+            if snap_boundaries and not ass_path:
+                try:
+                    from .silence_detector import AudioBoundarySnapper
+                    start_seconds, end_seconds = AudioBoundarySnapper.refine_clip_boundaries(
+                        input_video, start_seconds, end_seconds, enable_snapping=True
+                    )
+                    ffmpeg_start_time = VideoProcessor.convert_seconds_to_ffmpeg_time(start_seconds)
+                    ffmpeg_end_time = VideoProcessor.convert_seconds_to_ffmpeg_time(end_seconds)
+                except Exception as snap_err:
+                    logger.debug(f"Boundary snapping bypassed: {snap_err}")
 
             if end_seconds <= start_seconds:
                 logger.warning(f"Invalid clip boundaries ({start_seconds}s -> {end_seconds}s), adjusting window to +30s")
@@ -452,9 +457,18 @@ class VideoProcessor:
             canvas_w = 1080 if is_916 else in_w
             canvas_h = 1920 if is_916 else in_h
 
+            # Check if video re-encoding and filtering is required
+            needs_video_filtering = bool(
+                is_916 or has_watermark or has_text_watermark or has_hook or has_subtitles or dynamic_zoom
+            )
+
             # Build unified software filter_complex graph
             filter_steps = []
-            current_v = "0:v"
+            if needs_video_filtering:
+                filter_steps.append("[0:v]setpts=PTS-STARTPTS[v_sync]")
+                current_v = "v_sync"
+            else:
+                current_v = "0:v"
 
             # 1. Video formatting: 9:16 vertical format (1080x1920) or landscape
             from .smart_framing import SmartFramingEngine
@@ -599,11 +613,11 @@ class VideoProcessor:
             audio_fade_filter = ""
             if not audio_filter_fragment:
                 fade_out_st = max(0.1, duration - 0.20)
-                audio_fade_filter = f"[0:a]afade=t=in:ss=0:d=0.15,afade=t=out:st={fade_out_st:.2f}:d=0.20[outa]"
+                audio_fade_filter = f"[0:a]asetpts=PTS-STARTPTS,aresample=async=1,afade=t=in:ss=0:d=0.15,afade=t=out:st={fade_out_st:.2f}:d=0.20[outa]"
                 audio_out_node = "[outa]"
 
             # Fast stream copy when no video or audio filters are required
-            if not filter_steps and not audio_filter_fragment:
+            if not needs_video_filtering and not audio_filter_fragment:
                 cmd_copy = [
                     ffmpeg_bin, '-nostdin', '-y',
                     '-ss', ffmpeg_start_time,
@@ -1200,9 +1214,21 @@ class VideoProcessor:
             if isinstance(end_time, (int, float)):
                 end_time = VideoProcessor.convert_seconds_to_ffmpeg_time(end_time)
             
-            # Convert to seconds for subtitle slicing
+            # Convert to seconds for subtitle slicing and boundary refinement
             start_sec = VideoProcessor.convert_ffmpeg_time_to_seconds(start_time)
             end_sec = VideoProcessor.convert_ffmpeg_time_to_seconds(end_time)
+
+            # Refine boundaries using silence detection BEFORE generating subtitles
+            # so that both video cut and subtitle timestamps are synchronized to the exact same baseline
+            try:
+                from .silence_detector import AudioBoundarySnapper
+                start_sec, end_sec = AudioBoundarySnapper.refine_clip_boundaries(
+                    input_video, start_sec, end_sec, enable_snapping=True
+                )
+                start_time = VideoProcessor.convert_seconds_to_ffmpeg_time(start_sec)
+                end_time = VideoProcessor.convert_seconds_to_ffmpeg_time(end_sec)
+            except Exception as snap_err:
+                logger.debug(f"Pre-cut boundary snapping bypassed: {snap_err}")
 
             # Sanitize title for filesystem filename
             safe_title = VideoProcessor.sanitize_filename(title)
@@ -1376,6 +1402,7 @@ class VideoProcessor:
                 sfx_enabled=sfx_enabled,
                 custom_bgm_path=custom_bgm_path,
                 max_clip_duration=self.max_clip_duration,
+                snap_boundaries=False,
                 tracker=tracker
             ):
                 logger.info(f"Clip {clip_id} extracted successfully ({clip_idx + 1}/{total_clips})")
