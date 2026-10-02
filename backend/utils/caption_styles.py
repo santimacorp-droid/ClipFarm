@@ -340,6 +340,9 @@ def _clean_emojis_for_ass(text: str) -> str:
     # Strip any remaining unmapped multi-byte surrogate / supplemental emojis
     cleaned = re.sub(r'[\U00010000-\U0010ffff]', '', cleaned)
     cleaned = re.sub(r'[\u2600-\u26ff\u2700-\u27bf]', '', cleaned)
+    # Sanitize literal braces and backslashes to avoid breaking ASS override tags
+    cleaned = cleaned.replace('{', '(').replace('}', ')')
+    cleaned = cleaned.replace('\\', '/')
     # Clean up double spaces
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
     return cleaned

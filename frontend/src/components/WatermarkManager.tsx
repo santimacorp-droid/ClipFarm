@@ -174,7 +174,9 @@ export const WatermarkManager: React.FC = () => {
     setIsDragging(true)
     try {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    } catch (_) {}
+    } catch {
+      // Ignore browsers without pointer capture support
+    }
     updateCoordsFromPointer(e.clientX, e.clientY)
   }
 
@@ -188,7 +190,9 @@ export const WatermarkManager: React.FC = () => {
       setIsDragging(false)
       try {
         (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-      } catch (_) {}
+      } catch {
+        // Ignore browsers without pointer capture support
+      }
     }
   }
 

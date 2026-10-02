@@ -32,6 +32,24 @@ def get_video_dimensions(video_path: Path) -> Tuple[int, int]:
     return 1920, 1080  # assume landscape as fallback
 
 
+def has_audio_stream(video_path: Path) -> bool:
+    """Return True if video has at least one audio stream."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-select_streams", "a:0",
+                "-show_entries", "stream=codec_type",
+                "-of", "csv=p=0",
+                str(video_path)
+            ],
+            capture_output=True, text=True, timeout=10
+        )
+        return bool(result.stdout.strip())
+    except Exception:
+        return True
+
+
 def is_vertical(width: int, height: int) -> bool:
     """Return True if video is already in 9:16 (portrait) ratio."""
     return height >= width * 1.5
@@ -73,6 +91,7 @@ def format_to_vertical(
 
     # Always use software encode for filter-heavy operations
     # (VAAPI complex filter graph requires hwupload/hwdownload wrapping)
+    has_audio = has_audio_stream(input_path)
     cmd = [
         "ffmpeg", "-y",
         "-i", str(input_path),
@@ -80,11 +99,16 @@ def format_to_vertical(
         "-c:v", "libx264",
         "-preset", "fast",
         "-crf", "20",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "copy",
+        "-pix_fmt", "yuv420p"
+    ]
+    if has_audio:
+        cmd.extend(["-c:a", "copy"])
+    else:
+        cmd.append("-an")
+    cmd.extend([
         "-movflags", "+faststart",
         str(output_path)
-    ]
+    ])
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)

@@ -428,15 +428,17 @@ class VideoProcessor:
 
             duration = min(max_clip_duration, max(5.0, end_seconds - start_seconds))
             
-            # Probe input resolution
+            # Probe input resolution and audio stream
             in_w, in_h = 1920, 1080
+            has_audio = False
             vinfo = VideoProcessor.get_video_info(input_video)
             if vinfo and 'streams' in vinfo:
                 for stream in vinfo['streams']:
                     if stream.get('codec_type') == 'video':
                         in_w = int(stream.get('width', 1920))
                         in_h = int(stream.get('height', 1080))
-                        break
+                    elif stream.get('codec_type') == 'audio':
+                        has_audio = True
 
             # Feature presence flags
             has_watermark = watermark_path is not None and watermark_path.exists()
@@ -554,7 +556,7 @@ class VideoProcessor:
                 op_val = max(0.05, min(1.0, float(watermark_opacity)))
                 overlay_expr = get_watermark_overlay_expr(watermark_position, watermark_margin)
                 filter_steps.append(
-                    f"[{next_input_idx}:v]format=rgba,colorchannelmixer=aa={op_val},scale={wm_target_w}:-1[wm_scaled];"
+                    f"[{next_input_idx}:v]format=rgba,colorchannelmixer=aa={op_val},scale={wm_target_w}:-2[wm_scaled];"
                     f"[{current_v}][wm_scaled]overlay={overlay_expr}[v_wm]"
                 )
                 current_v = "v_wm"
@@ -609,9 +611,9 @@ class VideoProcessor:
                 custom_bgm_path=custom_bgm_path
             )
 
-            # Build audio fade if no custom audio filter fragment
+            # Build audio fade if no custom audio filter fragment and input has audio
             audio_fade_filter = ""
-            if not audio_filter_fragment:
+            if not audio_filter_fragment and has_audio:
                 fade_out_st = max(0.1, duration - 0.20)
                 audio_fade_filter = f"[0:a]asetpts=PTS-STARTPTS,aresample=async=1,afade=t=in:ss=0:d=0.15,afade=t=out:st={fade_out_st:.2f}:d=0.20[outa]"
                 audio_out_node = "[outa]"
@@ -623,11 +625,16 @@ class VideoProcessor:
                     '-ss', ffmpeg_start_time,
                     '-i', str(input_video),
                     '-t', str(duration),
-                    '-c:v', 'copy',
-                    '-c:a', 'copy',
+                    '-c:v', 'copy'
+                ]
+                if has_audio:
+                    cmd_copy.extend(['-c:a', 'copy'])
+                else:
+                    cmd_copy.append('-an')
+                cmd_copy.extend([
                     '-avoid_negative_ts', 'make_zero',
                     str(output_path)
-                ]
+                ])
                 res_copy = subprocess.run(cmd_copy, capture_output=True, text=True, encoding='utf-8', errors='ignore')
                 if res_copy.returncode == 0 and output_path.exists() and output_path.stat().st_size > 1024:
                     logger.info(f"Fast stream copy export succeeded: {output_path.name} (near-zero CPU, duration: {duration:.2f}s)")
@@ -671,13 +678,16 @@ class VideoProcessor:
                 cmd_hw.extend([
                     '-t', str(duration),
                     '-filter_complex', hw_filter_graph,
-                    '-map', '[outv]',
-                    '-map', audio_out_node if audio_out_node else '0:a?'
+                    '-map', '[outv]'
                 ])
+                if audio_out_node:
+                    cmd_hw.extend(['-map', audio_out_node, '-c:a', 'aac', '-b:a', '128k'])
+                elif has_audio:
+                    cmd_hw.extend(['-map', '0:a?', '-c:a', 'aac', '-b:a', '128k'])
+                else:
+                    cmd_hw.append('-an')
                 cmd_hw.extend(hw_cfg["codec_args"])
                 cmd_hw.extend([
-                    '-c:a', 'aac',
-                    '-b:a', '128k',
                     '-avoid_negative_ts', 'make_zero',
                     str(output_path)
                 ])
@@ -721,13 +731,18 @@ class VideoProcessor:
                 cmd_cpu.extend([
                     '-t', str(duration),
                     '-filter_complex', ";".join(cpu_steps),
-                    '-map', '[outv]',
-                    '-map', audio_out_node if audio_out_node else '0:a?',
+                    '-map', '[outv]'
+                ])
+                if audio_out_node:
+                    cmd_cpu.extend(['-map', audio_out_node, '-c:a', 'aac', '-b:a', '128k'])
+                elif has_audio:
+                    cmd_cpu.extend(['-map', '0:a?', '-c:a', 'aac', '-b:a', '128k'])
+                else:
+                    cmd_cpu.append('-an')
+                cmd_cpu.extend([
                     '-c:v', 'libx264',
                     '-preset', 'veryfast',
                     '-crf', '22',
-                    '-c:a', 'aac',
-                    '-b:a', '128k',
                     '-avoid_negative_ts', 'make_zero',
                     str(output_path)
                 ])
@@ -747,11 +762,16 @@ class VideoProcessor:
                 '-ss', ffmpeg_start_time,
                 '-i', str(input_video),
                 '-t', str(duration),
-                '-c:v', 'copy',
-                '-c:a', 'copy',
+                '-c:v', 'copy'
+            ]
+            if has_audio:
+                cmd_copy.extend(['-c:a', 'copy'])
+            else:
+                cmd_copy.append('-an')
+            cmd_copy.extend([
                 '-avoid_negative_ts', 'make_zero',
                 str(output_path)
-            ]
+            ])
             result_copy = subprocess.run(cmd_copy, capture_output=True, text=True, encoding='utf-8', errors='ignore')
             if result_copy.returncode == 0 and output_path.exists() and output_path.stat().st_size > 1024:
                 logger.warning(f"Used raw copy mode for: {output_path.name} (filters omitted)")
@@ -847,21 +867,18 @@ class VideoProcessor:
                     str(output_path)
                 ]
             
-            logger.info(f"Executing FFmpeg command: {' '.join(cmd)}")
-            
-            # Execute command
-            result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
-            
-            # Clean up temporary files
-            concat_file.unlink(missing_ok=True)
-            
-            if result.returncode == 0:
-                logger.info(f"Successfully created collection: {output_path}")
-                return True
-            else:
-                logger.error(f"Failed to create collection: {result.stderr}")
-                logger.error(f"FFmpeg stdout: {result.stdout}")
-                return False
+            try:
+                logger.info(f"Executing FFmpeg command: {' '.join(cmd)}")
+                result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+                if result.returncode == 0:
+                    logger.info(f"Successfully created collection: {output_path}")
+                    return True
+                else:
+                    logger.error(f"Failed to create collection: {result.stderr}")
+                    logger.error(f"FFmpeg stdout: {result.stdout}")
+                    return False
+            finally:
+                concat_file.unlink(missing_ok=True)
                 
         except Exception as e:
             logger.error(f"Video concatenation exception: {str(e)}")

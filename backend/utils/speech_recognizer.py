@@ -952,6 +952,7 @@ class SpeechRecognizer:
                 return self._generate_subtitle_whisper_local(video_path, output_path, config)
             raise SpeechRecognitionError("OpenAI / Groq API key is required. Please configure it in Settings -> Speech Recognition.")
 
+        audio_path: Optional[Path] = None
         try:
             logger.info(f"Starting subtitle generation with OpenAI-compatible API: {video_path}")
             if not video_path.exists():
@@ -1017,6 +1018,12 @@ class SpeechRecognizer:
                 logger.warning("Cloud transcription failed; attempting fallback to local Whisper...")
                 return self._generate_subtitle_whisper_local(video_path, output_path, config)
             raise SpeechRecognitionError(error_msg)
+        finally:
+            if audio_path and audio_path.exists():
+                try:
+                    audio_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
     
     def _generate_subtitle_azure_speech(self, video_path: Path, output_path: Path, 
                                       config: SpeechRecognitionConfig) -> Path:
@@ -1061,6 +1068,7 @@ class SpeechRecognizer:
                 return self._generate_subtitle_whisper_local(video_path, output_path, config)
             raise SpeechRecognitionError("Alibaba Cloud ASR unavailable, please configure DASHSCOPE_API_KEY")
         
+        audio_path: Optional[Path] = None
         try:
             logger.info(f"Starting subtitle generation with Alibaba Cloud DashScope ASR: {video_path}")
             if not video_path.exists():
@@ -1101,6 +1109,12 @@ class SpeechRecognizer:
                 logger.info("Falling back to local Whisper...")
                 return self._generate_subtitle_whisper_local(video_path, output_path, config)
             raise SpeechRecognitionError(f"Alibaba Cloud ASR subtitle generation failed: {e}")
+        finally:
+            if audio_path and audio_path.exists():
+                try:
+                    audio_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
     
     def _generate_subtitle_custom_api(self, video_path: Path, output_path: Path, 
                                      config: SpeechRecognitionConfig) -> Path:
@@ -1110,6 +1124,7 @@ class SpeechRecognizer:
                 "Custom API configuration incomplete, please configure custom_api_url and custom_api_key"
             )
         
+        audio_path: Optional[Path] = None
         try:
             logger.info(f"Starting subtitle generation with custom API: {video_path}")
             
@@ -1157,6 +1172,12 @@ class SpeechRecognizer:
             error_msg = f"Error generating subtitles with custom API: {e}"
             logger.error(error_msg)
             raise SpeechRecognitionError(error_msg)
+        finally:
+            if audio_path and audio_path.exists():
+                try:
+                    audio_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
     
     def get_available_methods(self) -> Dict[SpeechRecognitionMethod, bool]:
         """Get available speech recognition methods"""
