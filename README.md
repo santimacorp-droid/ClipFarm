@@ -12,6 +12,7 @@
 
 <br/>
 
+[![Live Demo & Docs](https://img.shields.io/badge/Live_Demo-GitHub_Pages-blue?style=flat-square&logo=github&logoColor=white)](https://santimacorp-droid.github.io/ClipFarm/)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Latest-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![React 18](https://img.shields.io/badge/React-18+-61DAFB?style=flat-square&logo=react&logoColor=black)](https://reactjs.org)
@@ -23,6 +24,7 @@
 
 <br/>
 
+**[🌐 Live Demo & Docs](https://santimacorp-droid.github.io/ClipFarm/)** • 
 **[⚡ Quick Start](#-quick-start)** • 
 **[✨ Features](#-key-features)** • 
 **[🤖 11 AI Engines](#-universal-ai-engine-support)** • 
@@ -68,6 +70,9 @@
 ## 🎯 Overview & Philosophy
 
 **ClipFarm Studio** is an open-source, full-stack video automation studio designed for podcasters, streamers, video editing agencies, and content creators. It automates the entire vertical short-form production pipeline: extracting viral narrative hooks from multi-hour footage, re-framing landscape 16:9 into vertical 9:16 with neural face tracking, burning animated karaoke subtitles, and formatting branded call-to-actions.
+
+> [!TIP]
+> 🌐 **Interactive Demo & Documentation Website**: Access the live hosted interface and documentation center at **[santimacorp-droid.github.io/ClipFarm](https://santimacorp-droid.github.io/ClipFarm/)**.
 
 ### Why ClipFarm?
 

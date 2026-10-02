@@ -2,6 +2,8 @@
 
 Welcome to the ClipFarm Studio documentation directory. Here you will find architecture specifications, setup guides, and technical reference manuals for video clipping, ASR speech recognition, and multi-model LLM integration.
 
+> 🌐 **Live Website & Interactive Demo**: [https://santimacorp-droid.github.io/ClipFarm/](https://santimacorp-droid.github.io/ClipFarm/)
+
 ---
 
 ## 🚀 Getting Started
