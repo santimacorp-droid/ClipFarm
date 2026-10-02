@@ -409,7 +409,7 @@
       position: relative;
       width: 100%;
       height: 100%;
-      background: linear-gradient(180deg, #1A2234 0%, #0D121F 100%);
+      background: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.5)), url('assets/demo_9_16_crop.jpg') center/cover;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -450,16 +450,11 @@
       z-index: 5;
       margin: auto 0;
       text-align: center;
+      min-height: 80px;
     }
 
     .speaker-glow-avatar {
-      width: 96px;
-      height: 96px;
-      border-radius: 50%;
-      margin: 0 auto;
-      background: url('assets/clipfarm_avatar.jpg') center/cover;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      box-shadow: 0 0 20px rgba(59, 130, 246, 0.25);
+      display: none;
     }
 
     /* Captions */
@@ -645,35 +640,275 @@
       transition: width 0.3s ease;
     }
 
-    /* 16:9 vs 9:16 Comparison Slider */
+    /* Neural Face Tracking Studio & Aspect Ratio Comparison */
     .comparison-section {
-      padding: 64px 0;
+      padding: 72px 0;
     }
 
-    .comparison-box {
+    .comparison-studio-grid {
+      display: grid;
+      grid-template-columns: 1.25fr 0.85fr;
+      gap: 28px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 960px) {
+      .comparison-studio-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .studio-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .studio-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .studio-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .studio-status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #EF4444;
+      box-shadow: 0 0 10px #EF4444;
+      animation: pulse-red 1.8s infinite;
+    }
+
+    @keyframes pulse-red {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.35; transform: scale(0.85); }
+    }
+
+    .studio-panel-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+      color: var(--text);
+    }
+
+    .studio-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-dim);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: var(--radius-sm);
+    }
+
+    .studio-badge.badge-green {
+      color: #4ADE80;
+      border-color: rgba(74, 222, 128, 0.25);
+      background: rgba(74, 222, 128, 0.08);
+    }
+
+    /* Master 16:9 Monitor */
+    .master-monitor-box {
       position: relative;
       width: 100%;
-      height: 380px;
-      border-radius: var(--radius-md);
+      aspect-ratio: 16 / 9;
+      background: #000000;
+      border-radius: var(--radius-sm);
       overflow: hidden;
-      border: 1px solid var(--border);
-      user-select: none;
-      cursor: ew-resize;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
     }
 
-    .comparison-img {
+    .master-video-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: filter 0.3s ease;
+    }
+
+    .master-hud-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #38BDF8;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      z-index: 10;
+    }
+
+    .master-hud-btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: #38BDF8;
+    }
+
+    /* Telemetry row */
+    .telemetry-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 14px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+    }
+
+    @media (max-width: 600px) {
+      .telemetry-bar {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .telemetry-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .t-label {
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+    }
+
+    .t-val {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: #38BDF8;
+    }
+
+    /* Framing Mode Selector */
+    .framing-mode-controls {
+      margin-top: 16px;
+    }
+
+    .framing-mode-label {
+      display: block;
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    .framing-mode-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .mode-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+    }
+
+    .mode-btn:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .mode-btn.active {
+      background: rgba(59, 130, 246, 0.12);
+      border-color: var(--primary);
+    }
+
+    .mode-btn strong {
+      display: block;
+      font-size: 12.5px;
+      color: #FFFFFF;
+    }
+
+    .mode-btn small {
+      display: block;
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 1px;
+    }
+
+    /* 9:16 Vertical Short with Slider */
+    .vertical-comparison-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px 0;
+      flex: 1;
+    }
+
+    .phone-slider-box {
+      position: relative;
+      width: 270px;
+      height: 480px;
+      border-radius: 32px;
+      overflow: hidden;
+      border: 4px solid #1E2638;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(59, 130, 246, 0.15);
+      user-select: none;
+      cursor: ew-resize;
+      background: #000000;
+    }
+
+    .phone-slider-notch {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 14px;
+      background: #1E2638;
+      border-radius: 8px;
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    .phone-slider-img {
       position: absolute;
       inset: 0;
       background-size: cover;
       background-position: center;
     }
 
-    .comparison-before {
-      background-image: url('assets/clipfarm_cover.jpg');
-      filter: brightness(0.85);
+    .phone-slider-before {
+      background-image: url('assets/demo_9_16_raw.jpg');
     }
 
-    .comparison-after {
+    .phone-slider-after {
       position: absolute;
       top: 0;
       bottom: 0;
@@ -681,54 +916,66 @@
       width: 50%;
       overflow: hidden;
       border-right: 2px solid #FFFFFF;
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
     }
 
-    .comparison-after-inner {
+    .phone-slider-after-inner {
       position: absolute;
       top: 0;
       bottom: 0;
       left: 0;
-      width: 1180px;
+      width: 270px;
       height: 100%;
-      background-image: url('assets/clipfarm_cover.jpg');
+      background-image: url('assets/demo_9_16_crop_captioned.jpg');
       background-size: cover;
       background-position: center;
-      filter: contrast(1.1) saturate(1.1);
+      transition: background-image 0.25s ease;
     }
 
-    .comparison-slider-handle {
+    .phone-slider-handle {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 36px;
-      height: 36px;
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
       background: #FFFFFF;
-      color: #000000;
+      color: #0F172A;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
-      z-index: 10;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+      z-index: 25;
       pointer-events: none;
+      border: 2px solid rgba(0, 0, 0, 0.2);
     }
 
-    .comparison-label {
+    .slider-badge {
       position: absolute;
-      bottom: 14px;
-      padding: 4px 10px;
+      bottom: 16px;
+      padding: 4px 9px;
       border-radius: var(--radius-sm);
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(0, 0, 0, 0.78);
       backdrop-filter: blur(8px);
-      font-size: 11.5px;
-      font-weight: 600;
+      font-size: 10px;
+      font-weight: 700;
       color: #FFFFFF;
-      z-index: 5;
+      z-index: 20;
+      pointer-events: none;
+      letter-spacing: 0.3px;
     }
 
-    .label-before { right: 16px; }
-    .label-after { left: 16px; }
+    .slider-badge-after { left: 12px; }
+    .slider-badge-before { right: 12px; }
+
+    .slider-instruction {
+      text-align: center;
+      font-size: 11.5px;
+      color: var(--text-dim);
+      margin-top: 14px;
+      font-weight: 500;
+    }
 
     /* Minimalist Bento Grid Features */
     .features-section {
@@ -1409,27 +1656,114 @@
     </div>
   </section>
 
-  <!-- Interactive 16:9 vs 9:16 Comparison Slider -->
-  <section class="comparison-section">
+  <!-- Interactive 16:9 vs 9:16 Comparison Section -->
+  <section class="comparison-section" id="comparison">
     <div class="container">
       <div class="section-header">
-        <span class="section-tag">Neural Face Tracking</span>
+        <span class="section-tag">Neural Face Tracking Engine</span>
         <h2 class="section-title">Widescreen 16:9 → Vertical 9:16</h2>
         <p class="section-subtitle">
-          Drag the interactive slider to inspect how OpenCV YuNet tracks speakers and creates ambient background fill.
+          See OpenCV YuNet track speaking faces in real time, intelligently reframe the composition, and convert landscape recordings into high-retention vertical shorts.
         </p>
       </div>
 
-      <div class="comparison-box" id="comp-box">
-        <div class="comparison-img comparison-before"></div>
-        <div class="comparison-after" id="comp-after">
-          <div class="comparison-after-inner"></div>
+      <div class="comparison-studio-grid">
+        <!-- Left Column: Master 16:9 Feed with Live Neural Tracking HUD -->
+        <div class="studio-panel master-panel">
+          <div class="studio-panel-header">
+            <div class="studio-header-left">
+              <div class="studio-status-dot"></div>
+              <span class="studio-panel-title">16:9 Master Feed • YuNet Face Tracker</span>
+            </div>
+            <span class="studio-badge">1920 × 1080</span>
+          </div>
+
+          <div class="master-monitor-box">
+            <img src="assets/demo_16_9_annotated.jpg" alt="16:9 Widescreen Face Tracking HUD" class="master-video-img" id="master-frame-img" />
+            <button class="master-hud-btn" onclick="toggleMasterHUD()" id="btn-toggle-hud" title="Toggle AI Detection HUD">
+              <span>🎯 HUD: ON</span>
+            </button>
+          </div>
+
+          <!-- Telemetry Bar -->
+          <div class="telemetry-bar">
+            <div class="telemetry-item">
+              <span class="t-label">Engine</span>
+              <span class="t-val">YuNet ONNX</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="t-label">FPS</span>
+              <span class="t-val">60.0 (CUDA)</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="t-label">Confidence</span>
+              <span class="t-val">94.5% Lock</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="t-label">Face Center</span>
+              <span class="t-val">X: 48.8% Y: 23.5%</span>
+            </div>
+          </div>
+
+          <!-- Framing Mode Selector -->
+          <div class="framing-mode-controls">
+            <span class="framing-mode-label">Select Framing Mode:</span>
+            <div class="framing-mode-buttons">
+              <button class="mode-btn active" id="mode-btn-crop" onclick="setFramingMode('crop')">
+                <span class="mode-btn-icon" style="font-size: 20px;">🎯</span>
+                <div>
+                  <strong>Solo Smart Face Crop</strong>
+                  <small>Dynamic YuNet centering</small>
+                </div>
+              </button>
+              <button class="mode-btn" id="mode-btn-blur" onclick="setFramingMode('blur')">
+                <span class="mode-btn-icon" style="font-size: 20px;">✨</span>
+                <div>
+                  <strong>Enhanced Blurred Canvas</strong>
+                  <small>Ambient dimmed background</small>
+                </div>
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="comparison-slider-handle" id="comp-handle">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18-6-6 6-6M15 6l6 6-6 6"/></svg>
+
+        <!-- Right Column: 9:16 Vertical Short with Drag-to-Compare Slider -->
+        <div class="studio-panel output-panel">
+          <div class="studio-panel-header">
+            <div class="studio-header-left">
+              <span style="font-size: 16px;">📱</span>
+              <span class="studio-panel-title">9:16 Short Output • Drag to Compare</span>
+            </div>
+            <span class="studio-badge badge-green">1080 × 1920</span>
+          </div>
+
+          <div class="vertical-comparison-wrapper">
+            <div class="phone-slider-box" id="comp-box">
+              <div class="phone-slider-notch"></div>
+              
+              <!-- Before: Raw 16:9 Letterboxed (black bars, unframed) -->
+              <div class="phone-slider-img phone-slider-before" id="slider-before-img"></div>
+
+              <!-- After: ClipFarm Smart Vertical (cropped or blurred with captions) -->
+              <div class="phone-slider-after" id="comp-after">
+                <div class="phone-slider-after-inner" id="slider-after-img"></div>
+              </div>
+
+              <!-- Draggable Slider Handle -->
+              <div class="phone-slider-handle" id="comp-handle">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18-6-6 6-6M15 6l6 6-6 6"/></svg>
+              </div>
+
+              <!-- Dynamic Labels on Phone -->
+              <span class="slider-badge slider-badge-after">ClipFarm 9:16</span>
+              <span class="slider-badge slider-badge-before">Raw 16:9</span>
+            </div>
+          </div>
+
+          <div class="slider-instruction">
+            <span>👈 Drag slider to compare Raw Letterbox vs ClipFarm Smart 9:16 👉</span>
+          </div>
         </div>
-        <span class="comparison-label label-after">9:16 Smart Vertical</span>
-        <span class="comparison-label label-before">16:9 Original Landscape</span>
       </div>
     </div>
   </section>
@@ -2023,9 +2357,13 @@
     function updateSlider(x) {
       if (!compBox || !compAfter || !compHandle) return;
       const rect = compBox.getBoundingClientRect();
+      const afterInner = document.getElementById('slider-after-img');
+      if (afterInner) {
+        afterInner.style.width = rect.width + 'px';
+      }
       let offsetX = x - rect.left;
-      if (offsetX < 20) offsetX = 20;
-      if (offsetX > rect.width - 20) offsetX = rect.width - 20;
+      if (offsetX < 15) offsetX = 15;
+      if (offsetX > rect.width - 15) offsetX = rect.width - 15;
       const percentage = (offsetX / rect.width) * 100;
 
       compAfter.style.width = percentage + '%';
@@ -2045,11 +2383,52 @@
       compBox.addEventListener('touchstart', (e) => {
         isDraggingSlider = true;
         if (e.touches.length > 0) updateSlider(e.touches[0].clientX);
-      });
+      }, { passive: true });
       window.addEventListener('touchend', () => { isDraggingSlider = false; });
       window.addEventListener('touchmove', (e) => {
         if (isDraggingSlider && e.touches.length > 0) updateSlider(e.touches[0].clientX);
+      }, { passive: true });
+
+      // Synchronize inner slider width on resize
+      window.addEventListener('resize', () => {
+        const rect = compBox.getBoundingClientRect();
+        const afterInner = document.getElementById('slider-after-img');
+        if (afterInner) afterInner.style.width = rect.width + 'px';
       });
+    }
+
+    // Framing Mode Switcher
+    let currentFramingMode = 'crop';
+    function setFramingMode(mode) {
+      currentFramingMode = mode;
+      const afterInner = document.getElementById('slider-after-img');
+      const btnCrop = document.getElementById('mode-btn-crop');
+      const btnBlur = document.getElementById('mode-btn-blur');
+
+      if (mode === 'crop') {
+        if (afterInner) afterInner.style.backgroundImage = "url('assets/demo_9_16_crop_captioned.jpg')";
+        if (btnCrop) btnCrop.classList.add('active');
+        if (btnBlur) btnBlur.classList.remove('active');
+      } else if (mode === 'blur') {
+        if (afterInner) afterInner.style.backgroundImage = "url('assets/demo_9_16_blur_captioned.jpg')";
+        if (btnBlur) btnBlur.classList.add('active');
+        if (btnCrop) btnCrop.classList.remove('active');
+      }
+    }
+
+    // Toggle YuNet HUD on 16:9 monitor
+    let hudActive = true;
+    function toggleMasterHUD() {
+      hudActive = !hudActive;
+      const masterImg = document.getElementById('master-frame-img');
+      const hudBtn = document.getElementById('btn-toggle-hud');
+      if (hudActive) {
+        if (masterImg) masterImg.src = 'assets/demo_16_9_annotated.jpg';
+        if (hudBtn) hudBtn.innerHTML = '<span>🎯 HUD: ON</span>';
+      } else {
+        if (masterImg) masterImg.src = 'assets/demo_16_9_original.jpg';
+        if (hudBtn) hudBtn.innerHTML = '<span>🎯 HUD: OFF</span>';
+      }
     }
 
     // 5. Steps Walkthrough
