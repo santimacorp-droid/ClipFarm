@@ -2,7 +2,7 @@
 """
 ClipFarm Studio - Release Package Builder
 Generates production-ready distribution packages for Ubuntu/Linux, Windows, and macOS:
-  - Ubuntu/Debian native package: clipfarm_2.0.0_amd64.deb
+  - Ubuntu/Debian native package: clipfarm_2.1.0_amd64.deb
   - Universal Linux self-extracting installer: ClipFarm-Studio-Linux-x86_64.run
   - Universal Linux archive: ClipFarm-Studio-Linux-x86_64.tar.gz
   - Windows standalone package: ClipFarm-Studio-Windows-x64.zip
@@ -22,7 +22,7 @@ RELEASE_DIR = PROJECT_ROOT / "release"
 BUILD_DIR = Path("/tmp/clipfarm_release_staging")
 APP_NAME = "clipfarm"
 APP_DISPLAY_NAME = "ClipFarm Studio"
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 
 def log(msg: str):
     print(f"==> {msg}", flush=True)

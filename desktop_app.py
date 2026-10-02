@@ -239,7 +239,7 @@ def run_native_qt_app(host: str, port: int, backend_proc: subprocess.Popen):
                 self,
                 "About ClipFarm Studio",
                 "<h3>ClipFarm Studio</h3>"
-                "<p>Version 2.0.0 (Native Desktop Edition)</p>"
+                "<p>Version 2.1.0 (Native Desktop Edition)</p>"
                 "<p>High-efficiency AI Short-Form Video Processing & Clipping Software.</p>"
                 "<p>Hardware-accelerated native standalone application.</p>"
             )
