@@ -409,7 +409,7 @@
       position: relative;
       width: 100%;
       height: 100%;
-      background: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.5)), url('assets/demo_9_16_crop.jpg') center/cover;
+      background: #000000;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -733,12 +733,105 @@
       box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
     }
 
+    .master-video-elem {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
     .master-video-img {
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
       transition: filter 0.3s ease;
+    }
+
+    /* Live AI HUD Overlay */
+    .master-hud-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      transition: opacity 0.25s ease;
+    }
+
+    .hud-dimmer-left {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 32.5%;
+      background: rgba(8, 12, 22, 0.62);
+    }
+
+    .hud-dimmer-right {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      width: 35.5%;
+      background: rgba(8, 12, 22, 0.62);
+    }
+
+    .hud-crop-zone {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 32.5%;
+      width: 32%;
+      border-left: 2px solid #38BDF8;
+      border-right: 2px solid #38BDF8;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.22);
+    }
+
+    .hud-crop-tag {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid #38BDF8;
+      color: #FFFFFF;
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+
+    .hud-face-box {
+      position: absolute;
+      left: 42%;
+      top: 13%;
+      width: 14%;
+      height: 28%;
+      border: 1.5px solid rgba(34, 197, 94, 0.9);
+      box-shadow: 0 0 12px rgba(34, 197, 94, 0.35);
+      border-radius: 4px;
+      animation: hud-pulse 2.2s infinite ease-in-out;
+    }
+
+    @keyframes hud-pulse {
+      0%, 100% { border-color: rgba(34, 197, 94, 0.9); box-shadow: 0 0 10px rgba(34, 197, 94, 0.3); }
+      50% { border-color: rgba(74, 222, 128, 1); box-shadow: 0 0 18px rgba(74, 222, 128, 0.5); }
+    }
+
+    .hud-face-tag {
+      position: absolute;
+      bottom: -22px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid #22C55E;
+      color: #4ADE80;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
     }
 
     .master-hud-btn {
@@ -917,6 +1010,26 @@
       overflow: hidden;
       border-right: 2px solid #FFFFFF;
       box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
+    }
+
+    .phone-slider-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .sim-bg-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      z-index: 1;
+      opacity: 0.85;
     }
 
     .phone-slider-after-inner {
@@ -1567,17 +1680,19 @@
           <div class="phone-mockup">
             <div class="phone-notch"></div>
             <div class="phone-screen" id="sim-screen">
-              
+              <!-- Background Video Loop -->
+              <video class="sim-bg-video" autoplay loop muted playsinline poster="assets/demo_9_16_crop.jpg">
+                <source src="assets/demo_9_16_crop.mp4" type="video/mp4">
+              </video>
+
               <!-- Hook Banner -->
               <div class="simulated-hook-banner" id="sim-hook">
                 <div class="simulated-hook-tag">🔥 VIRAL HOOK DETECTED</div>
                 <div class="simulated-hook-text">Wait until you see how this changes everything!</div>
               </div>
 
-              <!-- Center Speaker Avatar -->
-              <div class="simulated-speaker">
-                <div class="speaker-glow-avatar"></div>
-              </div>
+              <!-- Center Speaker Spacing -->
+              <div class="simulated-speaker"></div>
 
               <!-- Animated Kinetic Subtitles -->
               <div class="simulated-captions">
@@ -1591,7 +1706,7 @@
               </div>
 
               <!-- Social Bottom CTAs -->
-              <div style="display: flex; justify-content: space-between; align-items: center; z-index: 10; font-size: 10.5px; color: rgba(255,255,255,0.65);">
+              <div style="display: flex; justify-content: space-between; align-items: center; z-index: 10; font-size: 10.5px; color: rgba(255,255,255,0.8); background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 6px; backdrop-filter: blur(4px);">
                 <span>@clipfarm_studio</span>
                 <span>🎵 Original Sound</span>
               </div>
@@ -1679,7 +1794,23 @@
           </div>
 
           <div class="master-monitor-box">
-            <img src="assets/demo_16_9_annotated.jpg" alt="16:9 Widescreen Face Tracking HUD" class="master-video-img" id="master-frame-img" />
+            <!-- 16:9 Video Loop -->
+            <video id="master-video" class="master-video-elem" autoplay loop muted playsinline poster="assets/demo_16_9_annotated.jpg">
+              <source src="assets/demo_16_9.mp4" type="video/mp4">
+            </video>
+
+            <!-- Live OpenCV YuNet Neural Detection HUD Overlay -->
+            <div class="master-hud-overlay" id="master-hud-overlay">
+              <div class="hud-dimmer-left"></div>
+              <div class="hud-dimmer-right"></div>
+              <div class="hud-crop-zone">
+                <div class="hud-crop-tag">📱 9:16 SMART VERTICAL CROP</div>
+              </div>
+              <div class="hud-face-box">
+                <div class="hud-face-tag">🎯 YuNet Face: 94.5%</div>
+              </div>
+            </div>
+
             <button class="master-hud-btn" onclick="toggleMasterHUD()" id="btn-toggle-hud" title="Toggle AI Detection HUD">
               <span>🎯 HUD: ON</span>
             </button>
@@ -1741,12 +1872,40 @@
             <div class="phone-slider-box" id="comp-box">
               <div class="phone-slider-notch"></div>
               
-              <!-- Before: Raw 16:9 Letterboxed (black bars, unframed) -->
-              <div class="phone-slider-img phone-slider-before" id="slider-before-img"></div>
+              <!-- Before (Underneath): Raw 16:9 Letterboxed Video (black bars, unframed) -->
+              <video id="phone-video-raw" class="phone-slider-video" autoplay loop muted playsinline poster="assets/demo_9_16_raw.jpg">
+                <source src="assets/demo_9_16_raw.mp4" type="video/mp4">
+              </video>
 
-              <!-- After: ClipFarm Smart Vertical (cropped or blurred with captions) -->
+              <!-- After (Clipped by Slider): ClipFarm Smart Vertical Video -->
               <div class="phone-slider-after" id="comp-after">
-                <div class="phone-slider-after-inner" id="slider-after-img"></div>
+                <div class="phone-slider-after-inner" id="slider-after-img">
+                  <video id="phone-video-smart" class="phone-slider-video" autoplay loop muted playsinline poster="assets/demo_9_16_crop.jpg">
+                    <source id="phone-video-source" src="assets/demo_9_16_crop.mp4" type="video/mp4">
+                  </video>
+
+                  <!-- Top Hook Banner Overlay on Smart Video -->
+                  <div class="simulated-hook-banner" style="position: absolute; top: 26px; left: 10px; right: 10px; z-index: 15; pointer-events: none;">
+                    <div class="simulated-hook-tag">🔥 VIRAL HOOK DETECTED</div>
+                    <div class="simulated-hook-text">The $10M mistake that saved everything</div>
+                  </div>
+
+                  <!-- Live Kinetic Subtitle on Smart Video -->
+                  <div style="position: absolute; bottom: 65px; left: 0; right: 0; text-align: center; z-index: 15; pointer-events: none;">
+                    <div class="caption-box style-hormozi" style="display: inline-block;">
+                      <span class="caption-word">THE</span>
+                      <span class="caption-word">BIGGEST</span>
+                      <span class="caption-word highlight">SECRET</span>
+                      <span class="caption-word">TO</span>
+                      <span class="caption-word">GROWTH</span>
+                    </div>
+                  </div>
+
+                  <!-- Watermark Badge on Smart Video -->
+                  <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 15; pointer-events: none; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.2); border-radius: 20px; padding: 4px 12px; font-size: 10px; color: #FFF; white-space: nowrap;">
+                    🎵 @clipfarm_studio
+                  </div>
+                </div>
               </div>
 
               <!-- Draggable Slider Handle -->
@@ -2401,16 +2560,27 @@
     let currentFramingMode = 'crop';
     function setFramingMode(mode) {
       currentFramingMode = mode;
-      const afterInner = document.getElementById('slider-after-img');
       const btnCrop = document.getElementById('mode-btn-crop');
       const btnBlur = document.getElementById('mode-btn-blur');
+      const phoneSmartVideo = document.getElementById('phone-video-smart');
+      const phoneVideoSource = document.getElementById('phone-video-source');
 
       if (mode === 'crop') {
-        if (afterInner) afterInner.style.backgroundImage = "url('assets/demo_9_16_crop_captioned.jpg')";
+        if (phoneVideoSource) phoneVideoSource.src = 'assets/demo_9_16_crop.mp4';
+        if (phoneSmartVideo) {
+          phoneSmartVideo.poster = 'assets/demo_9_16_crop.jpg';
+          phoneSmartVideo.load();
+          phoneSmartVideo.play().catch(() => {});
+        }
         if (btnCrop) btnCrop.classList.add('active');
         if (btnBlur) btnBlur.classList.remove('active');
       } else if (mode === 'blur') {
-        if (afterInner) afterInner.style.backgroundImage = "url('assets/demo_9_16_blur_captioned.jpg')";
+        if (phoneVideoSource) phoneVideoSource.src = 'assets/demo_9_16_blur.mp4';
+        if (phoneSmartVideo) {
+          phoneSmartVideo.poster = 'assets/demo_9_16_blur.jpg';
+          phoneSmartVideo.load();
+          phoneSmartVideo.play().catch(() => {});
+        }
         if (btnBlur) btnBlur.classList.add('active');
         if (btnCrop) btnCrop.classList.remove('active');
       }
@@ -2420,14 +2590,27 @@
     let hudActive = true;
     function toggleMasterHUD() {
       hudActive = !hudActive;
-      const masterImg = document.getElementById('master-frame-img');
+      const masterHud = document.getElementById('master-hud-overlay');
       const hudBtn = document.getElementById('btn-toggle-hud');
       if (hudActive) {
-        if (masterImg) masterImg.src = 'assets/demo_16_9_annotated.jpg';
+        if (masterHud) masterHud.style.opacity = '1';
         if (hudBtn) hudBtn.innerHTML = '<span>🎯 HUD: ON</span>';
       } else {
-        if (masterImg) masterImg.src = 'assets/demo_16_9_original.jpg';
+        if (masterHud) masterHud.style.opacity = '0';
         if (hudBtn) hudBtn.innerHTML = '<span>🎯 HUD: OFF</span>';
+      }
+    }
+
+    // Synchronize video playback between 16:9 and 9:16 sliders
+    function syncVideoPlayback() {
+      const vRaw = document.getElementById('phone-video-raw');
+      const vSmart = document.getElementById('phone-video-smart');
+      if (vSmart && vRaw) {
+        vSmart.addEventListener('timeupdate', () => {
+          if (Math.abs(vRaw.currentTime - vSmart.currentTime) > 0.25) {
+            vRaw.currentTime = vSmart.currentTime;
+          }
+        });
       }
     }
 
@@ -2538,6 +2721,7 @@
     window.addEventListener('DOMContentLoaded', () => {
       detectUserOS();
       startTicker();
+      syncVideoPlayback();
     });
   </script>
 </body>

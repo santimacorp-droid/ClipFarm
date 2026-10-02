@@ -25,6 +25,7 @@ venv_*/
 
 # 视频和媒体文件
 *.mp4
+!docs/assets/*.mp4
 *.mkv
 *.avi
 *.mov
