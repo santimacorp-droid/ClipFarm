@@ -9,8 +9,8 @@ import {
   ToolOutlined
 } from '@ant-design/icons'
 import { settingsApi } from '../services/api'
-
 import { useApiModalStore } from '../store/useApiModalStore'
+import { getLocalCredentials, saveLocalCredentials, setHeuristicMode } from '../utils/localCredentials'
 
 const { Title, Text } = Typography
 
@@ -27,7 +27,7 @@ export const PROVIDER_OPTIONS = [
     label: '⚡ Google Gemini (Recommended — Fast & Free tier available)', 
     value: 'gemini', 
     defaultModel: 'gemini-1.5-flash',
-    models: ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash'],
+    models: ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash', 'gemini-2.5-flash'],
     keyUrl: 'https://aistudio.google.com/app/apikey',
     placeholder: 'AIzaSy...'
   },
@@ -56,6 +56,22 @@ export const PROVIDER_OPTIONS = [
     placeholder: 'sk-...'
   },
   { 
+    label: '⚡ Groq (Ultra-Fast Llama 3.3 / Qwen 2.5)', 
+    value: 'groq', 
+    defaultModel: 'llama-3.3-70b-versatile',
+    models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'qwen-2.5-32b'],
+    keyUrl: 'https://console.groq.com/keys',
+    placeholder: 'gsk_...'
+  },
+  { 
+    label: '🌐 OpenRouter (Claude, Llama, DeepSeek Gateway)', 
+    value: 'openrouter', 
+    defaultModel: 'anthropic/claude-3.5-sonnet',
+    models: ['anthropic/claude-3.5-sonnet', 'deepseek/deepseek-r1', 'meta-llama/llama-3.3-70b-instruct'],
+    keyUrl: 'https://openrouter.ai/keys',
+    placeholder: 'sk-or-...'
+  },
+  { 
     label: '🦙 Ollama (100% Free & Local — Zero Key Needed)', 
     value: 'ollama', 
     defaultModel: 'llama3.2',
@@ -66,11 +82,29 @@ export const PROVIDER_OPTIONS = [
     defaultBaseUrl: 'http://localhost:11434/v1'
   },
   { 
+    label: '🖥️ LM Studio (Local GGUF Models — Zero Key Needed)', 
+    value: 'lmstudio', 
+    defaultModel: 'local-model',
+    models: ['local-model'],
+    keyUrl: 'https://lmstudio.ai/',
+    placeholder: 'Optional for LM Studio',
+    hasBaseUrl: true,
+    defaultBaseUrl: 'http://localhost:1234/v1'
+  },
+  { 
     label: '☁️ Alibaba Qwen (DashScope)', 
     value: 'dashscope', 
     defaultModel: 'qwen-plus',
     models: ['qwen-plus', 'qwen-turbo', 'qwen-max'],
     keyUrl: 'https://dashscope.console.aliyun.com/',
+    placeholder: 'sk-...'
+  },
+  { 
+    label: '🌊 SiliconFlow (Qwen & DeepSeek Hosting)', 
+    value: 'siliconflow', 
+    defaultModel: 'Qwen/Qwen2.5-7B-Instruct',
+    models: ['Qwen/Qwen2.5-7B-Instruct', 'deepseek-ai/DeepSeek-V3'],
+    keyUrl: 'https://cloud.siliconflow.cn/account/ak',
     placeholder: 'sk-...'
   },
   { 
@@ -135,26 +169,44 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({
   }, [isOpen])
 
   const loadCurrentConfig = async () => {
+    // 1. First retrieve local credentials from browser storage
+    const localCreds = getLocalCredentials()
+    let prov = localCreds.provider || 'gemini'
+    let key = localCreds.apiKeys[prov] || ''
+    let model = localCreds.model || ''
+    let baseUrl = localCreds.baseUrl || ''
+
+    // 2. Fetch backend settings to complement if local is empty
     try {
       const settings = await settingsApi.getSettings()
-      const prov = settings?.api?.llm_provider || 'gemini'
-      const key = settings?.api?.api_keys?.[prov] || ''
-      const model = settings?.api?.api_model || currentProviderDef.defaultModel
-      const baseUrl = settings?.api?.custom_base_url || currentProviderDef.defaultBaseUrl || ''
-
-      setSelectedProvider(prov)
-      const def = PROVIDER_OPTIONS.find(p => p.value === prov) || PROVIDER_OPTIONS[0]
-      setAvailableModels(def.models)
-
-      form.setFieldsValue({
-        provider: prov,
-        apiKey: key,
-        modelName: model,
-        baseUrl: baseUrl
-      })
+      if (settings?.api) {
+        if (!key && settings.api.llm_provider) {
+          prov = settings.api.llm_provider
+        }
+        if (!key && settings.api.api_keys?.[prov]) {
+          key = settings.api.api_keys[prov]
+        }
+        if (!model && settings.api.api_model) {
+          model = settings.api.api_model
+        }
+        if (!baseUrl && settings.api.custom_base_url) {
+          baseUrl = settings.api.custom_base_url
+        }
+      }
     } catch (e) {
-      console.warn('Failed to load current settings for modal:', e)
+      console.warn('Failed to load current settings from backend:', e)
     }
+
+    setSelectedProvider(prov)
+    const def = PROVIDER_OPTIONS.find(p => p.value === prov) || PROVIDER_OPTIONS[0]
+    setAvailableModels(def.models)
+
+    form.setFieldsValue({
+      provider: prov,
+      apiKey: key,
+      modelName: model || def.defaultModel,
+      baseUrl: baseUrl || (def.hasBaseUrl ? def.defaultBaseUrl : '')
+    })
   }
 
   const handleProviderChange = (val: string) => {
@@ -162,9 +214,15 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({
     setTestResult(null)
     const def = PROVIDER_OPTIONS.find(p => p.value === val) || PROVIDER_OPTIONS[0]
     setAvailableModels(def.models)
+    
+    // Check if an API key for this provider is already saved locally
+    const localCreds = getLocalCredentials()
+    const existingKey = localCreds.apiKeys[val] || ''
+
     form.setFieldsValue({
+      apiKey: existingKey,
       modelName: def.defaultModel,
-      baseUrl: def.defaultBaseUrl || ''
+      baseUrl: def.hasBaseUrl ? def.defaultBaseUrl || '' : ''
     })
   }
 
@@ -199,49 +257,68 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({
       const values = await form.validateFields()
       setSaving(true)
 
-      const existingSettings = await settingsApi.getSettings().catch(() => ({}))
-      const existingKeys = existingSettings?.api?.api_keys || {}
+      // 1. Immediately save credentials locally in browser storage
+      saveLocalCredentials({
+        provider: values.provider,
+        model: values.modelName,
+        apiKey: values.apiKey || '',
+        baseUrl: values.baseUrl || ''
+      })
 
-      const updatedKeys = {
-        ...existingKeys,
-        [values.provider]: values.apiKey || ''
-      }
+      message.success('AI Engine credentials saved successfully!')
 
-      const backendPayload = {
-        basic: existingSettings?.basic || {
-          app_name: "ClipFarm Desktop",
-          app_version: "2.0.0",
-          debug_mode: false,
-          auto_start: true
-        },
-        service: existingSettings?.service || {
-          host: "127.0.0.1",
-          port: 8000,
-          max_memory_usage: 2048
-        },
-        api: {
-          api_keys: updatedKeys,
-          api_model: values.modelName || currentProviderDef.defaultModel,
-          api_max_tokens: 4096,
-          api_timeout: 30,
-          custom_base_url: values.baseUrl || '',
-          llm_provider: values.provider
-        },
-        processing: existingSettings?.processing || {
-          processing_chunk_size: 5000,
-          processing_min_score: 0.7,
-          processing_max_clips: 5,
-          processing_max_retries: 3
-        }
-      }
-
-      await settingsApi.updateSettings(backendPayload)
-      localStorage.removeItem('clipfarm_ai_mode')
-      localStorage.setItem('clipfarm_api_configured', 'true')
-      localStorage.setItem('clipfarm_llm_provider', values.provider)
-      message.success('AI Provider configured successfully!')
+      // 2. Immediately close modal and trigger success callback so user is unblocked
       handleSuccessTrigger()
+
+      // 3. Sync to backend settings asynchronously in background
+      try {
+        const existingSettings = await settingsApi.getSettings().catch(() => ({}))
+        const existingKeys = existingSettings?.api?.api_keys || {}
+        const localCreds = getLocalCredentials()
+
+        const updatedKeys = {
+          ...existingKeys,
+          ...localCreds.apiKeys,
+          [values.provider]: values.apiKey || ''
+        }
+
+        const backendPayload = {
+          basic: existingSettings?.basic || {
+            app_name: "ClipFarm Desktop",
+            app_version: "2.0.0",
+            debug_mode: false,
+            auto_start: true
+          },
+          service: existingSettings?.service || {
+            host: "127.0.0.1",
+            port: 8000,
+            max_memory_usage: 2048
+          },
+          api: {
+            api_keys: updatedKeys,
+            api_model: values.modelName || currentProviderDef.defaultModel,
+            api_max_tokens: 4096,
+            api_timeout: 30,
+            custom_base_url: values.baseUrl || '',
+            llm_provider: values.provider
+          },
+          processing: existingSettings?.processing || {
+            processing_chunk_size: 5000,
+            processing_min_score: 0.7,
+            processing_max_clips: 5,
+            processing_max_retries: 3
+          }
+        }
+
+        await settingsApi.updateSettings(backendPayload)
+      } catch (backendErr) {
+        console.warn('Backend sync completed with notice:', backendErr)
+      }
     } catch (err: any) {
+      if (err?.errorFields) {
+        // Form validation error, let Antd show validation messages
+        return
+      }
       console.error('Failed to save settings:', err)
       message.error('Failed to save settings: ' + (err.message || 'Unknown error'))
     } finally {
@@ -250,8 +327,7 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({
   }
 
   const handleProceedWithHeuristic = () => {
-    localStorage.setItem('clipfarm_ai_mode', 'offline_heuristic')
-    localStorage.setItem('clipfarm_api_configured', 'true')
+    setHeuristicMode()
     message.info('Proceeding with built-in heuristic highlight detection (no API key required).')
     handleSuccessTrigger()
   }

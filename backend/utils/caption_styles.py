@@ -110,6 +110,25 @@ CAPTION_STYLES = {
         "words_per_group": 6,
         "cjk_chars_per_group": 12,
     },
+    "clean_box": {
+        "name": "Clean Minimalist Box",
+        "font_name": DEFAULT_FONT_NAME,
+        "font_size": 52,
+        "primary_color": "&H00FFFFFF&",
+        "highlight_color": "&H00FFFFFF&",
+        "outline_color": "&H00000000&",
+        "back_color": "&HA0000000&",        # Dark Translucent Box
+        "bold": 0,
+        "italic": 0,
+        "outline": 1.0,
+        "shadow": 0.0,
+        "border_style": 3,                  # 3 = Opaque/Translucent Bounding Box
+        "alignment": 2,
+        "margin_v": 60,
+        "uppercase": False,
+        "words_per_group": 6,
+        "cjk_chars_per_group": 12,
+    },
     "none": {
         "name": "Clean Subtitles (No Animation)",
         "font_name": DEFAULT_FONT_NAME,
@@ -372,6 +391,124 @@ def _normalize_ass_color(color: str) -> str:
     return c
 
 
+_STOPWORDS = {
+    'THE', 'THAT', 'THIS', 'WITH', 'FROM', 'HAVE', 'BEEN', 'THEY', 'THEIR',
+    'WHAT', 'WHEN', 'WHERE', 'WHICH', 'THERE', 'THESE', 'THOSE', 'ABOUT',
+    'AFTER', 'BEFORE', 'BECAUSE', 'AND', 'BUT', 'FOR', 'NOT', 'YOU', 'YOUR',
+    'OUR', 'HIS', 'HER', 'ITS', 'ARE', 'WAS', 'WERE', 'HAD', 'HAS'
+}
+
+def _pick_focal_keyword_index(group: List[str]) -> int:
+    """Select the most emphatic/content-bearing word index in a 3-4 word phrase."""
+    if not group:
+        return 0
+    if len(group) == 1:
+        return 0
+    best_idx = 0
+    best_score = -999.0
+    for idx, tok in enumerate(group):
+        clean = re.sub(r'[^A-Za-z0-9\u4e00-\u9fff]', '', tok).upper()
+        if not clean:
+            continue
+        score = float(len(clean))
+        if clean in _STOPWORDS or len(clean) <= 2:
+            score -= 4.0
+        if 0 < idx < len(group) - 1:
+            score += 0.5
+        if score > best_score:
+            best_score = score
+            best_idx = idx
+    return best_idx
+
+
+def _split_segment_by_silence(
+    seg: Dict[str, Any],
+    silences: List[Tuple[float, float]],
+    min_pause: float = 0.60
+) -> List[Dict[str, Any]]:
+    """
+    Splits an SRT segment across major silence pauses (>= min_pause).
+    Snaps token boundaries to natural punctuation (comma, period, question mark)
+    near each pause so that subtitle phrases align cleanly with speech bursts.
+    """
+    if seg.get('words'):
+        return [seg]
+
+    seg_start = float(seg.get('start', 0.0))
+    seg_end = float(seg.get('end', 0.0))
+    seg_text = str(seg.get('text', '')).strip()
+    if not seg_text or (seg_end - seg_start) <= 0.4:
+        return [seg]
+
+    active_silences = [
+        (max(seg_start, s), min(seg_end, e))
+        for (s, e) in silences
+        if (e - s) >= min_pause and s < seg_end - 0.25 and e > seg_start + 0.25
+    ]
+    if not active_silences:
+        return [seg]
+
+    bursts: List[Tuple[float, float]] = []
+    cur = seg_start
+    for s_s, s_e in active_silences:
+        if s_s > cur + 0.25:
+            bursts.append((round(cur, 3), round(s_s, 3)))
+        cur = max(cur, s_e)
+    if cur < seg_end - 0.25:
+        bursts.append((round(cur, 3), round(seg_end, 3)))
+
+    if len(bursts) <= 1:
+        return [seg]
+
+    tokens = _tokenize_text(seg_text)
+    total_tokens = len(tokens)
+    if total_tokens <= len(bursts):
+        return [seg]
+
+    total_speech_dur = sum(be - bs for bs, be in bursts)
+    if total_speech_dur < 0.3:
+        return [seg]
+
+    sub_segs: List[Dict[str, Any]] = []
+    cur_tok_idx = 0
+    punct_enders = ('.', ',', '?', '!', ';', ':', '。', '，', '？', '！', '；')
+
+    for i, (b_start, b_end) in enumerate(bursts):
+        b_dur = b_end - b_start
+        remaining_bursts = len(bursts) - 1 - i
+        if remaining_bursts == 0:
+            n_tokens = total_tokens - cur_tok_idx
+        else:
+            raw_n = max(1, round(total_tokens * (b_dur / total_speech_dur)))
+            n_tokens = raw_n
+            best_snap = None
+            for offset in [0, 1, -1, 2, -2]:
+                cand_idx = cur_tok_idx + raw_n + offset
+                if cur_tok_idx < cand_idx < total_tokens:
+                    prev_tok = tokens[cand_idx - 1]
+                    if prev_tok.endswith(punct_enders):
+                        best_snap = cand_idx - cur_tok_idx
+                        break
+            if best_snap is not None:
+                n_tokens = best_snap
+
+        tok_slice = tokens[cur_tok_idx : cur_tok_idx + n_tokens]
+        cur_tok_idx += n_tokens
+
+        if tok_slice:
+            clean_sub_text = _join_tokens(tok_slice)
+            sub_entry = {
+                'start': b_start,
+                'end': b_end,
+                'text': clean_sub_text
+            }
+            if 'speaker' in seg:
+                sub_entry['speaker'] = seg['speaker']
+            sub_segs.append(sub_entry)
+
+    return sub_segs if sub_segs else [seg]
+
+
 def _parse_time_to_seconds(t_str: Any) -> float:
     """Converts '00:01:23,456' or '00:01:23.456' or '01:23.456' or float string to seconds."""
     if isinstance(t_str, (int, float)):
@@ -529,8 +666,11 @@ class ViralCaptionGenerator:
                 raw_clip_segments.append(item)
             else:
                 # SRT cues without word-level timestamps
+                # Drop pre-clip sentence tails that only overlap by a sliver (< 0.6s)
+                if seg_start < clip_start and (seg_end - clip_start) < 0.6:
+                    continue
                 overlap_dur = min(seg_end, clip_end) - max(seg_start, clip_start)
-                if overlap_dur < 0.2:
+                if overlap_dur < 0.3:
                     continue
 
                 rel_start = max(0.0, seg_start - clip_start)
@@ -583,6 +723,61 @@ class ViralCaptionGenerator:
             return False
 
     @classmethod
+    def detect_clip_silences(
+        cls,
+        media_path: Any,
+        clip_start_sec: float = 0.0,
+        duration_sec: float = 0.0,
+        noise_threshold_db: int = -28,
+        min_silence_duration: float = 0.5
+    ) -> List[Tuple[float, float]]:
+        """
+        Fast audio-only silence detector using FFmpeg silencedetect.
+        Returns list of (start_sec, end_sec) relative to clip start (0.0).
+        Executes in ~50ms without video decoding.
+        """
+        if not media_path:
+            return []
+        p = Path(media_path)
+        if not p.exists():
+            return []
+
+        import subprocess
+        cmd = ["ffmpeg", "-v", "info"]
+        if clip_start_sec > 0.05:
+            cmd.extend(["-ss", f"{clip_start_sec:.3f}"])
+        if duration_sec > 0.1:
+            cmd.extend(["-t", f"{duration_sec:.3f}"])
+        cmd.extend([
+            "-i", str(p),
+            "-vn",
+            "-af", f"silencedetect=n={noise_threshold_db}dB:d={min_silence_duration}",
+            "-f", "null", "-"
+        ])
+
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, errors="ignore", timeout=30)
+            starts, ends = [], []
+            for line in res.stderr.splitlines():
+                if "silence_start:" in line:
+                    m = re.search(r"silence_start:\s*([0-9.]+)", line)
+                    if m:
+                        starts.append(float(m.group(1)))
+                elif "silence_end:" in line:
+                    m = re.search(r"silence_end:\s*([0-9.]+)", line)
+                    if m:
+                        ends.append(float(m.group(1)))
+
+            intervals = []
+            for s, e in zip(starts, ends):
+                if e > s:
+                    intervals.append((round(s, 3), round(e, 3)))
+            return intervals
+        except Exception as e:
+            logger.debug(f"detect_clip_silences bypassed: {e}")
+            return []
+
+    @classmethod
     def generate_clip_ass(
         cls,
         source_srt_path: Optional[Path] = None,
@@ -596,6 +791,7 @@ class ViralCaptionGenerator:
         video_height: int = 1080,
         words_data: Optional[List[Dict[str, Any]]] = None,
         word_segments: Optional[List[Dict[str, Any]]] = None,
+        media_path: Optional[Path] = None,
         **kwargs: Any
     ) -> bool:
         """
@@ -620,7 +816,8 @@ class ViralCaptionGenerator:
             if output_ass_path is None:
                 raise ValueError("output_ass_path is required")
             output_ass_path = Path(output_ass_path)
-            cfg = CAPTION_STYLES.get(style_key, CAPTION_STYLES["hormozi_yellow"])
+            sk_norm = str(style_key or "hormozi_yellow").lower().strip()
+            cfg = CAPTION_STYLES.get(sk_norm, CAPTION_STYLES["hormozi_yellow"])
             clip_start_sec = _parse_time_to_seconds(clip_start)
             clip_end_sec = _parse_time_to_seconds(clip_end)
 
@@ -652,7 +849,39 @@ class ViralCaptionGenerator:
             else:
                 all_segs = []
 
+            # Infer media_path for silence detection if not explicitly passed
+            if media_path is None:
+                media_path = kwargs.get('media_path') or kwargs.get('video_path') or kwargs.get('audio_path')
+            if media_path is None and output_ass_path:
+                for ext in ('.mp4', '.mov', '.webm', '.mkv'):
+                    cand = output_ass_path.with_suffix(ext)
+                    if cand.exists():
+                        media_path = cand
+                        break
+            if media_path is None and source_srt_path:
+                p_srt = Path(source_srt_path)
+                for cand in [p_srt.with_suffix('.mp4'), p_srt.parent / 'input.mp4', p_srt.parent.parent / 'raw' / 'input.mp4']:
+                    if cand.exists():
+                        media_path = cand
+                        break
+
+            clip_total_duration = max(1.0, clip_end_sec - clip_start_sec)
+            clip_silences: List[Tuple[float, float]] = []
+            if media_path and Path(media_path).exists():
+                is_cut_clip = bool(output_ass_path and Path(media_path).stem == output_ass_path.stem)
+                silence_ss = 0.0 if is_cut_clip else clip_start_sec
+                clip_silences = cls.detect_clip_silences(
+                    media_path=media_path,
+                    clip_start_sec=silence_ss,
+                    duration_sec=clip_total_duration
+                )
+
             clip_segs = cls.get_clip_segments(all_segs, clip_start_sec, clip_end_sec)
+            if clip_silences:
+                split_segs = []
+                for seg in clip_segs:
+                    split_segs.extend(_split_segment_by_silence(seg, clip_silences))
+                clip_segs = split_segs
             
             # Responsive font size & margin adjustment based on vertical (9:16) vs landscape
             is_vertical = video_height > video_width
@@ -767,35 +996,22 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         if g_end <= g_start + 0.1:
                             g_end = g_start + 0.2
 
-                    # If plain subtitles or single token: render cleanly without per-word cycling
-                    if highlight_color == primary_color or group_len <= 1:
-                        line_text = _join_tokens(group)
-                        dialogue_lines.append(
-                            f"Dialogue: 0,{_seconds_to_ass_time(g_start)},{_seconds_to_ass_time(g_end)},{style},,0,0,0,,{line_text}"
-                        )
-                    else:
-                        # Build strictly partition-based word intervals [t_start, t_end]
-                        # guaranteeing ZERO overlap between words in the same group
+                    if has_word_timing:
+                        # Exact word-level karaoke intervals anchored to Whisper word timestamps
                         word_starts: List[float] = []
-                        if has_word_timing and group_words_slice:
-                            cur_w_start = g_start
-                            for w_idx in range(group_len):
-                                raw_w_s = float(group_words_slice[w_idx]['start'])
-                                if w_idx == 0:
-                                    w_s = max(g_start, raw_w_s)
-                                else:
-                                    w_s = max(cur_w_start + 0.08, raw_w_s)
-                                # Ensure room for remaining words
-                                remaining_words = group_len - 1 - w_idx
-                                max_allowed = g_end - (remaining_words * 0.08)
-                                if w_s > max_allowed:
-                                    w_s = max(cur_w_start + 0.05, max_allowed)
-                                word_starts.append(w_s)
-                                cur_w_start = w_s
-                        else:
-                            token_dur = (g_end - g_start) / group_len
-                            for w_idx in range(group_len):
-                                word_starts.append(g_start + (w_idx * token_dur))
+                        cur_w_start = g_start
+                        for w_idx in range(group_len):
+                            raw_w_s = float(group_words_slice[w_idx]['start'])
+                            if w_idx == 0:
+                                w_s = max(g_start, raw_w_s)
+                            else:
+                                w_s = max(cur_w_start + 0.08, raw_w_s)
+                            remaining_words = group_len - 1 - w_idx
+                            max_allowed = g_end - (remaining_words * 0.08)
+                            if w_s > max_allowed:
+                                w_s = max(cur_w_start + 0.05, max_allowed)
+                            word_starts.append(w_s)
+                            cur_w_start = w_s
 
                         for w_idx, current_tok in enumerate(group):
                             w_start = word_starts[w_idx]
@@ -805,7 +1021,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
                             rendered_tokens = []
                             for j, tok in enumerate(group):
-                                if j == w_idx:
+                                if j == w_idx and highlight_color != primary_color:
                                     rendered_tokens.append(f"{{\\c{highlight_color}}}{tok}{{\\c{primary_color}}}")
                                 else:
                                     rendered_tokens.append(tok)
@@ -814,6 +1030,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             dialogue_lines.append(
                                 f"Dialogue: 0,{_seconds_to_ass_time(w_start)},{_seconds_to_ass_time(w_end)},{style},,0,0,0,,{line_text}"
                             )
+                    else:
+                        # Clean phrase-level rendering for standard SRT (no fake karaoke word cycling)
+                        # Displays punchy 3-4 word phrase across its speech interval with focal keyword pop
+                        if highlight_color == primary_color or group_len <= 1:
+                            line_text = _join_tokens(group)
+                        else:
+                            focal_idx = _pick_focal_keyword_index(group)
+                            rendered_tokens = []
+                            for j, tok in enumerate(group):
+                                if j == focal_idx:
+                                    rendered_tokens.append(f"{{\\c{highlight_color}}}{tok}{{\\c{primary_color}}}")
+                                else:
+                                    rendered_tokens.append(tok)
+                            line_text = _join_tokens(rendered_tokens)
+
+                        dialogue_lines.append(
+                            f"Dialogue: 0,{_seconds_to_ass_time(g_start)},{_seconds_to_ass_time(g_end)},{style},,0,0,0,,{line_text}"
+                        )
 
                     token_cursor += group_len
                     current_group_start = g_end

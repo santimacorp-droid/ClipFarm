@@ -8,7 +8,7 @@ import logging
 import asyncio
 from typing import Dict, Set, Any, Optional
 from fastapi import WebSocket, WebSocketDisconnect
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +178,7 @@ class WebSocketMessage:
             "progress": progress,
             "message": message,
             "error": error,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     
     @staticmethod
@@ -191,7 +191,7 @@ class WebSocketMessage:
             "title": title,
             "message": message,
             "level": level,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     
     @staticmethod
@@ -204,7 +204,7 @@ class WebSocketMessage:
             "status": status,
             "progress": progress,
             "message": message,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     
     @staticmethod
@@ -216,5 +216,5 @@ class WebSocketMessage:
             "error_type": error_type,
             "error_message": error_message,
             "details": details,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         } 

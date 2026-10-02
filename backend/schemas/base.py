@@ -4,17 +4,12 @@ Base schemas for common response patterns.
 
 from datetime import datetime
 from typing import Optional, Any, Dict, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class BaseSchema(BaseModel):
     """Base schema with common configuration."""
-    
-    class Config:
-        from_attributes = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaginationParams(BaseSchema):

@@ -307,11 +307,13 @@ def render_text_watermark(
     opacity: float = 0.50,
     text_color: Tuple[int, int, int] = (255, 255, 255),
     shadow_color: Tuple[int, int, int] = (0, 0, 0),
-    padding: int = 12
+    padding: int = 12,
+    platform: Optional[str] = None
 ) -> Any:
     """
     Renders a semi-transparent text/handle watermark (e.g. '@yourhandle', '@creator')
-    with a subtle drop shadow for clear visibility over both light and dark video frames.
+    with an authentic platform logo (TikTok, YouTube, Instagram, Facebook) and a subtle
+    drop shadow for clear visibility over both light and dark video frames.
     
     Args:
         text: Handle or watermark text (e.g. '@yourhandle')
@@ -321,31 +323,30 @@ def render_text_watermark(
         text_color: RGB tuple for main text (default white)
         shadow_color: RGB tuple for shadow
         padding: Padding around text in pixels
+        platform: Platform name ('tiktok', 'youtube_shorts', 'instagram', 'facebook', etc.)
         
     Returns:
         PIL Image instance of the rendered watermark
     """
     from PIL import Image, ImageDraw, ImageFont
+    from .cta_overlay import (
+        draw_tiktok_icon,
+        draw_youtube_icon,
+        draw_instagram_icon,
+        draw_facebook_icon,
+        _get_font
+    )
 
     clean_text = str(text or "").strip()
     if not clean_text:
         clean_text = "@clip"
+    if not clean_text.startswith("@") and " " not in clean_text:
+        clean_text = f"@{clean_text}"
 
-    # Resolve system fonts
-    font = None
-    for font_p in [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-    ]:
-        if os.path.exists(font_p):
-            try:
-                font = ImageFont.truetype(font_p, font_size)
-                break
-            except Exception:
-                continue
+    plat_key = str(platform or "").lower().replace("-", "_").strip() if platform else ""
+    has_icon = plat_key in ("tiktok", "youtube", "youtube_shorts", "instagram", "facebook")
 
+    font = _get_font(font_size, bold=True)
     if font is None:
         font = ImageFont.load_default()
 
@@ -354,9 +355,22 @@ def render_text_watermark(
 
     text_w = d_draw.textlength(clean_text, font=font)
     text_h = int(font_size * 1.25)
+    icon_size = font_size + 4 if has_icon else 0
 
-    img_w = int(text_w + padding * 2)
-    img_h = int(text_h + padding * 2)
+    if has_icon:
+        icon_w = int(icon_size * 1.36) if plat_key in ("youtube", "youtube_shorts") else icon_size
+        icon_gap = 10
+        pad_x = padding + 4
+        pad_y = padding
+        img_w = int(text_w + icon_w + icon_gap + pad_x * 2)
+        img_h = int(max(text_h, icon_size) + pad_y * 2)
+    else:
+        icon_w = 0
+        icon_gap = 0
+        pad_x = padding
+        pad_y = padding
+        img_w = int(text_w + pad_x * 2)
+        img_h = int(text_h + pad_y * 2)
 
     wm_img = Image.new("RGBA", (img_w, img_h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(wm_img)
@@ -364,8 +378,33 @@ def render_text_watermark(
     alpha_val = int(max(0.05, min(1.0, float(opacity))) * 255)
     shadow_alpha = int(alpha_val * 0.75)
 
-    tx = padding
-    ty = padding
+    if has_icon:
+        # Subtle rounded frosted pill background
+        bg_alpha = int(140 * max(0.05, min(1.0, float(opacity))))
+        border_alpha = int(90 * max(0.05, min(1.0, float(opacity))))
+        draw.rounded_rectangle(
+            [(0, 0), (img_w - 1, img_h - 1)],
+            radius=img_h // 2,
+            fill=(10, 12, 18, bg_alpha),
+            outline=(255, 255, 255, border_alpha),
+            width=1
+        )
+        icon_x = pad_x
+        icon_y = (img_h - icon_size) // 2
+        if plat_key == "tiktok":
+            draw_tiktok_icon(draw, icon_x, icon_y, icon_size)
+        elif plat_key in ("youtube", "youtube_shorts"):
+            draw_youtube_icon(draw, icon_x, icon_y, icon_size)
+        elif plat_key == "instagram":
+            draw_instagram_icon(wm_img, icon_x, icon_y, icon_size)
+        elif plat_key == "facebook":
+            draw_facebook_icon(draw, icon_x, icon_y, icon_size)
+
+        tx = pad_x + icon_w + icon_gap
+        ty = (img_h - text_h) // 2 - 1
+    else:
+        tx = pad_x
+        ty = pad_y
 
     # Draw subtle dark drop-shadow offset by 2px
     draw.text((tx + 2, ty + 2), clean_text, font=font, fill=(shadow_color[0], shadow_color[1], shadow_color[2], shadow_alpha))

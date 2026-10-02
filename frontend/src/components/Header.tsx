@@ -29,7 +29,14 @@ const Header: React.FC = () => {
   useEffect(() => {
     checkStatus()
     const timer = setInterval(checkStatus, 15000)
-    return () => clearInterval(timer)
+    const handleCredsUpdate = () => {
+      checkStatus()
+    }
+    window.addEventListener('clipfarm_credentials_updated', handleCredsUpdate)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('clipfarm_credentials_updated', handleCredsUpdate)
+    }
   }, [location.pathname])
 
   return (

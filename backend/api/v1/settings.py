@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +34,15 @@ class ServiceSettings(BaseModel):
     port: int = Field(default=8000, description="Service port")
     max_memory_usage: int = Field(default=2048, description="Maximum memory usage(MB)")
     
-    @validator('port')
+    @field_validator('port')
+    @classmethod
     def validate_port(cls, v):
         if not 1024 <= v <= 65535:
             raise ValueError('Port number must be between1024-65535between')
         return v
     
-    @validator('max_memory_usage')
+    @field_validator('max_memory_usage')
+    @classmethod
     def validate_memory(cls, v):
         if not 512 <= v <= 8192:
             raise ValueError('Memory usage limit must be between...512-8192MBbetween')
@@ -73,7 +75,8 @@ class ApiSettings(BaseModel):
     custom_base_url: str = Field(default="", description="Custom or Local API Base URL")
     llm_provider: str = Field(default="dashscope", description="Active LLM provider")
     
-    @validator('api_timeout')
+    @field_validator('api_timeout')
+    @classmethod
     def validate_timeout(cls, v):
         if not 5 <= v <= 300:
             raise ValueError('API Timeout must be between 5-300 seconds')
@@ -87,13 +90,15 @@ class ProcessingSettings(BaseModel):
     processing_max_clips: int = Field(default=5, description="Collection max batch count")
     processing_max_retries: int = Field(default=3, description="Maximum retry count")
     
-    @validator('processing_chunk_size')
+    @field_validator('processing_chunk_size')
+    @classmethod
     def validate_chunk_size(cls, v):
         if not 1000 <= v <= 10000:
             raise ValueError('Block size must be between1000-10000between')
         return v
     
-    @validator('processing_min_score')
+    @field_validator('processing_min_score')
+    @classmethod
     def validate_min_score(cls, v):
         if not 0.1 <= v <= 1.0:
             raise ValueError('Minimum score threshold must be between...0.1-1.0between')
@@ -105,13 +110,15 @@ class LogSettings(BaseModel):
     log_level: str = Field(default="INFO", description="Log level")
     log_retention_days: int = Field(default=7, description="Log retention days")
     
-    @validator('log_level')
+    @field_validator('log_level')
+    @classmethod
     def validate_log_level(cls, v):
         if v not in ['DEBUG', 'INFO', 'WARNING', 'ERROR']:
             raise ValueError('Log level must be one ofDEBUG, INFO, WARNINGorERROR')
         return v
     
-    @validator('log_retention_days')
+    @field_validator('log_retention_days')
+    @classmethod
     def validate_retention_days(cls, v):
         if not 1 <= v <= 30:
             raise ValueError('Log retention days must be between1-30between days')
@@ -218,13 +225,22 @@ async def get_settings():
                     dashscope=config.dashscope_api_key,
                     openai=config.openai_api_key,
                     gemini=config.gemini_api_key,
+                    anthropic=config.anthropic_api_key,
+                    deepseek=config.deepseek_api_key,
+                    openrouter=config.openrouter_api_key,
+                    groq=config.groq_api_key,
                     siliconflow=config.siliconflow_api_key,
+                    custom=config.custom_api_key,
+                    ollama=config.ollama_api_key,
+                    lmstudio=config.lmstudio_api_key,
                     jimeng_access="",  # default value
                     jimeng_secret=""   # default value
                 ),
                 api_model=config.default_model,
                 api_max_tokens=config.max_tokens,
-                api_timeout=config.timeout
+                api_timeout=config.timeout,
+                custom_base_url=config.custom_base_url,
+                llm_provider=config.llm_provider
             ),
             processing=ProcessingSettings(
                 processing_chunk_size=config.chunk_size,
@@ -592,6 +608,7 @@ async def fetch_models(request: FetchModelsRequest):
             "provider": request.provider
         }
 
+@router.put("", response_model=Dict[str, Any])
 @router.put("/", response_model=Dict[str, Any])
 async def update_settings(settings: DesktopSettings):
     """Update settings"""
@@ -606,14 +623,23 @@ async def update_settings(settings: DesktopSettings):
         config.port = settings.service.port
         config.max_memory_usage = settings.service.max_memory_usage
         
-        # updateAPIset
+        # update API settings for all providers
         config.dashscope_api_key = settings.api.api_keys.dashscope
         config.openai_api_key = settings.api.api_keys.openai
         config.gemini_api_key = settings.api.api_keys.gemini
+        config.anthropic_api_key = settings.api.api_keys.anthropic
+        config.deepseek_api_key = settings.api.api_keys.deepseek
+        config.openrouter_api_key = settings.api.api_keys.openrouter
+        config.groq_api_key = settings.api.api_keys.groq
         config.siliconflow_api_key = settings.api.api_keys.siliconflow
+        config.custom_api_key = settings.api.api_keys.custom
+        config.ollama_api_key = settings.api.api_keys.ollama
+        config.lmstudio_api_key = settings.api.api_keys.lmstudio
         config.default_model = settings.api.api_model
         config.max_tokens = settings.api.api_max_tokens
         config.timeout = settings.api.api_timeout
+        config.llm_provider = settings.api.llm_provider
+        config.custom_base_url = settings.api.custom_base_url
         
         # Updating processing settings
         config.chunk_size = settings.processing.processing_chunk_size
@@ -625,11 +651,12 @@ async def update_settings(settings: DesktopSettings):
         config.log_level = settings.logs.log_level
         
         # Saving settings to file
+        config.paths.data_dir.mkdir(parents=True, exist_ok=True)
         settings_file = config.paths.data_dir / "settings.json"
         with open(settings_file, 'w', encoding='utf-8') as f:
             json.dump(settings.dict(), f, indent=2, ensure_ascii=False)
         
-        # Important: Save main config file to ensure...API keyCritical configurations persisted...
+        # Important: Save main config file to ensure critical configurations persisted
         from backend.core.desktop_config import save_desktop_config
         if not save_desktop_config(config):
             raise HTTPException(status_code=500, detail="Failed to save main configuration file")
@@ -644,9 +671,14 @@ async def update_settings(settings: DesktopSettings):
                 "dashscope_api_key": settings.api.api_keys.dashscope,
                 "openai_api_key": settings.api.api_keys.openai,
                 "gemini_api_key": settings.api.api_keys.gemini,
+                "anthropic_api_key": settings.api.api_keys.anthropic,
+                "deepseek_api_key": settings.api.api_keys.deepseek,
+                "openrouter_api_key": settings.api.api_keys.openrouter,
+                "groq_api_key": settings.api.api_keys.groq,
                 "siliconflow_api_key": settings.api.api_keys.siliconflow,
                 "custom_api_key": settings.api.api_keys.custom,
                 "ollama_api_key": settings.api.api_keys.ollama,
+                "lmstudio_api_key": settings.api.api_keys.lmstudio,
                 "custom_base_url": settings.api.custom_base_url,
                 "chunk_size": settings.processing.processing_chunk_size,
                 "min_score_threshold": settings.processing.processing_min_score,

@@ -43,6 +43,61 @@ def get_platform_cta(platform: str) -> dict:
     return PLATFORM_CTA.get(key, PLATFORM_CTA["default"])
 
 
+def _is_valid_handle(handle: Optional[str]) -> bool:
+    """Return True if handle is a genuine user-specified handle (not empty or dummy placeholder)."""
+    clean = str(handle or "").strip().lower()
+    if not clean:
+        return False
+    if clean.startswith("@"):
+        clean = clean[1:].strip()
+    return clean not in ("", "channel", "nohandle", "@nohandle", "none", "null", "undefined")
+
+
+def get_handle_for_platform(
+    platform: str,
+    handle_or_dict: Any,
+    default_handle: str = ""
+) -> str:
+    """
+    Resolve the creator handle for a specific media platform.
+    Supports:
+      - dict mapping: {"tiktok": "@tt_user", "instagram": "@ig_user", ...}
+      - JSON string of dict: '{"tiktok": "@tt_user", ...}'
+      - plain string handle: "@general_user" (applied to all platforms)
+    """
+    if not handle_or_dict:
+        return default_handle
+
+    plat_key = str(platform or "tiktok").lower().replace("-", "_").strip()
+
+    # If passed as dict directly
+    if isinstance(handle_or_dict, dict):
+        cand = (
+            handle_or_dict.get(plat_key) or
+            handle_or_dict.get(plat_key.replace("_shorts", "")) or
+            handle_or_dict.get(plat_key.replace("youtube", "youtube_shorts")) or
+            handle_or_dict.get(plat_key.replace("instagram", "reels")) or
+            handle_or_dict.get("default") or
+            default_handle
+        )
+        return str(cand or "").strip()
+
+    # If passed as string
+    if isinstance(handle_or_dict, str):
+        trimmed = handle_or_dict.strip()
+        if trimmed.startswith("{") and trimmed.endswith("}"):
+            try:
+                import json
+                parsed = json.loads(trimmed)
+                if isinstance(parsed, dict):
+                    return get_handle_for_platform(platform, parsed, default_handle)
+            except Exception:
+                pass
+        return trimmed
+
+    return default_handle
+
+
 # ─── Font Resolution ─────────────────────────────────────────────────────────
 
 FONT_CANDIDATES = [
@@ -93,15 +148,17 @@ def draw_tiktok_icon(draw: ImageDraw.ImageDraw, x: int, y: int, size: int) -> in
     cx, cy = x + r, y + r
     draw.ellipse([(x, y), (x + size, y + size)], fill=(16, 18, 24, 255), outline=(255, 255, 255, 45), width=1)
     
+    s = max(0.5, size / 28.0)
     def draw_note(offset_x, offset_y, color):
         ox, oy = cx + offset_x, cy + offset_y
-        draw.rectangle([(ox + 1, oy - 12), (ox + 5, oy + 4)], fill=color)
-        draw.polygon([(ox + 5, oy - 12), (ox + 13, oy - 8), (ox + 13, oy - 4), (ox + 5, oy - 8)], fill=color)
-        draw.ellipse([(ox - 8, oy + 1), (ox + 3, oy + 11)], fill=color)
+        draw.rectangle([(ox + max(1, int(1 * s)), oy - int(12 * s)), (ox + max(2, int(5 * s)), oy + int(4 * s))], fill=color)
+        draw.polygon([(ox + max(2, int(5 * s)), oy - int(12 * s)), (ox + int(13 * s), oy - int(8 * s)), (ox + int(13 * s), oy - int(4 * s)), (ox + max(2, int(5 * s)), oy - int(8 * s))], fill=color)
+        draw.ellipse([(ox - int(8 * s), oy + max(1, int(1 * s))), (ox + max(1, int(3 * s)), oy + int(11 * s))], fill=color)
 
-    draw_note(-2, 0, (0, 242, 254, 230))  # Cyan glow
-    draw_note(2, 0, (254, 44, 85, 230))   # TikTok red/pink
-    draw_note(0, 0, (255, 255, 255, 255)) # White foreground
+    c_off = max(1, int(round(2 * s)))
+    draw_note(-c_off, 0, (0, 242, 254, 230))  # Cyan glow
+    draw_note(c_off, 0, (254, 44, 85, 230))   # TikTok red/pink
+    draw_note(0, 0, (255, 255, 255, 255))     # White foreground
     return size
 
 def draw_instagram_icon(canvas: Image.Image, x: int, y: int, size: int) -> int:
@@ -315,7 +372,14 @@ def render_cta_card(
     """
     font_main = _get_font(28, bold=True)
     clean_h = handle.strip()
-    display_handle = clean_h if clean_h.startswith("@") else f"@{clean_h}" if clean_h else "@Channel"
+    if _is_valid_handle(clean_h):
+        display_handle = clean_h if clean_h.startswith("@") else f"@{clean_h}"
+    else:
+        brand_names = {
+            "youtube": "YouTube", "youtube_shorts": "YouTube",
+            "tiktok": "TikTok", "instagram": "Instagram", "facebook": "Facebook"
+        }
+        display_handle = brand_names.get(str(platform or "").lower().replace("-", "_"), "Creator")
 
     icon_size = 50
     card_h = 104
@@ -422,7 +486,7 @@ def render_cta_card(
 
 
 def render_handle_watermark(
-    platform: str = "facebook",
+    platform: str = "tiktok",
     handle: str = "",
     opacity: float = 0.55,
     font_size: int = 24
@@ -432,8 +496,16 @@ def render_handle_watermark(
     Only displays the platform icon and @handle with translucent opacity.
     No action/follow button or opaque card box.
     """
+    plat_key = str(platform or "tiktok").lower().replace("-", "_").strip()
     clean_h = handle.strip()
-    display_handle = clean_h if clean_h.startswith("@") else f"@{clean_h}" if clean_h else "@Channel"
+    if _is_valid_handle(clean_h):
+        display_handle = clean_h if clean_h.startswith("@") else f"@{clean_h}"
+    else:
+        brand_names = {
+            "youtube": "YouTube", "youtube_shorts": "YouTube",
+            "tiktok": "TikTok", "instagram": "Instagram", "facebook": "Facebook"
+        }
+        display_handle = brand_names.get(plat_key, "TikTok")
 
     font = _get_font(font_size, bold=True)
     icon_size = font_size + 4
@@ -444,9 +516,10 @@ def render_handle_watermark(
     tw = bbox[2] - bbox[0]
     th = bbox[3] - bbox[1]
 
+    icon_w = int(icon_size * 1.36) if plat_key in ("youtube", "youtube_shorts") else icon_size
     pad_x = 14
     pad_y = 7
-    w = pad_x * 2 + icon_size + 8 + tw
+    w = pad_x * 2 + icon_w + 8 + tw
     h = max(icon_size, th) + pad_y * 2
 
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -465,19 +538,19 @@ def render_handle_watermark(
 
     # Platform Icon
     icon_y = (h - icon_size) // 2
-    if platform == "facebook":
-        draw_facebook_icon(draw, pad_x, icon_y, icon_size)
-    elif platform in ("youtube", "youtube_shorts"):
+    if plat_key in ("youtube", "youtube_shorts"):
         draw_youtube_icon(draw, pad_x, icon_y, icon_size)
-    elif platform == "tiktok":
+    elif plat_key == "tiktok":
         draw_tiktok_icon(draw, pad_x, icon_y, icon_size)
-    elif platform == "instagram":
+    elif plat_key == "instagram":
         draw_instagram_icon(img, pad_x, icon_y, icon_size)
-    else:
+    elif plat_key == "facebook":
         draw_facebook_icon(draw, pad_x, icon_y, icon_size)
+    else:
+        draw_tiktok_icon(draw, pad_x, icon_y, icon_size)
 
     # Handle text with soft shadow for legibility on light backgrounds
-    tx = pad_x + icon_size + 8
+    tx = pad_x + icon_w + 8
     ty = (h - th) // 2 - 2
     draw.text((tx + 1, ty + 1), display_handle, font=font, fill=(0, 0, 0, int(180 * opacity)))
     draw.text((tx, ty), display_handle, font=font, fill=(255, 255, 255, int(230 * opacity)))
@@ -491,7 +564,7 @@ def render_handle_watermark(
 # ─── Static Watermark Badge Generator ────────────────────────────────────────
 
 def generate_watermark_canvas(
-    platform: str = "facebook",
+    platform: str = "tiktok",
     handle: str = "",
     style: str = "pill",
     video_width: int = 1080,
@@ -516,27 +589,63 @@ def generate_watermark_canvas(
         widget = widget.resize((ww, wh), Image.BILINEAR)
 
     pos = str(position or "lower_middle").lower().replace("-", "_")
-    if pos in ("lower_middle", "lower_center"):
-        target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.44)
-    elif pos == "lower_third":
-        target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.58)
-    elif pos == "center":
-        target_x = (video_width - ww) // 2
-        target_y = (video_height - wh) // 2
-    elif pos == "bottom_center":
-        target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.78)
-    elif pos == "bottom_left":
-        target_x = int(video_width * 0.08)
-        target_y = int(video_height * 0.44)
-    elif pos == "bottom_right":
-        target_x = video_width - ww - int(video_width * 0.08)
-        target_y = int(video_height * 0.44)
+    is_vertical = video_height > video_width
+    if is_vertical:
+        if pos in ("lower_middle", "lower_center"):
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.72)
+        elif pos == "lower_third":
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.65)
+        elif pos == "center":
+            target_x = (video_width - ww) // 2
+            target_y = (video_height - wh) // 2
+        elif pos == "bottom_center":
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.82)
+        elif pos == "bottom_left":
+            target_x = int(video_width * 0.06)
+            target_y = int(video_height * 0.82)
+        elif pos == "bottom_right":
+            target_x = video_width - ww - int(video_width * 0.06)
+            target_y = int(video_height * 0.82)
+        elif pos == "top_left":
+            target_x = int(video_width * 0.06)
+            target_y = int(video_height * 0.08)
+        elif pos == "top_right":
+            target_x = video_width - ww - int(video_width * 0.06)
+            target_y = int(video_height * 0.08)
+        else:
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.72)
     else:
-        target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.44)
+        if pos in ("lower_middle", "lower_center"):
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.80)
+        elif pos == "lower_third":
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.68)
+        elif pos == "center":
+            target_x = (video_width - ww) // 2
+            target_y = (video_height - wh) // 2
+        elif pos == "bottom_center":
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.84)
+        elif pos == "bottom_left":
+            target_x = int(video_width * 0.04)
+            target_y = int(video_height * 0.84)
+        elif pos == "bottom_right":
+            target_x = video_width - ww - int(video_width * 0.04)
+            target_y = int(video_height * 0.84)
+        elif pos == "top_left":
+            target_x = int(video_width * 0.04)
+            target_y = int(video_height * 0.06)
+        elif pos == "top_right":
+            target_x = video_width - ww - int(video_width * 0.04)
+            target_y = int(video_height * 0.06)
+        else:
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.80)
 
     canvas = Image.new("RGBA", (video_width, video_height), (0, 0, 0, 0))
     canvas.alpha_composite(widget, (target_x, target_y))
@@ -606,27 +715,63 @@ def build_cta_animation_clip(
 
     # Determine target (x, y) coordinates based on position
     pos = str(position or "lower_middle").lower().replace("-", "_")
-    if pos in ("lower_middle", "lower_center"):
-        target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.44)
-    elif pos == "lower_third":
-        target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.58)
-    elif pos == "center":
-        target_x = (video_width - ww) // 2
-        target_y = (video_height - wh) // 2
-    elif pos == "bottom_center":
-        target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.78)
-    elif pos == "bottom_left":
-        target_x = int(video_width * 0.08)
-        target_y = int(video_height * 0.44)
-    elif pos == "bottom_right":
-        target_x = video_width - ww - int(video_width * 0.08)
-        target_y = int(video_height * 0.44)
+    is_vertical = video_height > video_width
+    if is_vertical:
+        if pos in ("lower_middle", "lower_center"):
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.72)
+        elif pos == "lower_third":
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.65)
+        elif pos == "center":
+            target_x = (video_width - ww) // 2
+            target_y = (video_height - wh) // 2
+        elif pos == "bottom_center":
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.82)
+        elif pos == "bottom_left":
+            target_x = int(video_width * 0.06)
+            target_y = int(video_height * 0.82)
+        elif pos == "bottom_right":
+            target_x = video_width - ww - int(video_width * 0.06)
+            target_y = int(video_height * 0.82)
+        elif pos == "top_left":
+            target_x = int(video_width * 0.06)
+            target_y = int(video_height * 0.08)
+        elif pos == "top_right":
+            target_x = video_width - ww - int(video_width * 0.06)
+            target_y = int(video_height * 0.08)
+        else:
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.72)
     else:
-        target_x = (video_width - ww) // 2
-        target_y = int(video_height * 0.44)
+        if pos in ("lower_middle", "lower_center"):
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.80)
+        elif pos == "lower_third":
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.68)
+        elif pos == "center":
+            target_x = (video_width - ww) // 2
+            target_y = (video_height - wh) // 2
+        elif pos == "bottom_center":
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.84)
+        elif pos == "bottom_left":
+            target_x = int(video_width * 0.04)
+            target_y = int(video_height * 0.84)
+        elif pos == "bottom_right":
+            target_x = video_width - ww - int(video_width * 0.04)
+            target_y = int(video_height * 0.84)
+        elif pos == "top_left":
+            target_x = int(video_width * 0.04)
+            target_y = int(video_height * 0.06)
+        elif pos == "top_right":
+            target_x = video_width - ww - int(video_width * 0.04)
+            target_y = int(video_height * 0.06)
+        else:
+            target_x = (video_width - ww) // 2
+            target_y = int(video_height * 0.80)
 
     btn_offset = int((50 if not is_card else 90) * (ww / 600.0))
     cursor_target_x = target_x + ww - max(30, btn_offset)
@@ -772,7 +917,7 @@ def build_cta_filter(
 
     font_arg = f":fontfile='{font}'" if font else ""
     filters = []
-    if watermark and t0 > 0:
+    if watermark and _is_valid_handle(clean_h) and t0 > 0:
         filters.append(f"drawbox=x='{bx}':y='{by}':w='{btn_w}':h='{btn_h}':color={color}:t=fill:enable='between(t,0,{t0})'")
         filters.append(f"drawtext=text='{action}':fontsize=32{font_arg}:fontcolor=white:x='({bx})+({btn_w}/2-tw/2)':y='({by})+({btn_h}/2-th/2)':enable='between(t,0,{t0})'")
 
@@ -850,7 +995,7 @@ def apply_cta_overlay(
 
     # Normalize style: pill or card
     chosen_style = "card" if style in ("card", "badge") else "pill"
-    is_wm = watermark and (t_start > 0.1)
+    is_wm = watermark and _is_valid_handle(handle) and (t_start > 0.1)
 
     # Build or fetch transparent animated overlay MOV
     # as_watermark=False ensures full CTA widget slides in cleanly at t_start
@@ -1040,6 +1185,7 @@ def generate_multiplatform_cta_overlays(
     output_dir: Path,
     stem_prefix: str = "clip",
     handle: str = "",
+    platform_handles: Optional[Union[Dict[str, str], str]] = None,
     base_style: str = "pill",
     position: str = "lower_center",
     start_time: Optional[float] = None,
@@ -1054,6 +1200,7 @@ def generate_multiplatform_cta_overlays(
       3. YouTube Shorts (Official play button + Subscribe -> Subscribed ✓ + Bell)
       4. Facebook (Official circle 'f' + Royal Blue Follow -> Following ✓)
     
+    Each platform receives its platform-specific watermark icon, layout, and handle.
     Also generates/links the primary clip_cta.mp4 for default serving.
     """
     input_path = Path(input_path)
@@ -1092,18 +1239,24 @@ def generate_multiplatform_cta_overlays(
     results = {}
 
     def process_platform(plat: str) -> Tuple[str, Optional[str]]:
+        plat_handle = get_handle_for_platform(
+            plat,
+            platform_handles or handle,
+            default_handle=handle if isinstance(handle, str) else ""
+        )
         out_file = output_dir / f"{stem_prefix}_{plat}.mp4"
         success = apply_cta_overlay(
             input_path=input_path,
             output_path=out_file,
             platform=plat,
-            handle=handle,
+            handle=plat_handle,
             style=base_style,
             position=position,
             start_time=start_time,
             video_width=w,
             video_height=h,
-            video_duration=duration
+            video_duration=duration,
+            watermark=_is_valid_handle(plat_handle)
         )
         if success and out_file.exists() and out_file.stat().st_size > 0:
             return plat, str(out_file)

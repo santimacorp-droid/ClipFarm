@@ -65,8 +65,8 @@ def run_campaign_pipeline(campaign_id: str, schema_dict: dict, db_session=None) 
                     s_data = {}
                 s_data["status_message"] = msg or status.replace("_", " ").title()
                 camp.schema_json = json.dumps(s_data, ensure_ascii=False)
-                from datetime import datetime
-                camp.updated_at = datetime.utcnow()
+                from datetime import datetime, timezone
+                camp.updated_at = datetime.now(timezone.utc)
                 session.commit()
             logger.info(f"Campaign {campaign_id} status: {status} ({msg})")
         except Exception as err:

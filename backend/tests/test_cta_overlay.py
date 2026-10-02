@@ -93,3 +93,33 @@ def test_generate_multiplatform_cta_overlays():
         default_cta = out_dir / "highlight_cta.mp4"
         assert default_cta.exists()
 
+
+def test_is_valid_handle():
+    from backend.utils.cta_overlay import _is_valid_handle
+    assert not _is_valid_handle("")
+    assert not _is_valid_handle("   ")
+    assert not _is_valid_handle("@Channel")
+    assert not _is_valid_handle("channel")
+    assert not _is_valid_handle("nohandle")
+    assert not _is_valid_handle("@nohandle")
+    assert not _is_valid_handle("none")
+    assert _is_valid_handle("@santima")
+    assert _is_valid_handle("tech_insider")
+
+
+def test_watermark_safe_positioning_not_over_face():
+    from backend.utils.cta_overlay import generate_watermark_canvas
+    # Vertical 9:16 (1080x1920)
+    canvas = generate_watermark_canvas(
+        platform="tiktok",
+        handle="@mychannel",
+        video_width=1080,
+        video_height=1920,
+        position="lower_middle"
+    )
+    assert canvas.size == (1080, 1920)
+    # The canvas bbox should be in the lower region (y > 1100, never near 844/face)
+    bbox = canvas.getbbox()
+    assert bbox is not None
+    assert bbox[1] >= 1200, f"Watermark bbox top ({bbox[1]}) is too high/near face (expected >= 1200)"
+

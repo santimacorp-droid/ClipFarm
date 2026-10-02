@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, Union
 from dataclasses import dataclass, field
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from enum import Enum
 
 from . import path_utils
@@ -294,13 +294,15 @@ class Settings(BaseModel):
     speech_recognition_model: str = "small"
     speech_recognition_timeout: int = 1000
     
-    @validator('min_score_threshold')
+    @field_validator('min_score_threshold')
+    @classmethod
     def validate_score_threshold(cls, v):
         if not 0 <= v <= 1:
             raise ValueError('Score threshold must be between 0 and 1')
         return v
     
-    @validator('chunk_size')
+    @field_validator('chunk_size')
+    @classmethod
     def validate_chunk_size(cls, v):
         if v <= 0:
             raise ValueError('Chunk size must be greater than 0')

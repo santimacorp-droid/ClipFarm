@@ -8,7 +8,7 @@ import os
 import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, Union
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from . import path_utils
@@ -39,13 +39,15 @@ class APIConfig(BaseModel):
     timeout: int = Field(default=30, description="APITimeout")
     max_retries: int = Field(default=3, description="Maximum retry count")
     
-    @validator('max_tokens')
+    @field_validator('max_tokens')
+    @classmethod
     def validate_max_tokens(cls, v):
         if v <= 0:
             raise ValueError('max_tokensMust be greater than0')
         return v
     
-    @validator('timeout')
+    @field_validator('timeout')
+    @classmethod
     def validate_timeout(cls, v):
         if v <= 0:
             raise ValueError('timeoutMust be greater than0')
@@ -67,13 +69,15 @@ class ProcessingConfig(BaseModel):
     min_topics_per_chunk: int = Field(default=3, description="Minimum number of topics per chunk")
     max_topics_per_chunk: int = Field(default=8, description="Maximum number of topics per chunk")
     
-    @validator('min_score_threshold')
+    @field_validator('min_score_threshold')
+    @classmethod
     def validate_score_threshold(cls, v):
         if not 0 <= v <= 1:
             raise ValueError('Score threshold must be between 0 and 1')
         return v
     
-    @validator('chunk_size')
+    @field_validator('chunk_size')
+    @classmethod
     def validate_chunk_size(cls, v):
         if v <= 0:
             raise ValueError('Chunk size must be greater than0')

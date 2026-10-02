@@ -147,6 +147,7 @@ export interface UploadFilesRequest {
   watermark_text?: string
   watermark_text_opacity?: number
   watermark_text_position?: string
+  platform_handles?: Record<string, string>
 }
 
 export interface WatermarkPreset {
@@ -213,6 +214,10 @@ export interface BilibiliDownloadRequest {
   aspect_ratio?: string
   show_hook_banner?: boolean
   watermark_preset_id?: string
+  watermark_text?: string
+  watermark_text_opacity?: number
+  watermark_text_position?: string
+  platform_handles?: Record<string, string>
 }
 
 export interface BilibiliDownloadTask {
@@ -393,6 +398,9 @@ export const projectApi = {
     if (data.watermark_text_position) {
       formData.append('watermark_text_position', data.watermark_text_position)
     }
+    if (data.platform_handles) {
+      formData.append('platform_handles', JSON.stringify(data.platform_handles))
+    }
     
     try {
       const project = await api.post<unknown, Project>('/projects/upload', formData, {
@@ -436,6 +444,7 @@ export const projectApi = {
     watermark_text?: string
     watermark_text_opacity?: number
     watermark_text_position?: string
+    platform_handles?: Record<string, string>
   }): Promise<Project> => {
     try {
       const project = await api.post<unknown, Project>('/projects/import-local', data)

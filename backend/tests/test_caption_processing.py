@@ -572,4 +572,32 @@ def test_extract_clip_snapping_bypassed_when_subtitles_present(monkeypatch):
         assert len(called_snap) == 1, "Boundary snapping should be called when no ass_path and snap_boundaries=True!"
 
 
+def test_split_segment_by_silence():
+    from backend.utils.caption_styles import _split_segment_by_silence
+    seg = {
+        'start': 0.0,
+        'end': 10.0,
+        'text': "First thought here, and second thought continues"
+    }
+    # 2-second silence between 4.0 and 6.0
+    silences = [(4.0, 6.0)]
+    sub_segs = _split_segment_by_silence(seg, silences, min_pause=0.5)
+    assert len(sub_segs) == 2, f"Expected 2 sub-segments, got {len(sub_segs)}"
+    assert sub_segs[0]['start'] == 0.0
+    assert sub_segs[0]['end'] == 4.0
+    assert "First thought here," in sub_segs[0]['text']
+    assert sub_segs[1]['start'] == 6.0
+    assert sub_segs[1]['end'] == 10.0
+    assert "second thought continues" in sub_segs[1]['text']
+
+
+def test_pick_focal_keyword_index():
+    from backend.utils.caption_styles import _pick_focal_keyword_index
+    idx = _pick_focal_keyword_index(["THE", "TOOLS"])
+    assert idx == 1  # "TOOLS" is content word, "THE" is stopword
+
+    idx2 = _pick_focal_keyword_index(["WE'RE", "STRUGGLING", "TO", "CONNECT"])
+    assert idx2 == 1  # "STRUGGLING" is longest emphatic word
+
+
 

@@ -336,6 +336,18 @@ async def download_clip(
 
     if platform:
         plat_key = str(platform).lower().replace("-", "_").strip()
+        PLATFORM_ALIASES = {
+            "youtube": "youtube_shorts",
+            "yt": "youtube_shorts",
+            "shorts": "youtube_shorts",
+            "yt_shorts": "youtube_shorts",
+            "ig": "instagram",
+            "insta": "instagram",
+            "reels": "instagram",
+            "fb": "facebook",
+            "tt": "tiktok",
+        }
+        plat_key = PLATFORM_ALIASES.get(plat_key, plat_key)
         cta_plats = metadata.get("cta_platforms") or metadata.get("platform_videos") or {}
         if isinstance(cta_plats, dict) and plat_key in cta_plats:
             cand = cta_plats[plat_key]

@@ -19,6 +19,7 @@ import { projectApi, watermarkApi, youtubeApi, VideoCategory, WatermarkPreset, B
 import { useProjectStore } from '../store/useProjectStore'
 import { validateApiConfig, checkApiConfig, ApiConfigStatus } from '../utils/apiConfigCheck'
 import { useApiModalStore } from '../store/useApiModalStore'
+import { getLocalPlatformHandles, saveLocalPlatformHandles, LocalPlatformHandles } from '../utils/localCredentials'
 
 const { Text } = Typography
 
@@ -45,6 +46,22 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
   const [watermarkText, setWatermarkText] = useState<string>('')
   const [watermarkTextOpacity, setWatermarkTextOpacity] = useState<number>(50)
   const [watermarkTextPosition, setWatermarkTextPosition] = useState<string>('lower_center')
+  const [platformHandles, setPlatformHandles] = useState<LocalPlatformHandles>(() => getLocalPlatformHandles())
+  const [showPlatformHandles, setShowPlatformHandles] = useState<boolean>(false)
+
+  const getEffectivePlatformHandles = (): Record<string, string> | undefined => {
+    const handles: Record<string, string> = {}
+    const def = watermarkText.trim()
+    const tt = platformHandles.tiktok?.trim() || def
+    const yt = platformHandles.youtube_shorts?.trim() || def
+    const ig = platformHandles.instagram?.trim() || def
+    const fb = platformHandles.facebook?.trim() || def
+    if (tt) handles.tiktok = tt
+    if (yt) handles.youtube_shorts = yt
+    if (ig) handles.instagram = ig
+    if (fb) handles.facebook = fb
+    return Object.keys(handles).length > 0 ? handles : undefined
+  }
   const [categories, setCategories] = useState<VideoCategory[]>([])
   const [, setLoadingCategories] = useState(false)
   const [files, setFiles] = useState<{
@@ -67,6 +84,15 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
 
   useEffect(() => {
     refreshApiStatus()
+
+    const handleCredsUpdate = () => {
+      refreshApiStatus()
+    }
+
+    window.addEventListener('clipfarm_credentials_updated', handleCredsUpdate)
+    return () => {
+      window.removeEventListener('clipfarm_credentials_updated', handleCredsUpdate)
+    }
   }, [])
 
   // Load video category & watermark preset configuration
@@ -141,8 +167,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
 
     setUploading(true)
     setUploadProgress(0)
-    
+
     try {
+      const effHandles = getEffectivePlatformHandles()
+      if (effHandles) {
+        saveLocalPlatformHandles(platformHandles)
+      }
+
       const newProject = await projectApi.uploadFiles({
         video_file: files.video,
         srt_file: files.srt,
@@ -156,6 +187,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         watermark_text: watermarkText.trim() || undefined,
         watermark_text_opacity: watermarkText.trim() ? watermarkTextOpacity / 100 : undefined,
         watermark_text_position: watermarkTextPosition,
+        platform_handles: effHandles,
       }, (percent) => {
         setUploadProgress(percent)
       })
@@ -308,6 +340,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
   const executeUrlDownload = async (trimmedUrl: string, effectiveProjectName: string) => {
     setSubmittingUrl(true)
     try {
+      const effHandles = getEffectivePlatformHandles()
+      if (effHandles) {
+        saveLocalPlatformHandles(platformHandles)
+      }
+
       const res = await youtubeApi.createDownloadTask({
         url: trimmedUrl,
         project_name: effectiveProjectName,
@@ -317,6 +354,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         aspect_ratio: selectedAspectRatio,
         show_hook_banner: showHookBanner,
         watermark_preset_id: selectedWatermarkPreset,
+        watermark_text: watermarkText.trim() || undefined,
+        watermark_text_opacity: watermarkText.trim() ? watermarkTextOpacity / 100 : undefined,
+        watermark_text_position: watermarkTextPosition,
+        platform_handles: effHandles,
       })
 
       const projId = (res as any).project_id || res.id
@@ -1017,22 +1058,39 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
       {/* Social Handle / Text Watermark - Display when media is selected */}
       {hasMediaSelected && (
         <div style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
             <Text strong style={{ color: '#ffffff', fontSize: '14px' }}>
-              Social Handle / Text Watermark
+              Creator Social Handle & Platform Watermarks
             </Text>
-            {watermarkText.trim() && (
-              <span style={{
-                fontSize: '12px',
-                padding: '2px 8px',
-                borderRadius: '4px',
-                background: 'rgba(255, 255, 255, 0.1)',
-                color: `rgba(255, 255, 255, ${Math.max(0.4, watermarkTextOpacity / 100)})`,
-                letterSpacing: '0.5px'
-              }}>
-                Preview: {watermarkText} ({watermarkTextOpacity}%)
-              </span>
-            )}
+            {/* Live platform preview chips */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {[
+                { key: 'tiktok', name: 'TikTok', icon: '🎵', color: '#00f2fe', val: platformHandles.tiktok || watermarkText },
+                { key: 'youtube_shorts', name: 'Shorts', icon: '▶️', color: '#ff4d4f', val: platformHandles.youtube_shorts || watermarkText },
+                { key: 'instagram', name: 'Instagram', icon: '📸', color: '#f759ab', val: platformHandles.instagram || watermarkText },
+                { key: 'facebook', name: 'Facebook', icon: '👥', color: '#1890ff', val: platformHandles.facebook || watermarkText },
+              ].map(p => (
+                <span
+                  key={p.key}
+                  style={{
+                    fontSize: '11px',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    border: `1px solid ${p.color}40`,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <span>{p.icon}</span>
+                  <span style={{ color: p.color, fontWeight: 600 }}>{p.name}:</span>
+                  <span style={{ color: p.val?.trim() ? '#ffffff' : 'rgba(255, 255, 255, 0.4)' }}>
+                    {p.val?.trim() ? (p.val.startsWith('@') ? p.val : `@${p.val}`) : 'auto'}
+                  </span>
+                </span>
+              ))}
+            </div>
           </div>
           <div style={{
             padding: '12px 16px',
@@ -1043,54 +1101,157 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
             flexDirection: 'column',
             gap: '12px'
           }}>
+            {/* Universal handle input & position selector */}
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <Input
-                placeholder="e.g. @yourhandle or channel name (optional)"
-                value={watermarkText}
-                onChange={e => setWatermarkText(e.target.value)}
-                style={{
-                  flex: '1 1 240px',
-                  background: 'rgba(0, 0, 0, 0.3)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: '#ffffff',
-                  borderRadius: '6px'
-                }}
-                maxLength={40}
-              />
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {[
-                  { value: 'lower_center', label: 'Lower Center' },
-                  { value: 'bottom_center', label: 'Bottom' },
-                  { value: 'bottom_right', label: 'Bottom Right' },
-                  { value: 'top_right', label: 'Top Right' },
-                ].map(pos => {
-                  const isPosActive = watermarkTextPosition === pos.value
-                  return (
-                    <div
-                      key={pos.value}
-                      onClick={() => setWatermarkTextPosition(pos.value)}
-                      style={{
-                        fontSize: '11px',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        border: isPosActive ? '1px solid #1890ff' : '1px solid rgba(255, 255, 255, 0.15)',
-                        background: isPosActive ? '#1890ff30' : 'transparent',
-                        color: isPosActive ? '#ffffff' : 'rgba(255, 255, 255, 0.65)',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      {pos.label}
-                    </div>
-                  )
-                })}
+              <div style={{ flex: '1 1 240px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.65)' }}>
+                  Universal Default Handle (applied to all platforms unless overridden):
+                </span>
+                <Input
+                  placeholder="e.g. @yourcreatorname (optional)"
+                  value={watermarkText}
+                  onChange={e => setWatermarkText(e.target.value)}
+                  style={{
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#ffffff',
+                    borderRadius: '6px'
+                  }}
+                  maxLength={40}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.65)' }}>
+                  Overlay Position:
+                </span>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {[
+                    { value: 'lower_center', label: 'Lower Center' },
+                    { value: 'bottom_center', label: 'Bottom' },
+                    { value: 'bottom_right', label: 'Bottom Right' },
+                    { value: 'top_right', label: 'Top Right' },
+                  ].map(pos => {
+                    const isPosActive = watermarkTextPosition === pos.value
+                    return (
+                      <div
+                        key={pos.value}
+                        onClick={() => setWatermarkTextPosition(pos.value)}
+                        style={{
+                          fontSize: '11px',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          border: isPosActive ? '1px solid #1890ff' : '1px solid rgba(255, 255, 255, 0.15)',
+                          background: isPosActive ? '#1890ff30' : 'transparent',
+                          color: isPosActive ? '#ffffff' : 'rgba(255, 255, 255, 0.65)',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {pos.label}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             </div>
 
-            {watermarkText.trim() && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            {/* Toggle for Platform-Specific Handles */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px' }}>
+              <Button
+                type="dashed"
+                size="small"
+                onClick={() => setShowPlatformHandles(!showPlatformHandles)}
+                style={{
+                  fontSize: '12px',
+                  background: showPlatformHandles ? 'rgba(24, 144, 255, 0.15)' : 'transparent',
+                  borderColor: showPlatformHandles ? '#1890ff' : 'rgba(255, 255, 255, 0.2)',
+                  color: showPlatformHandles ? '#40a9ff' : 'rgba(255, 255, 255, 0.85)'
+                }}
+              >
+                {showPlatformHandles ? '▲ Hide Platform-Specific Handles' : '▼ Different Handles per Platform? (TikTok, YouTube, Instagram, Facebook)'}
+              </Button>
+              {showPlatformHandles && (
+                <Button
+                  size="small"
+                  type="link"
+                  onClick={() => {
+                    saveLocalPlatformHandles(platformHandles)
+                    message.success('Platform handles saved as default!')
+                  }}
+                  style={{ fontSize: '11px', color: '#52c41a' }}
+                >
+                  💾 Save as Default
+                </Button>
+              )}
+            </div>
+
+            {/* Platform-Specific Handles Inputs */}
+            {showPlatformHandles && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '10px',
+                padding: '10px',
+                background: 'rgba(0, 0, 0, 0.25)',
+                borderRadius: '6px',
+                border: '1px solid rgba(255, 255, 255, 0.08)'
+              }}>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#00f2fe', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                    🎵 TikTok Handle:
+                  </span>
+                  <Input
+                    placeholder={watermarkText ? `@${watermarkText.replace(/^@/, '')}` : 'e.g. @tiktok_user'}
+                    value={platformHandles.tiktok || ''}
+                    onChange={e => setPlatformHandles(prev => ({ ...prev, tiktok: e.target.value }))}
+                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,242,254,0.3)', color: '#fff', fontSize: '12px' }}
+                    maxLength={40}
+                  />
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#ff4d4f', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                    ▶️ YouTube Shorts:
+                  </span>
+                  <Input
+                    placeholder={watermarkText ? `@${watermarkText.replace(/^@/, '')}` : 'e.g. @yt_channel'}
+                    value={platformHandles.youtube_shorts || ''}
+                    onChange={e => setPlatformHandles(prev => ({ ...prev, youtube_shorts: e.target.value }))}
+                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,77,79,0.3)', color: '#fff', fontSize: '12px' }}
+                    maxLength={40}
+                  />
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#f759ab', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                    📸 Instagram:
+                  </span>
+                  <Input
+                    placeholder={watermarkText ? `@${watermarkText.replace(/^@/, '')}` : 'e.g. @insta_page'}
+                    value={platformHandles.instagram || ''}
+                    onChange={e => setPlatformHandles(prev => ({ ...prev, instagram: e.target.value }))}
+                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(247,89,171,0.3)', color: '#fff', fontSize: '12px' }}
+                    maxLength={40}
+                  />
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#1890ff', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                    👥 Facebook:
+                  </span>
+                  <Input
+                    placeholder={watermarkText ? `@${watermarkText.replace(/^@/, '')}` : 'e.g. @facebook_page'}
+                    value={platformHandles.facebook || ''}
+                    onChange={e => setPlatformHandles(prev => ({ ...prev, facebook: e.target.value }))}
+                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(24,144,255,0.3)', color: '#fff', fontSize: '12px' }}
+                    maxLength={40}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Opacity slider for handle watermark */}
+            {(watermarkText.trim() || Object.values(platformHandles).some(v => v?.trim())) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', paddingTop: '4px' }}>
                 <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)', whiteSpace: 'nowrap' }}>
-                  Opacity: {watermarkTextOpacity}%
+                  Overlay Opacity: {watermarkTextOpacity}%
                 </span>
                 <div style={{ flex: 1 }}>
                   <Slider

@@ -80,6 +80,10 @@ class YouTubeDownloadRequest(BaseModel):
     aspect_ratio: Optional[str] = "9:16_blur"
     show_hook_banner: Optional[bool] = True
     watermark_preset_id: Optional[str] = "none"
+    watermark_text: Optional[str] = None
+    watermark_text_opacity: Optional[float] = 0.50
+    watermark_text_position: Optional[str] = "lower_center"
+    platform_handles: Optional[Dict[str, str]] = None
 
 class YouTubeVideoInfo(BaseModel):
     title: str
@@ -273,6 +277,10 @@ async def create_youtube_download_task(request: YouTubeDownloadRequest):
                     "aspect_ratio": request.aspect_ratio or "9:16_blur",
                     "show_hook_banner": True if request.show_hook_banner is None else request.show_hook_banner,
                     "watermark_preset_id": request.watermark_preset_id or "none",
+                    "watermark_text": request.watermark_text,
+                    "watermark_text_opacity": request.watermark_text_opacity,
+                    "watermark_text_position": request.watermark_text_position or "lower_center",
+                    "platform_handles": request.platform_handles,
                     "youtube_info": {
                         "url": request.url,
                         "browser": request.browser,

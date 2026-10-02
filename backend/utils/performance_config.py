@@ -3,7 +3,7 @@ Performance configuration and optimization settings
 Provide system performance configuration and optimization parameters
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Dict, Any
 from enum import Enum
 
@@ -38,13 +38,15 @@ class FileUploadConfig(BaseModel):
         description="Subtitle formats"
     )
     
-    @validator('chunk_size')
+    @field_validator('chunk_size')
+    @classmethod
     def validate_chunk_size(cls, v):
         if v <= 0 or v > 10 * 1024 * 1024:  # Max10MB
             raise ValueError('The chunk size must be between 1 byte and 10 MB')
         return v
     
-    @validator('max_file_size')
+    @field_validator('max_file_size')
+    @classmethod
     def validate_max_file_size(cls, v):
         if v <= 0 or v > 10 * 1024 * 1024 * 1024:  # Max10GB
             raise ValueError('The maximum file size must be between 1 byte and 10 GB')
@@ -70,7 +72,8 @@ class ProcessingConfig(BaseModel):
     batch_size: int = Field(default=10, description="Batch size")
     batch_timeout: int = Field(default=600, description="Batch timeout (seconds))")  # 10Minutes
     
-    @validator('max_concurrent_tasks')
+    @field_validator('max_concurrent_tasks')
+    @classmethod
     def validate_max_concurrent_tasks(cls, v):
         if v <= 0 or v > 10:
             raise ValueError('The maximum concurrent task count must be between 1 and 10')
@@ -105,7 +108,8 @@ class DatabaseConfig(BaseModel):
     query_timeout: int = Field(default=30, description="Query timeout (seconds))")
     enable_query_cache: bool = Field(default=True, description="Enable query caching")
     
-    @validator('pool_size')
+    @field_validator('pool_size')
+    @classmethod
     def validate_pool_size(cls, v):
         if v <= 0 or v > 100:
             raise ValueError('The connection pool size must be between 1 and 100')

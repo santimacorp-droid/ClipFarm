@@ -519,12 +519,27 @@ class PipelineAdapter:
             watermark_scale = 15.0
             watermark_opacity = 0.85
             watermark_margin = 24
+            watermark_text = None
+            watermark_text_opacity = 0.50
+            watermark_text_position = "lower_center"
+            platform_handles = None
 
             if self.project:
                 cfg = self.project.processing_config or self.project.settings or {}
                 caption_style = cfg.get("caption_style", "hormozi_yellow")
                 show_hook_banner = cfg.get("show_hook_banner", True)
                 aspect_ratio = cfg.get("aspect_ratio", "9:16_blur")
+                if cfg.get("platform_handles"):
+                    platform_handles = cfg["platform_handles"]
+                if cfg.get("watermark_text"):
+                    watermark_text = cfg["watermark_text"]
+                if cfg.get("watermark_text_opacity") is not None:
+                    try:
+                        watermark_text_opacity = float(cfg["watermark_text_opacity"])
+                    except (ValueError, TypeError):
+                        watermark_text_opacity = 0.50
+                if cfg.get("watermark_text_position"):
+                    watermark_text_position = cfg["watermark_text_position"]
                 
                 # Resolve watermark preset
                 wm_preset_id = cfg.get("watermark_preset_id")
@@ -565,6 +580,10 @@ class PipelineAdapter:
                 watermark_scale=watermark_scale,
                 watermark_opacity=watermark_opacity,
                 watermark_margin=watermark_margin,
+                watermark_text=watermark_text,
+                watermark_text_opacity=watermark_text_opacity,
+                watermark_text_position=watermark_text_position,
+                platform_handles=platform_handles,
                 aspect_ratio=aspect_ratio
             )
             

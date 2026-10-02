@@ -1,8 +1,11 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from .base import Base
+
+def _utcnow():
+    return datetime.now(timezone.utc)
 
 class Campaign(Base):
     __tablename__ = "campaigns"
@@ -13,8 +16,8 @@ class Campaign(Base):
     schema_json = Column(Text, nullable=False)   # full CampaignSchema as JSON string
     status      = Column(String, default="draft")
     # status: draft | active | downloading | transcribing | finding_moments | cutting | done | failed
-    created_at  = Column(DateTime, default=datetime.utcnow)
-    updated_at  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at  = Column(DateTime, default=_utcnow)
+    updated_at  = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     clips = relationship("CampaignClip", back_populates="campaign", cascade="all, delete-orphan")
 
@@ -26,6 +29,6 @@ class CampaignClip(Base):
     moment_name     = Column(String)
     clip_data_json  = Column(Text)   # full CampaignClipSchema as JSON string
     status          = Column(String, default="pending")
-    created_at      = Column(DateTime, default=datetime.utcnow)
+    created_at      = Column(DateTime, default=_utcnow)
 
     campaign = relationship("Campaign", back_populates="clips")

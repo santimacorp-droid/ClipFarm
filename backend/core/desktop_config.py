@@ -80,6 +80,15 @@ class DesktopConfig:
         self._openai_api_key = os.getenv("API_OPENAI_API_KEY", "")
         self._gemini_api_key = os.getenv("API_GEMINI_API_KEY", "")
         self._siliconflow_api_key = os.getenv("API_SILICONFLOW_API_KEY", "")
+        self._anthropic_api_key = os.getenv("API_ANTHROPIC_API_KEY", "")
+        self._deepseek_api_key = os.getenv("API_DEEPSEEK_API_KEY", "")
+        self._openrouter_api_key = os.getenv("API_OPENROUTER_API_KEY", "")
+        self._groq_api_key = os.getenv("API_GROQ_API_KEY", "")
+        self._custom_api_key = os.getenv("API_CUSTOM_API_KEY", "")
+        self._ollama_api_key = os.getenv("API_OLLAMA_API_KEY", "")
+        self._lmstudio_api_key = os.getenv("API_LMSTUDIO_API_KEY", "")
+        self._llm_provider = os.getenv("CLIPFARM_LLM_PROVIDER", "dashscope")
+        self._custom_base_url = os.getenv("CLIPFARM_CUSTOM_BASE_URL", "")
         self._jimeng_access_key = os.getenv("API_JIMENG_ACCESS_KEY", "")
         self._jimeng_secret_key = os.getenv("API_JIMENG_SECRET_KEY", "")
         self._max_memory_usage = int(os.getenv("CLIPFARM_MAX_MEMORY_USAGE") or os.getenv("AUTOCLIP_MAX_MEMORY_USAGE", "2048"))
@@ -242,6 +251,78 @@ class DesktopConfig:
     @siliconflow_api_key.setter
     def siliconflow_api_key(self, value: str) -> None:
         self._siliconflow_api_key = value
+
+    @property
+    def anthropic_api_key(self) -> str:
+        return self._anthropic_api_key
+
+    @anthropic_api_key.setter
+    def anthropic_api_key(self, value: str) -> None:
+        self._anthropic_api_key = value
+
+    @property
+    def deepseek_api_key(self) -> str:
+        return self._deepseek_api_key
+
+    @deepseek_api_key.setter
+    def deepseek_api_key(self, value: str) -> None:
+        self._deepseek_api_key = value
+
+    @property
+    def openrouter_api_key(self) -> str:
+        return self._openrouter_api_key
+
+    @openrouter_api_key.setter
+    def openrouter_api_key(self, value: str) -> None:
+        self._openrouter_api_key = value
+
+    @property
+    def groq_api_key(self) -> str:
+        return self._groq_api_key
+
+    @groq_api_key.setter
+    def groq_api_key(self, value: str) -> None:
+        self._groq_api_key = value
+
+    @property
+    def custom_api_key(self) -> str:
+        return self._custom_api_key
+
+    @custom_api_key.setter
+    def custom_api_key(self, value: str) -> None:
+        self._custom_api_key = value
+
+    @property
+    def ollama_api_key(self) -> str:
+        return self._ollama_api_key
+
+    @ollama_api_key.setter
+    def ollama_api_key(self, value: str) -> None:
+        self._ollama_api_key = value
+
+    @property
+    def lmstudio_api_key(self) -> str:
+        return self._lmstudio_api_key
+
+    @lmstudio_api_key.setter
+    def lmstudio_api_key(self, value: str) -> None:
+        self._lmstudio_api_key = value
+
+    @property
+    def llm_provider(self) -> str:
+        return self._llm_provider
+
+    @llm_provider.setter
+    def llm_provider(self, value: str) -> None:
+        self._llm_provider = value
+
+    @property
+    def custom_base_url(self) -> str:
+        return self._custom_base_url
+
+    @custom_base_url.setter
+    def custom_base_url(self, value: str) -> None:
+        self._custom_base_url = value
 
     @property
     def jimeng_access_key(self) -> str:

@@ -602,6 +602,7 @@ class SimplePipelineAdapter:
             cta_platform = getattr(shared_config, 'DEFAULT_CTA_PLATFORM', 'tiktok')
             cta_handle = getattr(shared_config, 'DEFAULT_CTA_HANDLE', '')
             cta_position = getattr(shared_config, 'DEFAULT_CTA_POSITION', 'lower_center')
+            platform_handles = None
             try:
                 from backend.core.database import SessionLocal
                 from backend.services.project_service import ProjectService
@@ -614,6 +615,8 @@ class SimplePipelineAdapter:
                         caption_style = cfg.get("caption_style", "hormozi_yellow")
                         show_hook_banner = cfg.get("show_hook_banner", True)
                         aspect_ratio = cfg.get("aspect_ratio", "9:16_blur")
+                        if cfg.get("platform_handles"):
+                            platform_handles = cfg["platform_handles"]
                         if cfg.get("watermark_text"):
                             watermark_text = cfg["watermark_text"]
                         if cfg.get("watermark_text_opacity") is not None:
@@ -669,6 +672,9 @@ class SimplePipelineAdapter:
                         if not c.get('cta_position') and cta_position:
                             c['cta_position'] = cta_position
                             changed = True
+                        if not c.get('platform_handles') and platform_handles:
+                            c['platform_handles'] = platform_handles
+                            changed = True
                     if changed:
                         with open(titles_file, 'w', encoding='utf-8') as f:
                             json.dump(cur_titles, f, ensure_ascii=False, indent=2)
@@ -698,6 +704,7 @@ class SimplePipelineAdapter:
                 watermark_text=watermark_text,
                 watermark_text_opacity=watermark_text_opacity,
                 watermark_text_position=watermark_text_position,
+                platform_handles=platform_handles,
                 aspect_ratio=aspect_ratio,
                 category=category,
                 tracker=tracker

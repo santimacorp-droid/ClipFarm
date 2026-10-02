@@ -4,7 +4,7 @@ projectAPIrouting
 
 import logging
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -55,6 +55,7 @@ async def upload_files(
     watermark_text: Optional[str] = Form(None),
     watermark_text_opacity: Optional[float] = Form(0.50),
     watermark_text_position: Optional[str] = Form("lower_center"),
+    platform_handles: Optional[str] = Form(None),
     project_service: ProjectService = Depends(get_project_service)
 ):
     """Upload video file and optional subtitle file to create a new project. If no subtitle is provided, Whisper will automatically generate one."""
@@ -67,6 +68,13 @@ async def upload_files(
         if srt_file and not srt_file.filename.lower().endswith('.srt'):
             raise HTTPException(status_code=400, detail="Invalid subtitle file format")
         
+        parsed_platform_handles = None
+        if platform_handles:
+            try:
+                parsed_platform_handles = json.loads(platform_handles) if isinstance(platform_handles, str) else platform_handles
+            except Exception:
+                parsed_platform_handles = None
+
         # Create project data
         subtitle_info = srt_file.filename if srt_file else "Whisper auto-generated"
         project_data = ProjectCreate(
@@ -87,7 +95,8 @@ async def upload_files(
                 "watermark_preset_id": watermark_preset_id or "none",
                 "watermark_text": watermark_text,
                 "watermark_text_opacity": watermark_text_opacity,
-                "watermark_text_position": watermark_text_position or "lower_center"
+                "watermark_text_position": watermark_text_position or "lower_center",
+                "platform_handles": parsed_platform_handles
             }
         )
         
@@ -211,6 +220,7 @@ class LocalImportRequest(BaseModel):
     watermark_text: Optional[str] = None
     watermark_text_opacity: Optional[float] = 0.50
     watermark_text_position: Optional[str] = "lower_center"
+    platform_handles: Optional[Dict[str, str]] = None
     srt_path: Optional[str] = None
 
 
@@ -248,7 +258,8 @@ async def import_local_file(
             "watermark_preset_id": data.watermark_preset_id or "none",
             "watermark_text": data.watermark_text,
             "watermark_text_opacity": data.watermark_text_opacity,
-            "watermark_text_position": data.watermark_text_position or "lower_center"
+            "watermark_text_position": data.watermark_text_position or "lower_center",
+            "platform_handles": data.platform_handles
         }
     )
 
@@ -458,8 +469,8 @@ async def update_project(
             source_url=None,
             source_file=None,
             settings=project_data.settings or {},
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
             completed_at=None,
             total_clips=0,
             total_collections=0,

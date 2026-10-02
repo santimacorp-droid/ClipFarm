@@ -74,6 +74,7 @@ class VideoGenerator:
                        watermark_text: Optional[str] = None,
                        watermark_text_opacity: float = 0.50,
                        watermark_text_position: str = "lower_center",
+                       platform_handles: Optional[Dict[str, str]] = None,
                        aspect_ratio: str = "9:16_blur",
                        category: str = "general",
                        tracker: Optional[Any] = None) -> List[Path]:
@@ -134,7 +135,8 @@ class VideoGenerator:
                 'recommend_reason': clip.get('recommend_reason'),
                 'watermark_text': clip.get('watermark_text') or watermark_text,
                 'watermark_text_opacity': clip.get('watermark_text_opacity') or watermark_text_opacity,
-                'watermark_text_position': clip.get('watermark_text_position') or watermark_text_position
+                'watermark_text_position': clip.get('watermark_text_position') or watermark_text_position,
+                'platform_handles': clip.get('platform_handles') or platform_handles
             })
 
         # Smart sentence boundary extension for step 6 clips
@@ -165,6 +167,7 @@ class VideoGenerator:
             watermark_text=watermark_text,
             watermark_text_opacity=watermark_text_opacity,
             watermark_text_position=watermark_text_position,
+            platform_handles=platform_handles,
             aspect_ratio=aspect_ratio,
             category=category,
             tracker=tracker
@@ -180,7 +183,13 @@ class VideoGenerator:
             raw_style = clip.get('cta_style')
             cta_style = raw_style if (raw_style and raw_style != 'none') else getattr(shared_config, 'DEFAULT_CTA_STYLE', 'follow_tap')
             cta_platform = clip.get('cta_platform') or getattr(shared_config, 'DEFAULT_CTA_PLATFORM', 'tiktok')
-            cta_handle = clip.get('cta_handle', '') or getattr(shared_config, 'DEFAULT_CTA_HANDLE', '')
+            eff_handles = clip.get('platform_handles') or platform_handles
+            cta_handle = clip.get('cta_handle', '')
+            if not cta_handle and eff_handles:
+                from ..utils.cta_overlay import get_handle_for_platform
+                cta_handle = get_handle_for_platform(cta_platform, eff_handles, default_handle="")
+            if not cta_handle:
+                cta_handle = getattr(shared_config, 'DEFAULT_CTA_HANDLE', '') or (watermark_text or '')
             cta_position = clip.get('cta_position') or getattr(shared_config, 'DEFAULT_CTA_POSITION', 'lower_center')
 
             if cta_style and cta_style != 'none' and output_video.exists():
@@ -191,7 +200,8 @@ class VideoGenerator:
                     handle=cta_handle,
                     base_style=cta_style,
                     position=cta_position,
-                    primary_platform=cta_platform
+                    primary_platform=cta_platform,
+                    platform_handles=eff_handles
                 )
                 cta_output = output_video.parent / f"{output_video.stem}_cta.mp4"
                 if cta_platforms_map:
@@ -204,6 +214,8 @@ class VideoGenerator:
                     clip['platform_videos'] = cta_platforms_map
                     clip['cta_style'] = cta_style
                     clip['cta_platform'] = cta_platform
+                    if eff_handles:
+                        clip['platform_handles'] = eff_handles
                     logger.info(f"Generated multiplatform CTA overlays for normal clip {cid}: {list(cta_platforms_map.keys())}")
 
             updated_successful_clips.append(output_video)
@@ -311,6 +323,7 @@ def run_step6_video(clips_with_titles_path: Path, collections_path: Path, input_
                    watermark_text: Optional[str] = None,
                    watermark_text_opacity: float = 0.50,
                    watermark_text_position: str = "lower_center",
+                   platform_handles: Optional[Dict[str, str]] = None,
                    aspect_ratio: str = "9:16_blur",
                    category: str = "general",
                    tracker: Optional[Any] = None) -> Dict[str, Any]:
@@ -379,6 +392,7 @@ def run_step6_video(clips_with_titles_path: Path, collections_path: Path, input_
         watermark_text=watermark_text,
         watermark_text_opacity=watermark_text_opacity,
         watermark_text_position=watermark_text_position,
+        platform_handles=platform_handles,
         aspect_ratio=aspect_ratio,
         category=category,
         tracker=tracker

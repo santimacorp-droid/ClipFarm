@@ -12,7 +12,7 @@ import sys
 import threading
 import uuid
 import zipfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -332,7 +332,7 @@ def update_campaign(campaign_id: str, body: CampaignUpdate, db: Session = Depend
         campaign.name = body.schema_json["campaign_name"]
     if "brand_name" in body.schema_json:
         campaign.brand_name = body.schema_json["brand_name"]
-    campaign.updated_at = datetime.utcnow()
+    campaign.updated_at = datetime.now(timezone.utc)
     db.commit()
     return {"status": "updated"}
 
@@ -377,7 +377,7 @@ async def upload_campaign_video(
     s_data["source_duration"] = probe_info["duration"]
     s_data["status_message"] = "Video ready for clipping"
     campaign.schema_json = json.dumps(s_data, ensure_ascii=False)
-    campaign.updated_at = datetime.utcnow()
+    campaign.updated_at = datetime.now(timezone.utc)
     db.commit()
     
     return {
@@ -430,7 +430,7 @@ def import_campaign_video_url(
     s_data["source_duration"] = probe_info["duration"]
     s_data["status_message"] = "Video downloaded and ready"
     campaign.schema_json = json.dumps(s_data, ensure_ascii=False)
-    campaign.updated_at = datetime.utcnow()
+    campaign.updated_at = datetime.now(timezone.utc)
     db.commit()
     
     return {
@@ -465,7 +465,7 @@ async def upload_campaign_logo(
         s_data = {}
     s_data["logo_url"] = str(logo_path)
     campaign.schema_json = json.dumps(s_data, ensure_ascii=False)
-    campaign.updated_at = datetime.utcnow()
+    campaign.updated_at = datetime.now(timezone.utc)
     db.commit()
     
     return {"status": "uploaded", "logo_url": str(logo_path)}
@@ -495,7 +495,7 @@ def delete_campaign_logo(campaign_id: str, db: Session = Depends(get_db)):
     if "restrictions" in s_data:
         s_data["restrictions"]["logo_required"] = False
     campaign.schema_json = json.dumps(s_data, ensure_ascii=False)
-    campaign.updated_at = datetime.utcnow()
+    campaign.updated_at = datetime.now(timezone.utc)
     db.commit()
     
     return {"status": "logo_removed"}
@@ -565,7 +565,7 @@ def select_campaign_source(campaign_id: str, body: dict = Body(...), db: Session
         s_data["source_filename"] = filename
         s_data["source_duration"] = probe["duration"]
         campaign.schema_json = json.dumps(s_data, ensure_ascii=False)
-        campaign.updated_at = datetime.utcnow()
+        campaign.updated_at = datetime.now(timezone.utc)
         db.commit()
         
     return {"status": "active_source_updated", **probe}
@@ -604,7 +604,7 @@ def run_campaign(campaign_id: str, force: bool = False, db: Session = Depends(ge
     
     if not force and campaign.status in ("downloading", "transcribing", "finding_moments", "cutting", "editing", "active"):
         # If campaign has been in running state for > 3 minutes without update, assume previous thread died
-        stale_threshold = datetime.utcnow() - timedelta(minutes=3)
+        stale_threshold = datetime.now(timezone.utc) - timedelta(minutes=3)
         if campaign.updated_at and campaign.updated_at > stale_threshold:
             raise HTTPException(status_code=409, detail="Campaign is already running")
         logger.warning(f"Campaign {campaign_id} was stuck in status '{campaign.status}'. Overriding.")
@@ -650,7 +650,7 @@ def reset_campaign_status(campaign_id: str, db: Session = Depends(get_db)):
         s_data = {}
     s_data["status_message"] = "Pipeline reset by user. Ready to cut clips."
     campaign.schema_json = json.dumps(s_data, ensure_ascii=False)
-    campaign.updated_at = datetime.utcnow()
+    campaign.updated_at = datetime.now(timezone.utc)
     db.commit()
     logger.info(f"Campaign {campaign_id} status reset to draft")
     return {"status": "reset", "campaign_id": campaign_id}
@@ -879,7 +879,7 @@ def log_clip_publish(
     schema_data = json.loads(campaign.schema_json) if campaign and campaign.schema_json else {}
     min_days = schema_data.get("compliance", {}).get("min_days_live", 30)
     
-    published_date = body.published_at or datetime.utcnow().strftime("%Y-%m-%d")
+    published_date = body.published_at or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
         expires_date = (
             datetime.strptime(published_date, "%Y-%m-%d") + timedelta(days=min_days)

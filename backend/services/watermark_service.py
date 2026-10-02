@@ -8,7 +8,7 @@ import logging
 import os
 import shutil
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from PIL import Image, ImageDraw, ImageFont
@@ -46,7 +46,7 @@ class WatermarkService:
                     "opacity": 0.85,
                     "margin": 24,
                     "is_default": True,
-                    "created_at": datetime.utcnow().isoformat()
+                    "created_at": datetime.now(timezone.utc).isoformat()
                 }
             ]
             self._save_presets(initial_presets)
@@ -148,7 +148,7 @@ class WatermarkService:
             "opacity": max(0.05, min(1.0, float(opacity))),
             "margin": max(0, min(120, int(margin))),
             "is_default": bool(is_default),
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
 
         presets = self._load_presets()

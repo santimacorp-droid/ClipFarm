@@ -965,6 +965,7 @@ class VideoProcessor:
         watermark_text: Optional[str] = None,
         watermark_text_opacity: float = 0.50,
         watermark_text_position: str = "lower_center",
+        platform_handles: Optional[Dict[str, str]] = None,
         aspect_ratio: str = "9:16",
         dynamic_zoom: bool = False,
         bgm_track: Optional[str] = None,
@@ -1068,6 +1069,7 @@ class VideoProcessor:
                         watermark_text=watermark_text,
                         watermark_text_opacity=watermark_text_opacity,
                         watermark_text_position=watermark_text_position,
+                        platform_handles=platform_handles,
                         aspect_ratio=aspect_ratio,
                         dynamic_zoom=dynamic_zoom,
                         bgm_track=bgm_track,
@@ -1115,6 +1117,7 @@ class VideoProcessor:
                             watermark_text=watermark_text,
                             watermark_text_opacity=watermark_text_opacity,
                             watermark_text_position=watermark_text_position,
+                            platform_handles=platform_handles,
                             aspect_ratio=aspect_ratio,
                             dynamic_zoom=dynamic_zoom,
                             bgm_track=bgm_track,
@@ -1146,6 +1149,10 @@ class VideoProcessor:
                     watermark_scale=watermark_scale,
                     watermark_opacity=watermark_opacity,
                     watermark_margin=watermark_margin,
+                    watermark_text=watermark_text,
+                    watermark_text_opacity=watermark_text_opacity,
+                    watermark_text_position=watermark_text_position,
+                    platform_handles=platform_handles,
                     aspect_ratio=aspect_ratio,
                     dynamic_zoom=dynamic_zoom,
                     bgm_track=bgm_track,
@@ -1179,6 +1186,7 @@ class VideoProcessor:
         watermark_text: Optional[str] = None,
         watermark_text_opacity: float = 0.50,
         watermark_text_position: str = "lower_center",
+        platform_handles: Optional[Dict[str, str]] = None,
         aspect_ratio: str = "9:16",
         dynamic_zoom: bool = False,
         bgm_track: Optional[str] = None,
@@ -1248,16 +1256,21 @@ class VideoProcessor:
             if effective_wm_text and str(effective_wm_text).strip() and str(effective_wm_text).lower() != 'none':
                 try:
                     from .watermark_processor import render_text_watermark
+                    from .cta_overlay import get_handle_for_platform
+                    target_platform = clip_data.get('cta_platform') or clip_data.get('platform') or ('tiktok' if 'tiktok' in str(clip_data.get('duration_mode', '')) else 'tiktok')
+                    plat_handles = clip_data.get('platform_handles') or platform_handles or getattr(self, 'platform_handles', None)
+                    resolved_text = get_handle_for_platform(target_platform, plat_handles or effective_wm_text, default_handle=str(effective_wm_text).strip())
                     text_wm_png = output_path.parent / f"{output_path.stem}_handle_wm.png"
                     render_text_watermark(
-                        text=str(effective_wm_text).strip(),
+                        text=resolved_text,
+                        platform=target_platform,
                         output_path=text_wm_png,
                         opacity=effective_wm_opacity
                     )
                     if not text_wm_png.exists() or text_wm_png.stat().st_size == 0:
                         text_wm_png = None
                     else:
-                        logger.info(f"Generated text watermark PNG for clip {clip_id}: '{effective_wm_text}' -> {text_wm_png}")
+                        logger.info(f"Generated text watermark PNG for clip {clip_id} ({target_platform}): '{resolved_text}' -> {text_wm_png}")
                 except Exception as tw_err:
                     logger.debug(f"Failed to render text handle watermark: {tw_err}")
                     text_wm_png = None
@@ -1297,21 +1310,23 @@ class VideoProcessor:
                     )
 
                     # If subtitle burn-in is enabled (style is not none)
-                    active_style = caption_style if (caption_style and caption_style.lower() != "none") else "hormozi_yellow"
-                    if ViralCaptionGenerator.generate_clip_ass(
-                        source_srt_path=srt_path,
-                        clip_start=start_sec,
-                        clip_end=end_sec,
-                        output_ass_path=clip_ass_path,
-                        style_key=active_style,
-                        hook_title=None,
-                        show_hook_banner=False,
-                        video_width=target_width,
-                        video_height=target_height,
-                        words_data=words_data,
-                        word_segments=words_data
-                    ):
-                        ass_to_burn = clip_ass_path
+                    if caption_style and str(caption_style).lower() != "none":
+                        active_style = caption_style
+                        if ViralCaptionGenerator.generate_clip_ass(
+                            source_srt_path=srt_path,
+                            clip_start=start_sec,
+                            clip_end=end_sec,
+                            output_ass_path=clip_ass_path,
+                            style_key=active_style,
+                            hook_title=None,
+                            show_hook_banner=False,
+                            video_width=target_width,
+                            video_height=target_height,
+                            words_data=words_data,
+                            word_segments=words_data,
+                            media_path=input_video
+                        ):
+                            ass_to_burn = clip_ass_path
                 except Exception as cap_err:
                     logger.warning(f"Failed to generate subtitle files for clip {clip_id}: {cap_err}")
 

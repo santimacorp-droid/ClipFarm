@@ -16,7 +16,7 @@ from backend.services.pipeline_adapter import create_pipeline_adapter
 from backend.core.database import SessionLocal
 from backend.models.project import Project, ProjectStatus
 from backend.models.task import Task, TaskStatus, TaskType
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ def process_video_pipeline(
                 project = db.query(Project).filter(Project.id == project_id).first()
                 if project:
                     project.status = ProjectStatus.FAILED
-                    project.updated_at = datetime.utcnow()
+                    project.updated_at = datetime.now(timezone.utc)
                     logger.info(f"Project status updated to Failed: {project_id}")
                 
                 db.commit()
@@ -173,8 +173,8 @@ def process_video_pipeline(
                 project = db.query(Project).filter(Project.id == project_id).first()
                 if project:
                     project.status = ProjectStatus.COMPLETED
-                    project.completed_at = datetime.utcnow()
-                    project.updated_at = datetime.utcnow()
+                    project.completed_at = datetime.now(timezone.utc)
+                    project.updated_at = datetime.now(timezone.utc)
                     logger.info(f"Project status updated to Done: {project_id}")
                 
                 db.commit()
@@ -221,7 +221,7 @@ def process_video_pipeline(
                 project = db.query(Project).filter(Project.id == project_id).first()
                 if project:
                     project.status = ProjectStatus.FAILED
-                    project.updated_at = datetime.utcnow()
+                    project.updated_at = datetime.now(timezone.utc)
                     logger.info(f"Project status updated to Failed: {project_id}")
                 
                 db.commit()

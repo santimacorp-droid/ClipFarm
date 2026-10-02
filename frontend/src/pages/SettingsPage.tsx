@@ -48,6 +48,7 @@ import WatermarkManager from '../components/WatermarkManager'
 import { isDesktopMode } from '../utils/desktopMode'
 import { trackApiKeyConfigured } from '../appEvents/events'
 import { isAnalyticsEnabled, setAnalyticsEnabled } from '../appEvents/client'
+import { getLocalCredentials, saveLocalCredentials } from '../utils/localCredentials'
 import './SettingsPage.css'
 
 const { Content } = Layout
@@ -262,27 +263,30 @@ const SettingsPage: React.FC = () => {
         setTokenStats(tokenStatsRes.value)
       }
 
-      const providerName = providerData.provider || 'dashscope'
+      // Check local browser credentials
+      const localCreds = getLocalCredentials()
+
+      const providerName = settingsData.api?.llm_provider || localCreds.provider || providerData.provider || 'gemini'
       setCurrentProvider(providerData)
       
-      const modelName = settingsData.api?.api_model || providerData.model || 'qwen-plus-character'
+      const modelName = settingsData.api?.api_model || localCreds.model || providerData.model || 'gemini-1.5-flash'
       setActiveModelName(modelName)
 
-      // Convert nested settings structure to flat structure
+      // Convert nested settings structure to flat structure, prioritizing backend then local credentials
       const flatSettings = {
         llm_provider: providerName,
-        dashscope_api_key: settingsData.api?.api_keys?.dashscope || '',
-        openai_api_key: settingsData.api?.api_keys?.openai || '',
-        gemini_api_key: settingsData.api?.api_keys?.gemini || '',
-        anthropic_api_key: settingsData.api?.api_keys?.anthropic || '',
-        deepseek_api_key: settingsData.api?.api_keys?.deepseek || '',
-        openrouter_api_key: settingsData.api?.api_keys?.openrouter || '',
-        groq_api_key: settingsData.api?.api_keys?.groq || '',
-        siliconflow_api_key: settingsData.api?.api_keys?.siliconflow || '',
-        custom_api_key: settingsData.api?.api_keys?.custom || '',
-        ollama_api_key: settingsData.api?.api_keys?.ollama || '',
-        lmstudio_api_key: settingsData.api?.api_keys?.lmstudio || '',
-        custom_base_url: settingsData.api?.custom_base_url || '',
+        dashscope_api_key: settingsData.api?.api_keys?.dashscope || localCreds.apiKeys.dashscope || '',
+        openai_api_key: settingsData.api?.api_keys?.openai || localCreds.apiKeys.openai || '',
+        gemini_api_key: settingsData.api?.api_keys?.gemini || localCreds.apiKeys.gemini || '',
+        anthropic_api_key: settingsData.api?.api_keys?.anthropic || localCreds.apiKeys.anthropic || '',
+        deepseek_api_key: settingsData.api?.api_keys?.deepseek || localCreds.apiKeys.deepseek || '',
+        openrouter_api_key: settingsData.api?.api_keys?.openrouter || localCreds.apiKeys.openrouter || '',
+        groq_api_key: settingsData.api?.api_keys?.groq || localCreds.apiKeys.groq || '',
+        siliconflow_api_key: settingsData.api?.api_keys?.siliconflow || localCreds.apiKeys.siliconflow || '',
+        custom_api_key: settingsData.api?.api_keys?.custom || localCreds.apiKeys.custom || '',
+        ollama_api_key: settingsData.api?.api_keys?.ollama || localCreds.apiKeys.ollama || '',
+        lmstudio_api_key: settingsData.api?.api_keys?.lmstudio || localCreds.apiKeys.lmstudio || '',
+        custom_base_url: settingsData.api?.custom_base_url || localCreds.baseUrl || '',
         jimeng_access_key: settingsData.api?.api_keys?.jimeng_access || '',
         jimeng_secret_key: settingsData.api?.api_keys?.jimeng_secret || '',
         model_name: modelName,
@@ -337,7 +341,28 @@ const SettingsPage: React.FC = () => {
       
       // Get existingAPI keys, Only update fields with values
       const existingApiKeys = existingSettings?.api?.api_keys || {}
+      const localCreds = getLocalCredentials()
       
+      // Save locally to localStorage first
+      saveLocalCredentials({
+        provider: selectedProvider,
+        model: values.model_name,
+        baseUrl: values.custom_base_url,
+        allKeys: {
+          dashscope: values.dashscope_api_key || existingApiKeys.dashscope || localCreds.apiKeys.dashscope || "",
+          openai: values.openai_api_key || existingApiKeys.openai || localCreds.apiKeys.openai || "",
+          gemini: values.gemini_api_key || existingApiKeys.gemini || localCreds.apiKeys.gemini || "",
+          anthropic: values.anthropic_api_key || existingApiKeys.anthropic || localCreds.apiKeys.anthropic || "",
+          deepseek: values.deepseek_api_key || existingApiKeys.deepseek || localCreds.apiKeys.deepseek || "",
+          openrouter: values.openrouter_api_key || existingApiKeys.openrouter || localCreds.apiKeys.openrouter || "",
+          groq: values.groq_api_key || existingApiKeys.groq || localCreds.apiKeys.groq || "",
+          siliconflow: values.siliconflow_api_key || existingApiKeys.siliconflow || localCreds.apiKeys.siliconflow || "",
+          custom: values.custom_api_key || existingApiKeys.custom || localCreds.apiKeys.custom || "",
+          ollama: values.ollama_api_key || existingApiKeys.ollama || localCreds.apiKeys.ollama || "",
+          lmstudio: values.lmstudio_api_key || existingApiKeys.lmstudio || localCreds.apiKeys.lmstudio || "",
+        }
+      })
+
       // Convert flat data to nested structure expected by backend
       const backendSettings = {
         basic: {
@@ -353,17 +378,17 @@ const SettingsPage: React.FC = () => {
         },
           api: {
             api_keys: {
-              dashscope: values.dashscope_api_key || existingApiKeys.dashscope || "",
-              openai: values.openai_api_key || existingApiKeys.openai || "",
-              gemini: values.gemini_api_key || existingApiKeys.gemini || "",
-              anthropic: values.anthropic_api_key || existingApiKeys.anthropic || "",
-              deepseek: values.deepseek_api_key || existingApiKeys.deepseek || "",
-              openrouter: values.openrouter_api_key || existingApiKeys.openrouter || "",
-              groq: values.groq_api_key || existingApiKeys.groq || "",
-              siliconflow: values.siliconflow_api_key || existingApiKeys.siliconflow || "",
-              custom: values.custom_api_key || existingApiKeys.custom || "",
-              ollama: values.ollama_api_key || existingApiKeys.ollama || "",
-              lmstudio: values.lmstudio_api_key || existingApiKeys.lmstudio || "",
+              dashscope: values.dashscope_api_key || existingApiKeys.dashscope || localCreds.apiKeys.dashscope || "",
+              openai: values.openai_api_key || existingApiKeys.openai || localCreds.apiKeys.openai || "",
+              gemini: values.gemini_api_key || existingApiKeys.gemini || localCreds.apiKeys.gemini || "",
+              anthropic: values.anthropic_api_key || existingApiKeys.anthropic || localCreds.apiKeys.anthropic || "",
+              deepseek: values.deepseek_api_key || existingApiKeys.deepseek || localCreds.apiKeys.deepseek || "",
+              openrouter: values.openrouter_api_key || existingApiKeys.openrouter || localCreds.apiKeys.openrouter || "",
+              groq: values.groq_api_key || existingApiKeys.groq || localCreds.apiKeys.groq || "",
+              siliconflow: values.siliconflow_api_key || existingApiKeys.siliconflow || localCreds.apiKeys.siliconflow || "",
+              custom: values.custom_api_key || existingApiKeys.custom || localCreds.apiKeys.custom || "",
+              ollama: values.ollama_api_key || existingApiKeys.ollama || localCreds.apiKeys.ollama || "",
+              lmstudio: values.lmstudio_api_key || existingApiKeys.lmstudio || localCreds.apiKeys.lmstudio || "",
               jimeng_access: values.jimeng_access_key || existingApiKeys.jimeng_access || "",
               jimeng_secret: values.jimeng_secret_key || existingApiKeys.jimeng_secret || ""
             },

@@ -29,9 +29,12 @@ import {
   DragOutlined, 
   AimOutlined, 
   MobileOutlined, 
-  DesktopOutlined 
+  DesktopOutlined,
+  ShareAltOutlined,
+  SaveOutlined
 } from '@ant-design/icons'
 import { watermarkApi, WatermarkPreset } from '../services/api'
+import { getLocalPlatformHandles, saveLocalPlatformHandles, LocalPlatformHandles } from '../utils/localCredentials'
 
 const { Text, Paragraph } = Typography
 
@@ -69,6 +72,10 @@ export const WatermarkManager: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false)
   const [previewAspect, setPreviewAspect] = useState<'9_16' | '16_9'>('9_16')
 
+  // Multiplatform creator handles state
+  const [platformHandles, setPlatformHandles] = useState<LocalPlatformHandles>(() => getLocalPlatformHandles())
+  const [savingHandles, setSavingHandles] = useState(false)
+
   const loadPresets = async () => {
     setLoading(true)
     try {
@@ -84,7 +91,22 @@ export const WatermarkManager: React.FC = () => {
 
   useEffect(() => {
     loadPresets()
+
+    const handleHandlesUpdated = () => {
+      setPlatformHandles(getLocalPlatformHandles())
+    }
+    window.addEventListener('clipfarm_platform_handles_updated', handleHandlesUpdated)
+    return () => {
+      window.removeEventListener('clipfarm_platform_handles_updated', handleHandlesUpdated)
+    }
   }, [])
+
+  const handleSaveHandles = () => {
+    setSavingHandles(true)
+    saveLocalPlatformHandles(platformHandles)
+    message.success('Default platform handles saved successfully!')
+    setSavingHandles(false)
+  }
 
   const handleOpenCreateModal = () => {
     setEditingPreset(null)
@@ -454,6 +476,198 @@ export const WatermarkManager: React.FC = () => {
         pagination={false}
         style={{ marginBottom: '20px' }}
       />
+
+      <Divider style={{ borderColor: 'rgba(255, 255, 255, 0.1)', margin: '28px 0 20px 0' }} />
+
+      {/* Default Multiplatform Creator Handles & Watermarks */}
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.02)',
+        borderRadius: '8px',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        padding: '20px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShareAltOutlined style={{ color: '#00f2fe', fontSize: '18px' }} />
+              <Text strong style={{ color: '#ffffff', fontSize: '16px' }}>
+                Default Multiplatform Handles & Watermark Badges
+              </Text>
+            </div>
+            <Paragraph style={{ color: 'var(--ac-sub)', margin: '4px 0 0 0', fontSize: '12px' }}>
+              Configure your default handles per social platform. ClipFarm will burn authentic vector badges (TikTok music note, YouTube Shorts play, Instagram camera, Facebook) and your handle onto clips exported for each destination.
+            </Paragraph>
+          </div>
+          <Button
+            type="primary"
+            icon={<SaveOutlined />}
+            loading={savingHandles}
+            onClick={handleSaveHandles}
+            style={{
+              background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+              border: 'none',
+              fontWeight: 600
+            }}
+          >
+            Save Default Handles
+          </Button>
+        </div>
+
+        {/* 4-Platform Input Cards */}
+        <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
+          <Col xs={24} sm={12} md={6}>
+            <div style={{
+              background: 'rgba(0, 0, 0, 0.25)',
+              borderRadius: '6px',
+              padding: '12px',
+              border: '1px solid rgba(0, 242, 254, 0.25)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                <span style={{ fontSize: '15px' }}>🎵</span>
+                <Text strong style={{ color: '#00f2fe', fontSize: '13px' }}>TikTok Handle</Text>
+              </div>
+              <Input
+                placeholder="@your_tiktok"
+                value={platformHandles.tiktok || ''}
+                onChange={e => setPlatformHandles(prev => ({ ...prev, tiktok: e.target.value }))}
+                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,242,254,0.3)', color: '#fff' }}
+              />
+              <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--ac-sub)' }}>
+                Watermark Badge Preview:
+                <div style={{
+                  marginTop: '4px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(0, 0, 0, 0.65)',
+                  padding: '3px 8px',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(0, 242, 254, 0.5)',
+                  color: '#ffffff',
+                  fontSize: '11px'
+                }}>
+                  <span style={{ color: '#00f2fe' }}>🎵</span>
+                  <span>{platformHandles.tiktok || '@your_tiktok'}</span>
+                </div>
+              </div>
+            </div>
+          </Col>
+
+          <Col xs={24} sm={12} md={6}>
+            <div style={{
+              background: 'rgba(0, 0, 0, 0.25)',
+              borderRadius: '6px',
+              padding: '12px',
+              border: '1px solid rgba(255, 77, 79, 0.25)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                <span style={{ fontSize: '15px' }}>▶️</span>
+                <Text strong style={{ color: '#ff4d4f', fontSize: '13px' }}>YouTube Shorts</Text>
+              </div>
+              <Input
+                placeholder="@your_channel"
+                value={platformHandles.youtube_shorts || ''}
+                onChange={e => setPlatformHandles(prev => ({ ...prev, youtube_shorts: e.target.value }))}
+                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,77,79,0.3)', color: '#fff' }}
+              />
+              <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--ac-sub)' }}>
+                Watermark Badge Preview:
+                <div style={{
+                  marginTop: '4px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(0, 0, 0, 0.65)',
+                  padding: '3px 8px',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255, 77, 79, 0.5)',
+                  color: '#ffffff',
+                  fontSize: '11px'
+                }}>
+                  <span style={{ color: '#ff4d4f' }}>▶️</span>
+                  <span>{platformHandles.youtube_shorts || '@your_channel'}</span>
+                </div>
+              </div>
+            </div>
+          </Col>
+
+          <Col xs={24} sm={12} md={6}>
+            <div style={{
+              background: 'rgba(0, 0, 0, 0.25)',
+              borderRadius: '6px',
+              padding: '12px',
+              border: '1px solid rgba(247, 89, 171, 0.25)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                <span style={{ fontSize: '15px' }}>📸</span>
+                <Text strong style={{ color: '#f759ab', fontSize: '13px' }}>Instagram</Text>
+              </div>
+              <Input
+                placeholder="@your_instagram"
+                value={platformHandles.instagram || ''}
+                onChange={e => setPlatformHandles(prev => ({ ...prev, instagram: e.target.value }))}
+                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(247,89,171,0.3)', color: '#fff' }}
+              />
+              <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--ac-sub)' }}>
+                Watermark Badge Preview:
+                <div style={{
+                  marginTop: '4px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(0, 0, 0, 0.65)',
+                  padding: '3px 8px',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(247, 89, 171, 0.5)',
+                  color: '#ffffff',
+                  fontSize: '11px'
+                }}>
+                  <span style={{ color: '#f759ab' }}>📸</span>
+                  <span>{platformHandles.instagram || '@your_instagram'}</span>
+                </div>
+              </div>
+            </div>
+          </Col>
+
+          <Col xs={24} sm={12} md={6}>
+            <div style={{
+              background: 'rgba(0, 0, 0, 0.25)',
+              borderRadius: '6px',
+              padding: '12px',
+              border: '1px solid rgba(24, 144, 255, 0.25)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                <span style={{ fontSize: '15px' }}>👥</span>
+                <Text strong style={{ color: '#1890ff', fontSize: '13px' }}>Facebook Page</Text>
+              </div>
+              <Input
+                placeholder="@your_facebook"
+                value={platformHandles.facebook || ''}
+                onChange={e => setPlatformHandles(prev => ({ ...prev, facebook: e.target.value }))}
+                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(24,144,255,0.3)', color: '#fff' }}
+              />
+              <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--ac-sub)' }}>
+                Watermark Badge Preview:
+                <div style={{
+                  marginTop: '4px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(0, 0, 0, 0.65)',
+                  padding: '3px 8px',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(24, 144, 255, 0.5)',
+                  color: '#ffffff',
+                  fontSize: '11px'
+                }}>
+                  <span style={{ color: '#1890ff' }}>👥</span>
+                  <span>{platformHandles.facebook || '@your_facebook'}</span>
+                </div>
+              </div>
+            </div>
+          </Col>
+        </Row>
+      </div>
 
       {/* Create / Edit Preset Modal */}
       <Modal
